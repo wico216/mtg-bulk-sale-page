@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 2 - Card Catalog
+**Current focus:** Phase 3 - Search and Filters
 
 ## Current Position
 
-Phase: 2 of 5 (Card Catalog) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase Complete
-Last activity: 2026-04-02 -- Completed 02-03 (Card Detail Modal)
+Phase: 3 of 5 (Search and Filters)
+Plan: 1 of 3 in current phase
+Status: In Progress
+Last activity: 2026-04-02 -- Completed 03-01 (Filter Store and Search)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
@@ -29,10 +29,11 @@ Progress: [██████░░░░] 60%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 02 | 3 | 15min | 5min |
+| 03 | 1 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (2min), 01-03 (2min), 02-01 (1min), 02-02 (2min), 02-03 (12min)
-- Trend: stable (02-03 longer due to checkpoint feedback cycle)
+- Last 5 plans: 01-03 (2min), 02-01 (1min), 02-02 (2min), 02-03 (12min), 03-01 (2min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -54,6 +55,9 @@ Recent decisions affecting current work:
 - [02-01]: Oracle text for DFC joined with ' // ' separator matching Scryfall convention
 - [02-03]: Scroll lock in card-grid.tsx via useEffect, keeping card-modal.tsx presentational
 - [02-03]: Mana symbols rendered as Scryfall SVG CDN icons parsed from {X} syntax
+- [03-01]: Zustand 5 curried create pattern for TypeScript; Set toggles use new Set() for reactivity
+- [03-01]: Color filter OR logic with colorless (C) as special case checking empty colorIdentity
+- [03-01]: Null prices sort to end in both price-desc and price-asc
 
 ### Pending Todos
 
@@ -66,5 +70,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 02-03-PLAN.md -- Phase 02 complete, ready for Phase 03
-Resume file: .planning/ROADMAP.md
+Stopped at: Completed 03-01-PLAN.md -- Filter store and search bar in place, ready for 03-02
+Resume file: .planning/phases/03-search-and-filters/03-02-PLAN.md
