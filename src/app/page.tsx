@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { CardData } from "@/lib/types";
 import Header from "@/components/header";
+import FilterBar from "@/components/filter-bar";
 import CardGrid from "@/components/card-grid";
 
 function loadCardData(): CardData | null {
@@ -36,6 +37,7 @@ export default function Home() {
   return (
     <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <Header />
+      <FilterBar />
       <main className="pt-6">
         <CardGrid cards={data.cards} meta={data.meta} />
       </main>

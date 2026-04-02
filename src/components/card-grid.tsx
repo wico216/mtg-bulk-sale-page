@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Card, CardData } from "@/lib/types";
+import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
 import CardModal from "@/components/card-modal";
 
@@ -11,8 +12,16 @@ interface CardGridProps {
 }
 
 export default function CardGrid({ cards, meta }: CardGridProps) {
+  const setAllCards = useFilterStore((s) => s.setAllCards);
+  const filteredCards = useFilterStore((s) => s.getFilteredCards());
+  const clearFilters = useFilterStore((s) => s.clearFilters);
+
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAllCards(cards);
+  }, [cards, setAllCards]);
 
   useEffect(() => {
     if (selectedCard || lightboxUrl) {
@@ -41,15 +50,27 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-8">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
-        {cards.map((card) => (
-          <CardTile
-            key={card.id}
-            card={card}
-            onClick={() => setSelectedCard(card)}
-          />
-        ))}
-      </div>
+      {filteredCards.length === 0 && cards.length > 0 ? (
+        <div className="text-center py-16">
+          <p className="text-zinc-500 mb-3">No cards match your filters</p>
+          <button
+            onClick={clearFilters}
+            className="text-sm text-accent hover:text-accent-hover cursor-pointer"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
+          {filteredCards.map((card) => (
+            <CardTile
+              key={card.id}
+              card={card}
+              onClick={() => setSelectedCard(card)}
+            />
+          ))}
+        </div>
+      )}
       {selectedCard && (
         <CardModal
           card={selectedCard}
