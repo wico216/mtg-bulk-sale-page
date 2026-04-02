@@ -1,19 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { CardData } from "@/lib/types";
+import { loadCardData } from "@/lib/load-cards";
 import Header from "@/components/header";
 import FilterBar from "@/components/filter-bar";
 import CardGrid from "@/components/card-grid";
-
-function loadCardData(): CardData | null {
-  try {
-    const filePath = resolve(process.cwd(), "data/generated/cards.json");
-    const raw = readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as CardData;
-  } catch {
-    return null;
-  }
-}
 
 export default function Home() {
   const data = loadCardData();
