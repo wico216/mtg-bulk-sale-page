@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 1 of 5 (Data Pipeline)
-Plan: 0 of 4 in current phase
-Status: Ready to plan
-Last activity: 2026-04-02 -- Roadmap created with 5 phases, 18 plans, 22 requirements mapped
+Plan: 1 of 3 in current phase
+Status: Executing
+Last activity: 2026-04-02 -- Completed 01-01 (CSV Parsing and Card Model)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 6%
 
 ## Performance Metrics
 
@@ -27,11 +27,11 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01 | 1 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01 (4min)
+- Trend: baseline
 
 *Updated after each plan completion*
 
@@ -45,6 +45,8 @@ Recent decisions affecting current work:
 - [Roadmap]: Stack is Next.js 16 (SSG) + Tailwind + Zustand + PapaParse + Scryfall API + Resend
 - [Roadmap]: Static site with build-time Scryfall enrichment (not runtime) to respect rate limits
 - [Roadmap]: Zero database -- card data generated at build time from CSV
+- [01-01]: Composite dedup key: setCode-collectorNumber-foil-condition for distinct card listings
+- [01-01]: String-coerce collectorNumber from PapaParse dynamicTyping to avoid numeric type mismatch
 
 ### Pending Todos
 
@@ -52,11 +54,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Need a Manabox CSV sample file to confirm field mapping (Phase 1)
 - Resend free tier limits need verification at signup (Phase 5)
 
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-data-pipeline/01-CONTEXT.md
+Stopped at: Completed 01-01-PLAN.md
+Resume file: .planning/phases/01-data-pipeline/01-01-SUMMARY.md
