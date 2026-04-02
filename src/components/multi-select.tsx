@@ -8,6 +8,7 @@ interface MultiSelectProps {
   selected: Set<string>;
   onToggle: (value: string) => void;
   formatOption?: (value: string) => string;
+  dropUp?: boolean;
 }
 
 export default function MultiSelect({
@@ -16,6 +17,7 @@ export default function MultiSelect({
   selected,
   onToggle,
   formatOption,
+  dropUp,
 }: MultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -41,7 +43,7 @@ export default function MultiSelect({
           />
 
           {/* Dropdown panel */}
-          <div className="absolute top-full mt-1 z-30 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg min-w-[200px] max-h-60 overflow-y-auto">
+          <div className={`absolute ${dropUp ? "bottom-full mb-1" : "top-full mt-1"} z-30 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg min-w-[200px] max-h-60 overflow-y-auto`}>
             {options.map((option) => (
               <label
                 key={option}

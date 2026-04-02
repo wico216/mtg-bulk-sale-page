@@ -16,7 +16,7 @@ export default function SortDropdown() {
     <select
       value={sortBy}
       onChange={(e) => setSortBy(e.target.value as SortOption)}
-      className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm cursor-pointer"
+      className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm cursor-pointer"
     >
       {SORT_OPTIONS.map(({ value, label }) => (
         <option key={value} value={value}>
