@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import type { Card } from "@/lib/types";
+import { useCartStore } from "@/lib/store/cart-store";
 
 const CONDITION_MAP: Record<string, string> = {
   near_mint: "NM",
@@ -24,6 +27,12 @@ interface CardTileProps {
 }
 
 export default function CardTile({ card, onClick }: CardTileProps) {
+  const inCart = useCartStore((s) => s.hasItem(card.id));
+  const qty = useCartStore((s) => s.getQuantity(card.id));
+  const addItem = useCartStore((s) => s.addItem);
+  const setQuantity = useCartStore((s) => s.setQuantity);
+  const removeItem = useCartStore((s) => s.removeItem);
+
   return (
     <button
       type="button"
@@ -63,6 +72,73 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           {formatCondition(card.condition)} x{card.quantity}
         </p>
       </div>
+
+      {/* Cart controls */}
+      {!inCart ? (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            addItem(card.id, card.quantity);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              addItem(card.id, card.quantity);
+            }
+          }}
+          className="mt-2 w-full py-1.5 text-xs font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors block text-center"
+        >
+          Add to cart
+        </span>
+      ) : (
+        <div
+          className="mt-2 flex items-center justify-center gap-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={() =>
+              qty <= 1
+                ? removeItem(card.id)
+                : setQuantity(card.id, qty - 1, card.quantity)
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                qty <= 1
+                  ? removeItem(card.id)
+                  : setQuantity(card.id, qty - 1, card.quantity);
+              }
+            }}
+            className="w-7 h-7 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          >
+            -
+          </span>
+          <span className="text-sm font-medium min-w-[2ch] text-center">
+            {qty}
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                setQuantity(card.id, qty + 1, card.quantity);
+              }
+            }}
+            aria-disabled={qty >= card.quantity}
+            className={`w-7 h-7 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium transition-colors ${
+              qty >= card.quantity
+                ? "opacity-30 cursor-not-allowed"
+                : "hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+            }`}
+          >
+            +
+          </span>
+        </div>
+      )}
     </button>
   );
 }

@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import type { Card } from "@/lib/types";
+import { useCartStore } from "@/lib/store/cart-store";
 
 const CONDITION_MAP: Record<string, string> = {
   near_mint: "NM",
@@ -59,6 +62,12 @@ interface CardModalProps {
 }
 
 export default function CardModal({ card, onClose, onImageClick }: CardModalProps) {
+  const inCart = useCartStore((s) => s.hasItem(card.id));
+  const qty = useCartStore((s) => s.getQuantity(card.id));
+  const addItem = useCartStore((s) => s.addItem);
+  const setQuantity = useCartStore((s) => s.setQuantity);
+  const removeItem = useCartStore((s) => s.removeItem);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 md:p-8"
@@ -123,6 +132,43 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
           <p className="text-sm text-zinc-600 mb-1">
             {formatCondition(card.condition)} &mdash; Qty: {card.quantity}
           </p>
+
+          {/* Cart controls */}
+          {!inCart ? (
+            <button
+              type="button"
+              onClick={() => addItem(card.id, card.quantity)}
+              className="mt-3 px-5 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
+            >
+              Add to cart
+            </button>
+          ) : (
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  qty <= 1
+                    ? removeItem(card.id)
+                    : setQuantity(card.id, qty - 1, card.quantity)
+                }
+                className="w-8 h-8 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                -
+              </button>
+              <span className="text-base font-medium min-w-[2ch] text-center">
+                {qty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
+                disabled={qty >= card.quantity}
+                className="w-8 h-8 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                +
+              </button>
+              <span className="text-sm text-zinc-400 ml-2">in cart</span>
+            </div>
+          )}
 
           {card.oracleText ? (
             <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-line mt-4 pt-4 border-t border-zinc-100">
