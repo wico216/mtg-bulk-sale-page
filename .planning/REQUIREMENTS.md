@@ -1,4 +1,4 @@
-# Requirements: Viki — MTG Bulk Store
+# Requirements: Viki -- MTG Bulk Store
 
 **Defined:** 2026-04-02
 **Core Value:** Friends can easily find and order cards from your bulk collection without friction
@@ -59,7 +59,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| Payment processing | Friends pay in person — no Stripe/payment complexity |
+| Payment processing | Friends pay in person -- no Stripe/payment complexity |
 | User accounts / login | Unnecessary for friend circle |
 | Admin dashboard | CSV re-upload + rebuild is sufficient |
 | Real-time inventory sync | Manual CSV re-upload when stock changes |
@@ -77,34 +77,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| CATL-01 | — | Pending |
-| CATL-02 | — | Pending |
-| CATL-03 | — | Pending |
-| CATL-04 | — | Pending |
-| CATL-05 | — | Pending |
-| CATL-06 | — | Pending |
-| CATL-07 | — | Pending |
-| CATL-08 | — | Pending |
-| CART-01 | — | Pending |
-| CART-02 | — | Pending |
-| CART-03 | — | Pending |
-| CART-04 | — | Pending |
-| CART-05 | — | Pending |
-| CHKT-01 | — | Pending |
-| CHKT-02 | — | Pending |
-| CHKT-03 | — | Pending |
-| CHKT-04 | — | Pending |
-| CHKT-05 | — | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Pending |
+| CATL-01 | Phase 2 | Pending |
+| CATL-02 | Phase 3 | Pending |
+| CATL-03 | Phase 3 | Pending |
+| CATL-04 | Phase 3 | Pending |
+| CATL-05 | Phase 3 | Pending |
+| CATL-06 | Phase 3 | Pending |
+| CATL-07 | Phase 2 | Pending |
+| CATL-08 | Phase 2 | Pending |
+| CART-01 | Phase 4 | Pending |
+| CART-02 | Phase 4 | Pending |
+| CART-03 | Phase 4 | Pending |
+| CART-04 | Phase 4 | Pending |
+| CART-05 | Phase 4 | Pending |
+| CHKT-01 | Phase 5 | Pending |
+| CHKT-02 | Phase 5 | Pending |
+| CHKT-03 | Phase 5 | Pending |
+| CHKT-04 | Phase 5 | Pending |
+| CHKT-05 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after initial definition*
+*Last updated: 2026-04-02 after roadmap creation*
