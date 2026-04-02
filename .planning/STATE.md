@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 1 of 5 (Data Pipeline)
-Plan: 2 of 3 in current phase
-Status: Executing
-Last activity: 2026-04-02 -- Completed 01-02 (Scryfall API Integration)
+Phase: 1 of 5 (Data Pipeline) -- COMPLETE
+Plan: 3 of 3 in current phase
+Status: Phase Complete
+Last activity: 2026-04-02 -- Completed 01-03 (Build-Time Data Generation)
 
-Progress: [████░░░░░░] 13%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
@@ -27,11 +27,11 @@ Progress: [████░░░░░░] 13%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 2 | 6min | 3min |
+| 01 | 3 | 8min | 2.7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (2min)
-- Trend: improving
+- Last 5 plans: 01-01 (4min), 01-02 (2min), 01-03 (2min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -49,6 +49,7 @@ Recent decisions affecting current work:
 - [01-01]: String-coerce collectorNumber from PapaParse dynamicTyping to avoid numeric type mismatch
 - [01-02]: No name+set fallback needed: SLD high collector numbers resolve via standard Scryfall endpoint
 - [01-02]: Price fallback chain: usd -> usd_foil -> usd_etched -> null covers all printings
+- [01-03]: Chain generate before next build so cards.json is always fresh on deploy
 
 ### Pending Todos
 
@@ -61,5 +62,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 01-02-PLAN.md
-Resume file: .planning/phases/01-data-pipeline/01-02-SUMMARY.md
+Stopped at: Completed 01-03-PLAN.md (Phase 1 complete)
+Resume file: .planning/phases/01-data-pipeline/01-03-SUMMARY.md
