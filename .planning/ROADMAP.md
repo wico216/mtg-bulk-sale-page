@@ -62,13 +62,12 @@ Plans:
   3. User can filter by set/expansion and by rarity independently or in combination
   4. User can sort the visible cards by price (low-high, high-low) and by name (A-Z)
   5. All filters and sort work together without conflicts or clearing each other
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Name search with real-time filtering
-- [ ] 03-02: Mana color multi-select filter (WUBRG)
-- [ ] 03-03: Set and rarity filter dropdowns
-- [ ] 03-04: Sort controls (price, name) and filter combination logic
+- [ ] 03-01: Zustand filter store, card-grid integration, sticky filter bar with search input
+- [ ] 03-02: Mana color pills (WUBRG+C), set/rarity multi-select dropdowns, sort dropdown
+- [ ] 03-03: Mobile bottom sheet for filter controls and responsive verification
 
 ### Phase 4: Shopping Cart
 **Goal**: Users can collect desired cards into a persistent cart and manage their selections
@@ -114,6 +113,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Data Pipeline | 0/3 | Complete    | 2026-04-02 |
 | 2. Card Catalog | 0/3 | Not started | - |
-| 3. Search and Filters | 0/4 | Not started | - |
+| 3. Search and Filters | 0/3 | Not started | - |
 | 4. Shopping Cart | 0/3 | Not started | - |
 | 5. Checkout and Deploy | 0/4 | Not started | - |
