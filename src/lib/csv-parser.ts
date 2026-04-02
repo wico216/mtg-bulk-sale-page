@@ -43,6 +43,7 @@ function parseSingleCsv(filePath: string): Card[] {
       quantity: row.Quantity ?? 1,
       colorIdentity: [],
       imageUrl: null,
+      oracleText: null,
       rarity: row.Rarity || "unknown",
       foil,
     });

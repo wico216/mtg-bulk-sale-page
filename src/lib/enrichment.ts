@@ -20,6 +20,26 @@ function getImageUrl(card: ScryfallCard): string | null {
 }
 
 /**
+ * Extract oracle rules text from a Scryfall card.
+ * Handles double-faced cards by joining oracle text from each face.
+ */
+function getOracleText(card: ScryfallCard): string | null {
+  if (card.oracle_text) {
+    return card.oracle_text;
+  }
+
+  // Double-faced cards store oracle text per face
+  if (card.card_faces) {
+    const texts = card.card_faces
+      .map((face) => face.oracle_text)
+      .filter((text): text is string => !!text);
+    return texts.length > 0 ? texts.join(" // ") : null;
+  }
+
+  return null;
+}
+
+/**
  * Extract USD price with fallback chain: usd -> usd_foil -> usd_etched.
  * Scryfall returns prices as strings like "16.05".
  */
@@ -70,6 +90,7 @@ export async function enrichCards(cards: Card[]): Promise<EnrichmentResult> {
     card.imageUrl = getImageUrl(scryfallData);
     card.price = getPrice(scryfallData.prices);
     card.colorIdentity = scryfallData.color_identity;
+    card.oracleText = getOracleText(scryfallData);
 
     if (card.price === null) {
       stats.missingPrices++;

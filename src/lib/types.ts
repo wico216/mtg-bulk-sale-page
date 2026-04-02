@@ -41,6 +41,8 @@ export interface Card {
   colorIdentity: string[];
   /** Scryfall image URL, null if unavailable */
   imageUrl: string | null;
+  /** Oracle rules text, null if unavailable */
+  oracleText: string | null;
   rarity: string;
   foil: boolean;
 }
@@ -66,6 +68,7 @@ export interface ScryfallCard {
   object: string;
   name: string;
   color_identity: string[];
+  oracle_text?: string;
   image_uris?: {
     normal: string;
     small: string;
@@ -73,6 +76,7 @@ export interface ScryfallCard {
   };
   card_faces?: Array<{
     name: string;
+    oracle_text?: string;
     image_uris?: {
       normal: string;
     };
