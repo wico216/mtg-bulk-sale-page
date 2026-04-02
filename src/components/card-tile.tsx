@@ -57,6 +57,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
         <p className="text-sm font-medium leading-tight truncate">
           {card.name}
         </p>
+        <p className="text-xs text-zinc-400 truncate">{card.setName}</p>
         <p className="text-sm text-zinc-500">{formatPrice(card.price)}</p>
         <p className="text-xs text-zinc-400">
           {formatCondition(card.condition)} x{card.quantity}
