@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Card, CardData } from "@/lib/types";
 import CardTile from "@/components/card-tile";
+import CardModal from "@/components/card-modal";
 
 interface CardGridProps {
   cards: Card[];
@@ -11,6 +12,17 @@ interface CardGridProps {
 
 export default function CardGrid({ cards, meta }: CardGridProps) {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+
+  useEffect(() => {
+    if (selectedCard) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [selectedCard]);
 
   if (cards.length === 0) {
     return (
@@ -37,7 +49,12 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
           />
         ))}
       </div>
-      {/* Modal rendered in Plan 02-03 */}
+      {selectedCard && (
+        <CardModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+        />
+      )}
     </div>
   );
 }
