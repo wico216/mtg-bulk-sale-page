@@ -30,13 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Each card is enriched with a TCGPlayer market price from Scryfall
   4. The resulting card data includes all model fields: name, set, collector number, price, condition, quantity, color identity, image URL, and rarity
   5. The Next.js project builds successfully and serves a page using the generated card data
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Next.js project scaffolding with Tailwind and base configuration
-- [ ] 01-02: CSV parsing with PapaParse and Manabox field mapping
-- [ ] 01-03: Scryfall API enrichment (images and prices) with rate limiting
-- [ ] 01-04: Card data model definition and build-time data generation
+- [ ] 01-01-PLAN.md — Next.js scaffolding, card data model types, and CSV parsing with PapaParse
+- [ ] 01-02-PLAN.md — Scryfall API client with caching, rate limiting, and card enrichment pipeline
+- [ ] 01-03-PLAN.md — Build-time data generation script and Next.js integration
 
 ### Phase 2: Card Catalog
 **Goal**: Users can browse the full card inventory in a visual grid and inspect individual cards
@@ -113,7 +112,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Pipeline | 0/4 | Not started | - |
+| 1. Data Pipeline | 0/3 | Planning complete | - |
 | 2. Card Catalog | 0/3 | Not started | - |
 | 3. Search and Filters | 0/4 | Not started | - |
 | 4. Shopping Cart | 0/3 | Not started | - |
