@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Card, CardData } from "@/lib/types";
 import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
@@ -13,8 +13,20 @@ interface CardGridProps {
 
 export default function CardGrid({ cards, meta }: CardGridProps) {
   const setAllCards = useFilterStore((s) => s.setAllCards);
-  const filteredCards = useFilterStore((s) => s.getFilteredCards());
   const clearFilters = useFilterStore((s) => s.clearFilters);
+  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
+  const allCards = useFilterStore((s) => s.allCards);
+  const searchQuery = useFilterStore((s) => s.searchQuery);
+  const selectedColors = useFilterStore((s) => s.selectedColors);
+  const selectedSets = useFilterStore((s) => s.selectedSets);
+  const selectedRarities = useFilterStore((s) => s.selectedRarities);
+  const sortBy = useFilterStore((s) => s.sortBy);
+
+  const filteredCards = useMemo(
+    () => getFilteredCards(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allCards, searchQuery, selectedColors, selectedSets, selectedRarities, sortBy],
+  );
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
