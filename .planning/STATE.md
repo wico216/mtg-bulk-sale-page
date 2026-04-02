@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 3 of 5 (Search and Filters)
-Plan: 2 of 3 in current phase
-Status: In Progress
-Last activity: 2026-04-02 -- Completed 03-02 (Desktop Filter Controls)
+Phase: 3 of 5 (Search and Filters) -- COMPLETE
+Plan: 3 of 3 in current phase
+Status: Phase Complete
+Last activity: 2026-04-02 -- Completed 03-03 (Mobile Filter Bottom Sheet)
 
 Progress: [████████░░] 80%
 
@@ -29,11 +29,11 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 02 | 3 | 15min | 5min |
-| 03 | 2 | 3min | 1.5min |
+| 03 | 3 | 24min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (1min), 02-02 (2min), 02-03 (12min), 03-01 (2min), 03-02 (1min)
-- Trend: stable
+- Last 5 plans: 02-02 (2min), 02-03 (12min), 03-01 (2min), 03-02 (1min), 03-03 (21min)
+- Trend: stable (03-03 longer due to SSR bug fix and UX iteration during checkpoint)
 
 *Updated after each plan completion*
 
@@ -61,6 +61,10 @@ Recent decisions affecting current work:
 - [03-02]: Rarity dropdown uses MTG conventional order (mythic/rare/uncommon/common) not alphabetical
 - [03-02]: MultiSelect backdrop div pattern for outside-click close prevents two-open-at-once pitfall
 - [03-02]: Native select for SortDropdown with only 3 fixed options
+- [03-03]: Set picker as its own bottom sheet (z-50) with search and clear, not a dropdown in the main sheet
+- [03-03]: Rarity/sort use inline toggle pills on mobile (small option sets don't need dropdowns)
+- [03-03]: Selected sets sort to top of set picker list for quick filter management
+- [03-03]: Zustand selectors must not call getFilteredCards() (new array = SSR infinite loop); use useMemo with individual state subscriptions
 
 ### Pending Todos
 
@@ -73,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 03-02-PLAN.md -- All desktop filter controls integrated, ready for 03-03 mobile bottom sheet
-Resume file: .planning/phases/03-search-and-filters/03-03-PLAN.md
+Stopped at: Completed 03-03-PLAN.md -- Phase 3 (Search and Filters) complete. All responsive filter controls working on desktop and mobile.
+Resume file: .planning/phases/04-cart-and-checkout/ (next phase)
