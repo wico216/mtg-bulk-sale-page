@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 4 of 5 (Shopping Cart)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In Progress
-Last activity: 2026-04-02 -- Completed 04-01 (Cart Store and Catalog Integration)
+Last activity: 2026-04-02 -- Completed 04-02 (Cart Page and Item Management)
 
 Progress: [████████░░] 82%
 
@@ -30,10 +30,10 @@ Progress: [████████░░] 82%
 | 01 | 3 | 8min | 2.7min |
 | 02 | 3 | 15min | 5min |
 | 03 | 3 | 24min | 8min |
-| 04 | 1 | 3min | 3min |
+| 04 | 2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (12min), 03-01 (2min), 03-02 (1min), 03-03 (21min), 04-01 (3min)
+- Last 5 plans: 03-01 (2min), 03-02 (1min), 03-03 (21min), 04-01 (3min), 04-02 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -70,6 +70,9 @@ Recent decisions affecting current work:
 - [04-01]: createJSONStorage wraps localStorage for SSG safety (no build failures without manual checks)
 - [04-01]: Tile cart controls use span[role=button] with stopPropagation to avoid nested <button> DOM violations
 - [04-01]: Plus button disables at stock cap (no message on tile; message is for cart page input per user decision)
+- [04-02]: Shared loadCardData utility in src/lib/load-cards.ts used by both / and /cart server components
+- [04-02]: Native window.confirm for clear-cart (simple, accessible, no custom dialog state per research)
+- [04-02]: Hydration guard via persist.hasHydrated + onFinishHydration prevents empty-cart flash
 
 ### Pending Todos
 
@@ -82,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 04-01-PLAN.md -- Cart store created, catalog integration complete (header badge, tile stepper, modal add-to-cart).
-Resume file: .planning/phases/04-shopping-cart/04-02-PLAN.md (next plan)
+Stopped at: Completed 04-02-PLAN.md -- Cart page with quantity controls, stock validation, clear cart, sticky summary bar.
+Resume file: .planning/phases/04-shopping-cart/04-03-PLAN.md (next plan)
