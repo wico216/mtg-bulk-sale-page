@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 3 of 5 (Search and Filters)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In Progress
-Last activity: 2026-04-02 -- Completed 03-01 (Filter Store and Search)
+Last activity: 2026-04-02 -- Completed 03-02 (Desktop Filter Controls)
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -29,10 +29,10 @@ Progress: [███████░░░] 70%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 02 | 3 | 15min | 5min |
-| 03 | 1 | 2min | 2min |
+| 03 | 2 | 3min | 1.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (2min), 02-01 (1min), 02-02 (2min), 02-03 (12min), 03-01 (2min)
+- Last 5 plans: 02-01 (1min), 02-02 (2min), 02-03 (12min), 03-01 (2min), 03-02 (1min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -58,6 +58,9 @@ Recent decisions affecting current work:
 - [03-01]: Zustand 5 curried create pattern for TypeScript; Set toggles use new Set() for reactivity
 - [03-01]: Color filter OR logic with colorless (C) as special case checking empty colorIdentity
 - [03-01]: Null prices sort to end in both price-desc and price-asc
+- [03-02]: Rarity dropdown uses MTG conventional order (mythic/rare/uncommon/common) not alphabetical
+- [03-02]: MultiSelect backdrop div pattern for outside-click close prevents two-open-at-once pitfall
+- [03-02]: Native select for SortDropdown with only 3 fixed options
 
 ### Pending Todos
 
@@ -70,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 03-01-PLAN.md -- Filter store and search bar in place, ready for 03-02
-Resume file: .planning/phases/03-search-and-filters/03-02-PLAN.md
+Stopped at: Completed 03-02-PLAN.md -- All desktop filter controls integrated, ready for 03-03 mobile bottom sheet
+Resume file: .planning/phases/03-search-and-filters/03-03-PLAN.md
