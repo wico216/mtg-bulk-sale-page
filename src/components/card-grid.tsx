@@ -12,9 +12,10 @@ interface CardGridProps {
 
 export default function CardGrid({ cards, meta }: CardGridProps) {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedCard) {
+    if (selectedCard || lightboxUrl) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -22,7 +23,7 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [selectedCard]);
+  }, [selectedCard, lightboxUrl]);
 
   if (cards.length === 0) {
     return (
@@ -53,7 +54,32 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
         <CardModal
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
+          onImageClick={() => {
+            if (selectedCard.imageUrl) {
+              setSelectedCard(null);
+              setLightboxUrl(selectedCard.imageUrl.replace("/normal/", "/large/"));
+            }
+          }}
         />
+      )}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] overflow-auto bg-black/90 touch-pinch-zoom"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <div className="min-h-full flex items-center justify-center p-4">
+            <img
+              src={lightboxUrl}
+              alt="Full card art"
+              className="max-w-none cursor-zoom-out"
+              style={{ height: "90vh" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxUrl(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
