@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 3 - Search and Filters
+**Current focus:** Phase 4 - Shopping Cart
 
 ## Current Position
 
-Phase: 3 of 5 (Search and Filters) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase Complete
-Last activity: 2026-04-02 -- Completed 03-03 (Mobile Filter Bottom Sheet)
+Phase: 4 of 5 (Shopping Cart)
+Plan: 1 of 3 in current phase
+Status: In Progress
+Last activity: 2026-04-02 -- Completed 04-01 (Cart Store and Catalog Integration)
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
@@ -30,10 +30,11 @@ Progress: [████████░░] 80%
 | 01 | 3 | 8min | 2.7min |
 | 02 | 3 | 15min | 5min |
 | 03 | 3 | 24min | 8min |
+| 04 | 1 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (2min), 02-03 (12min), 03-01 (2min), 03-02 (1min), 03-03 (21min)
-- Trend: stable (03-03 longer due to SSR bug fix and UX iteration during checkpoint)
+- Last 5 plans: 02-03 (12min), 03-01 (2min), 03-02 (1min), 03-03 (21min), 04-01 (3min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -65,6 +66,10 @@ Recent decisions affecting current work:
 - [03-03]: Rarity/sort use inline toggle pills on mobile (small option sets don't need dropdowns)
 - [03-03]: Selected sets sort to top of set picker list for quick filter management
 - [03-03]: Zustand selectors must not call getFilteredCards() (new array = SSR infinite loop); use useMemo with individual state subscriptions
+- [04-01]: Cart store uses Map<string, number> with custom replacer/reviver for localStorage JSON serialization
+- [04-01]: createJSONStorage wraps localStorage for SSG safety (no build failures without manual checks)
+- [04-01]: Tile cart controls use span[role=button] with stopPropagation to avoid nested <button> DOM violations
+- [04-01]: Plus button disables at stock cap (no message on tile; message is for cart page input per user decision)
 
 ### Pending Todos
 
@@ -77,5 +82,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 03-03-PLAN.md -- Phase 3 (Search and Filters) complete. All responsive filter controls working on desktop and mobile.
-Resume file: .planning/phases/04-cart-and-checkout/ (next phase)
+Stopped at: Completed 04-01-PLAN.md -- Cart store created, catalog integration complete (header badge, tile stepper, modal add-to-cart).
+Resume file: .planning/phases/04-shopping-cart/04-02-PLAN.md (next plan)
