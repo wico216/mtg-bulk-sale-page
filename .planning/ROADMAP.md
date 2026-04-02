@@ -12,7 +12,7 @@ Viki goes from CSV file to live storefront in 5 phases. First we build the data 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Data Pipeline** - CSV import, Scryfall enrichment, and card data model
+- [x] **Phase 1: Data Pipeline** - CSV import, Scryfall enrichment, and card data model (completed 2026-04-02)
 - [ ] **Phase 2: Card Catalog** - Browsable card grid with detail view and mobile layout
 - [ ] **Phase 3: Search and Filters** - Find cards by name, color, set, rarity, and sort order
 - [ ] **Phase 4: Shopping Cart** - Add, adjust, remove cards with persistent totals
@@ -112,7 +112,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Pipeline | 0/3 | Planning complete | - |
+| 1. Data Pipeline | 0/3 | Complete    | 2026-04-02 |
 | 2. Card Catalog | 0/3 | Not started | - |
 | 3. Search and Filters | 0/4 | Not started | - |
 | 4. Shopping Cart | 0/3 | Not started | - |
