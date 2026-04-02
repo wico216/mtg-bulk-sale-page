@@ -45,12 +45,12 @@ Plans:
   1. User sees a responsive grid of cards showing image, name, set, price, condition, and quantity
   2. User can tap or click any card to open a detail modal with oracle text and full metadata
   3. The catalog layout works on phone screens without horizontal scrolling or broken elements
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Card grid component with image, name, set, price, condition, quantity display
-- [ ] 02-02: Card detail modal with oracle text and full metadata
-- [ ] 02-03: Responsive layout and mobile optimization
+- [ ] 02-01: Data model extension (oracleText), next/image config, accent theme colors
+- [ ] 02-02: Card grid with header, image-dominant tiles, responsive layout
+- [ ] 02-03: Card detail modal with oracle text, metadata, and mobile full-screen
 
 ### Phase 3: Search and Filters
 **Goal**: Users can quickly find specific cards using search, filters, and sorting
