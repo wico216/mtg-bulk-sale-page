@@ -12,15 +12,14 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] CSV import from Manabox app to populate inventory — Validated in Phase 1: Data Pipeline
+- [x] Card display with auto-fetched images (Scryfall), price, condition, quantity — Validated in Phase 2: Card Catalog
+- [x] Search cards by name — Validated in Phase 3: Search and Filters
+- [x] Filter cards by mana color — Validated in Phase 3: Search and Filters
+- [x] Shopping cart to collect desired cards — Validated in Phase 4: Shopping Cart
 
 ### Active
 
-- [ ] CSV import from Manabox app to populate inventory
-- [ ] Card display with auto-fetched images (Scryfall), price, condition, quantity
-- [ ] Search cards by name
-- [ ] Filter cards by mana color
-- [ ] Shopping cart to collect desired cards
 - [ ] Checkout sends order email to seller (you)
 - [ ] Checkout sends confirmation email to buyer (friend)
 - [ ] Confirmation page shown to friend after checkout
@@ -59,4 +58,4 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Public access | No need to gate access for a friend store | — Pending |
 
 ---
-*Last updated: 2026-04-02 after initialization*
+*Last updated: 2026-04-02 after Phase 4 completion — cart fully verified*
