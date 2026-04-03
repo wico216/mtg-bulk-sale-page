@@ -104,8 +104,7 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
             <img
               src={lightboxUrl}
               alt="Full card art"
-              className="max-w-none cursor-zoom-out"
-              style={{ height: "90vh" }}
+              className="max-h-[90vh] max-w-[90vw] object-contain cursor-zoom-out"
               onClick={(e) => {
                 e.stopPropagation();
                 setLightboxUrl(null);

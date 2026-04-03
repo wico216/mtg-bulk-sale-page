@@ -151,22 +151,22 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
                     ? removeItem(card.id)
                     : setQuantity(card.id, qty - 1, card.quantity)
                 }
-                className="w-8 h-8 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-full border-2 !border-black dark:!border-white text-sm font-bold !text-black dark:!text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 -
               </button>
-              <span className="text-base font-medium min-w-[2ch] text-center">
+              <span className="text-base font-bold min-w-[2ch] text-center !text-black dark:!text-white">
                 {qty}
               </span>
               <button
                 type="button"
                 onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
                 disabled={qty >= card.quantity}
-                className="w-8 h-8 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-8 h-8 flex items-center justify-center rounded-full border-2 !border-black dark:!border-white text-sm font-bold !text-black dark:!text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +
               </button>
-              <span className="text-sm text-zinc-400 ml-2">in cart</span>
+              <span className="text-sm !text-black dark:!text-white font-semibold ml-2">in cart</span>
             </div>
           )}
 
