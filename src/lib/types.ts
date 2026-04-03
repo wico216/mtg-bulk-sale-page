@@ -88,3 +88,40 @@ export interface ScryfallCard {
   };
   layout: string;
 }
+
+/** A single item in a submitted order */
+export interface OrderItem {
+  cardId: string;
+  name: string;
+  setName: string;
+  price: number | null;
+  quantity: number;
+  lineTotal: number | null;
+}
+
+/** Complete order data -- consumed by email templates and future thermal printer (D-14) */
+export interface OrderData {
+  orderRef: string;
+  buyerName: string;
+  buyerEmail: string;
+  message?: string;
+  items: OrderItem[];
+  totalItems: number;
+  totalPrice: number;
+  createdAt: string; // ISO 8601 timestamp
+}
+
+/** Shape of POST body sent to /api/checkout */
+export interface CheckoutRequest {
+  buyerName: string;
+  buyerEmail: string;
+  message?: string;
+  items: Array<{ cardId: string; quantity: number }>;
+}
+
+/** Shape of /api/checkout success response */
+export interface CheckoutResponse {
+  success: boolean;
+  orderRef: string;
+  order: OrderData;
+}
