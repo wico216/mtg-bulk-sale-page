@@ -82,9 +82,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: Cart state management with Zustand and localStorage persistence
-- [ ] 04-02: Add-to-cart integration on catalog cards
-- [ ] 04-03: Cart view with quantity controls, remove, and running totals
+- [x] 04-01: Cart state management with Zustand and localStorage persistence
+- [x] 04-02: Add-to-cart integration on catalog cards
+- [x] 04-03: Cart view with quantity controls, remove, and running totals
 
 ### Phase 5: Checkout and Deploy
 **Goal**: Users can submit orders via email and the store is live on the internet
