@@ -35,11 +35,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Checkout
 
-- [ ] **CHKT-01**: User can enter name and email to place an order (no account required)
-- [ ] **CHKT-02**: User sees order review/summary before final submission
+- [x] **CHKT-01**: User can enter name and email to place an order (no account required)
+- [x] **CHKT-02**: User sees order review/summary before final submission
 - [x] **CHKT-03**: Checkout sends order details email to seller
 - [x] **CHKT-04**: Checkout sends confirmation email to buyer
-- [ ] **CHKT-05**: User sees confirmation page after successful order with "pay in person" note
+- [x] **CHKT-05**: User sees confirmation page after successful order with "pay in person" note
 
 ## v2 Requirements
 
@@ -94,11 +94,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CART-03 | Phase 4 | Pending |
 | CART-04 | Phase 4 | Pending |
 | CART-05 | Phase 4 | Pending |
-| CHKT-01 | Phase 5 | Pending |
-| CHKT-02 | Phase 5 | Pending |
+| CHKT-01 | Phase 5 | Complete |
+| CHKT-02 | Phase 5 | Complete |
 | CHKT-03 | Phase 5 | Complete |
 | CHKT-04 | Phase 5 | Complete |
-| CHKT-05 | Phase 5 | Pending |
+| CHKT-05 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total
