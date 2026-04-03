@@ -94,6 +94,9 @@ export interface OrderItem {
   cardId: string;
   name: string;
   setName: string;
+  setCode: string;
+  collectorNumber: string;
+  condition: string;
   price: number | null;
   quantity: number;
   lineTotal: number | null;

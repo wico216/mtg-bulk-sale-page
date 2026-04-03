@@ -10,7 +10,10 @@ export function buildBuyerEmailHtml(order: OrderData): string {
     .map(
       (item) => `
       <tr>
-        <td style="padding: 8px; border: 1px solid #e5e7eb; color: #171717;">${escapeHtml(item.name)}</td>
+        <td style="padding: 8px; border: 1px solid #e5e7eb; color: #171717;">
+          ${escapeHtml(item.name)}<br/>
+          <span style="font-size: 12px; color: #71717a;">${escapeHtml(item.setName)} (${escapeHtml(item.setCode.toUpperCase())}) #${escapeHtml(item.collectorNumber)}</span>
+        </td>
         <td style="padding: 8px; border: 1px solid #e5e7eb; color: #171717; text-align: center;">${item.quantity}</td>
         <td style="padding: 8px; border: 1px solid #e5e7eb; color: #171717; text-align: right;">${item.lineTotal !== null ? `$${item.lineTotal.toFixed(2)}` : "N/A"}</td>
       </tr>`,

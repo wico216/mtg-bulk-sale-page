@@ -166,8 +166,18 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
         <h1 className="text-xl font-semibold mb-6">Checkout</h1>
 
         <div className="flex flex-col md:grid md:grid-cols-3 md:gap-8">
-          {/* Form renders first in mobile column flow (per D-05) */}
-          <div className="md:col-span-2">
+          {/* Order summary on top always */}
+          <div className="md:col-span-3">
+            <OrderSummary
+              items={orderSummaryItems}
+              totalPrice={totalPrice}
+              totalItems={totalItems}
+              editCartLink={true}
+            />
+          </div>
+
+          {/* Form below summary */}
+          <div className="mt-8 md:col-span-3">
             <h2 className="text-sm font-semibold text-zinc-500 mb-4">
               Your details
             </h2>
@@ -270,16 +280,6 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                 {submitting ? "Placing order..." : "Place order"}
               </button>
             </form>
-          </div>
-
-          {/* Order summary renders second in mobile, right sidebar on desktop */}
-          <div className="mt-8 md:mt-0 md:order-2 md:sticky md:top-6 md:self-start">
-            <OrderSummary
-              items={orderSummaryItems}
-              totalPrice={totalPrice}
-              totalItems={totalItems}
-              editCartLink={true}
-            />
           </div>
         </div>
       </div>

@@ -38,6 +38,9 @@ export function buildOrderData(
     const card = cardMap.get(reqItem.cardId);
     const name = card?.name ?? reqItem.cardId;
     const setName = card?.setName ?? "";
+    const setCode = card?.setCode ?? "";
+    const collectorNumber = card?.collectorNumber ?? "";
+    const condition = card?.condition ?? "";
     const price = card?.price ?? null;
     const lineTotal = price !== null ? price * reqItem.quantity : null;
 
@@ -45,6 +48,9 @@ export function buildOrderData(
       cardId: reqItem.cardId,
       name,
       setName,
+      setCode,
+      collectorNumber,
+      condition,
       price,
       quantity: reqItem.quantity,
       lineTotal,
