@@ -96,13 +96,12 @@ Plans:
   3. After submission, the seller receives an email with complete order details
   4. After submission, the buyer receives a confirmation email with their order summary
   5. User sees a confirmation page after checkout with a clear "pay in person" note
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Checkout form with name/email and order review summary
-- [ ] 05-02: Email sending via Resend (seller notification + buyer confirmation)
-- [ ] 05-03: Confirmation page with pay-in-person messaging
-- [ ] 05-04: Vercel deployment and production configuration
+- [ ] 05-01-PLAN.md — Order types, email templates, notification pipeline, and POST /api/checkout Route Handler
+- [ ] 05-02-PLAN.md — Checkout page (form + order summary) and confirmation page with pay-in-person note
+- [ ] 05-03-PLAN.md — Build verification, environment setup, integration testing, and Vercel deployment
 
 ## Progress
 
@@ -115,4 +114,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Card Catalog | 0/3 | Not started | - |
 | 3. Search and Filters | 0/3 | Not started | - |
 | 4. Shopping Cart | 0/3 | Not started | - |
-| 5. Checkout and Deploy | 0/4 | Not started | - |
+| 5. Checkout and Deploy | 0/3 | Not started | - |
