@@ -33,7 +33,7 @@ Declared values (must be multiples of 4):
 |-------|-------|-------|
 | xs | 4px | Icon gaps, inline padding (`gap-1`, `p-1`) |
 | sm | 8px | Compact element spacing (`gap-2`, `p-2`) |
-| md | 16px | Default element spacing, page horizontal padding (`px-4`, `gap-4`) |
+| md | 16px | Default element spacing, page horizontal padding, order summary row padding and gap (`px-4`, `gap-4`, `p-4`) |
 | lg | 24px | Section padding, form field gaps (`gap-6`, `py-6`) |
 | xl | 32px | Layout gaps between major sections (`gap-8`) |
 | 2xl | 48px | Page-level vertical padding for confirmation hero (`py-12`) |
@@ -48,11 +48,11 @@ Exceptions: Touch target minimum 44px height for the submit button on mobile (us
 | Role | Size | Weight | Line Height | Tailwind Class |
 |------|------|--------|-------------|----------------|
 | Body | 14px | 400 (regular) | 1.5 | `text-sm` |
-| Label | 14px | 500 (medium) | 1.5 | `text-sm font-medium` |
+| Label | 14px | 600 (semibold) | 1.5 | `text-sm font-semibold` |
 | Heading | 20px | 600 (semibold) | 1.2 | `text-xl font-semibold` |
-| Display | 24px | 700 (bold) | 1.2 | `text-2xl font-bold` |
+| Display | 24px | 600 (semibold) | 1.2 | `text-2xl font-semibold` |
 
-Source: Existing codebase patterns. Cart page uses `text-xl font-semibold` for "Your Cart"; header uses `text-lg font-bold`. Display size (24px) is new for the confirmation page "Order placed!" heading. Body and label sizes match existing `text-sm` / `text-sm font-medium` usage across all components.
+Source: Existing codebase patterns. Cart page uses `text-xl font-semibold` for "Your Cart"; header uses `text-lg font-bold` (pre-existing, not governed by this contract). Display size (24px) is new for the confirmation page "Order placed!" heading. Body and label sizes match existing `text-sm` usage across all components. Weights consolidated to 2 (400 regular + 600 semibold) for visual consistency.
 
 ---
 
@@ -75,6 +75,7 @@ Accent reserved for:
 - Confirmation checkmark background circle (`bg-accent-light`)
 - "Browse more cards" link on confirmation page (`bg-accent text-white`)
 - Email template header color (`#4f46e5` inline style)
+- Form field focus ring (`ring-accent/50 border-accent`)
 
 ---
 
@@ -221,12 +222,12 @@ Accent reserved for:
 
 Each order line item renders as:
 - 48x67px thumbnail (same dimensions as `cart-item.tsx`)
-- Card name (text-sm font-medium, truncate)
+- Card name (text-sm font-semibold, truncate)
 - Set name (text-xs text-zinc-400, truncate)
 - Quantity badge: "x{N}" (text-sm text-zinc-500)
 - Line total: "${price * qty}" or "N/A" (text-sm, right-aligned)
-- Row background: `bg-zinc-50 dark:bg-zinc-900 rounded-lg p-3`
-- Row gap: `gap-3` (12px)
+- Row background: `bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4`
+- Row gap: `gap-4` (16px)
 - No quantity controls (D-04: read-only)
 - No remove button (D-04: read-only)
 
@@ -240,9 +241,9 @@ Each order line item renders as:
 |                                                       |
 |  ( checkmark icon in accent-light circle )           |
 |                                                       |
-|  "Order placed!"  (text-2xl font-bold)               |
+|  "Order placed!"  (text-2xl font-semibold)           |
 |                                                       |
-|  "3 cards -- $6.50"  (text-lg text-zinc-500)         |
+|  "3 cards -- $6.50"  (text-xl text-zinc-500)         |
 |                                                       |
 |  "Confirmation sent to you@example.com"              |
 |  (text-sm text-zinc-400)                             |
@@ -274,7 +275,7 @@ Each order line item renders as:
 
 | State | Visual | Copy |
 |-------|--------|------|
-| Idle | `bg-accent text-white rounded-md px-5 py-3 text-sm font-medium w-full` | "Place order" |
+| Idle | `bg-accent text-white rounded-md px-5 py-3 text-sm font-semibold w-full` | "Place order" |
 | Hover | `bg-accent-hover` | "Place order" |
 | Submitting | `opacity-70 cursor-not-allowed` + no hover effect | "Placing order..." |
 | Disabled (empty cart) | `opacity-30 cursor-not-allowed bg-zinc-300 text-zinc-500` | "Place order" |
