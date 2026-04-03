@@ -99,7 +99,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Order types, email templates, notification pipeline, and POST /api/checkout Route Handler
+- [x] 05-01-PLAN.md — Order types, email templates, notification pipeline, and POST /api/checkout Route Handler
 - [ ] 05-02-PLAN.md — Checkout page (form + order summary) and confirmation page with pay-in-person note
 - [ ] 05-03-PLAN.md — Build verification, environment setup, integration testing, and Vercel deployment
 
