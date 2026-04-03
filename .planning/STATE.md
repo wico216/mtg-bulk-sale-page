@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 04 — shopping-cart
+**Current focus:** Phase 05 — checkout-and-deploy
 
 ## Current Position
 
