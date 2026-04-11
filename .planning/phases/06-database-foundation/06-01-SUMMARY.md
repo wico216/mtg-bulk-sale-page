@@ -55,7 +55,7 @@ completed: 2026-04-11
 - **Duration:** 3 min
 - **Started:** 2026-04-11T16:17:53Z
 - **Completed:** 2026-04-11T16:21:01Z
-- **Tasks:** 1 of 2 (Task 2 is human-action checkpoint)
+- **Tasks:** 2 of 2
 - **Files modified:** 6
 
 ## Accomplishments
@@ -71,7 +71,7 @@ completed: 2026-04-11
 Each task was committed atomically:
 
 1. **Task 1: Install Drizzle dependencies and create schema, client, and config files** - `d32b64f` (feat)
-2. **Task 2: Provision Neon database and push schema** - CHECKPOINT: human-action (awaiting user)
+2. **Task 2: Provision Neon database and push schema** - completed (user provisioned Neon, pushed schema)
 
 ## Files Created/Modified
 - `src/db/schema.ts` - Drizzle table definitions for cards (16 cols), orders (with status enum), order_items (denormalized with imageUrl)
@@ -96,13 +96,9 @@ None - plan executed exactly as written.
 
 None.
 
-## User Setup Required
+## User Setup Completed
 
-**Task 2 is a human-action checkpoint.** The user must:
-1. Create a Neon Postgres project at https://console.neon.tech
-2. Copy the **direct** (not pooled) connection string
-3. Create `.env.local` with `DATABASE_URL=<connection-string>`
-4. Run `npx drizzle-kit push` to apply the schema
+User provisioned Neon Postgres database, configured DATABASE_URL in .env.local and Vercel dashboard, and ran `drizzle-kit push` to create tables (cards, orders, order_items) in the database.
 
 ## Next Phase Readiness
 - Schema, client, and config files are complete and TypeScript-verified
