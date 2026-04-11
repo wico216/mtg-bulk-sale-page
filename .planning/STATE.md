@@ -1,36 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-04-03T13:58:28.962Z"
-last_activity: 2026-04-03
+milestone: v1.1
+milestone_name: Admin Panel & Inventory Management
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-04-11"
+last_activity: 2026-04-11
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
-  percent: 82
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-02)
+See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 05 — checkout-and-deploy
+**Current focus:** Defining requirements for v1.1
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-03
-
-Progress: [████████░░] 82%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-11 — Milestone v1.1 started
 
 ## Performance Metrics
 
@@ -44,19 +42,7 @@ Progress: [████████░░] 82%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 3 | 8min | 2.7min |
-| 02 | 3 | 15min | 5min |
-| 03 | 3 | 24min | 8min |
-| 04 | 2 | 5min | 2.5min |
-
-**Recent Trend:**
-
-- Last 5 plans: 03-01 (2min), 03-02 (1min), 03-03 (21min), 04-01 (3min), 04-02 (2min)
-- Trend: stable
-
-*Updated after each plan completion*
-| Phase 05 P01 | 5min | 2 tasks | 10 files |
-| Phase 05 P02 | 3min | 2 tasks | 5 files |
+| (none yet) | | | |
 
 ## Accumulated Context
 
@@ -101,6 +87,10 @@ Recent decisions affecting current work:
 - [Phase 05]: Form renders first on mobile (D-05 action-first) with sticky submit bar (D-06) matching cart-summary-bar pattern
 - [Phase 05]: sessionStorage stash before clearCart prevents data loss; URL params carry essentials for refresh resilience
 - [Phase 05]: Confirmation page Suspense boundary required by Next.js 16 for useSearchParams
+- [v1.1]: Migrating from static JSON to Vercel Postgres for live inventory
+- [v1.1]: GitHub OAuth for admin panel authentication
+- [v1.1]: Auto-decrement stock on checkout
+- [v1.1]: CSV import replaces full inventory (Manabox export as source of truth)
 
 ### Pending Todos
 
@@ -108,10 +98,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Resend free tier limits need verification at signup (Phase 5)
+None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T12:10:15.754Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-04-11
+Stopped at: Milestone v1.1 initialization
 Resume file: None
