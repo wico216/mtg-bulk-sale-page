@@ -130,11 +130,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Cards table schema stores all existing card fields (name, set, collector number, price, condition, quantity, color identity, image URL, rarity, oracle text)
   3. Orders and order_items tables exist with the schema needed for future checkout storage
   4. All existing card inventory from static JSON is seeded into the database with no data loss
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md -- Drizzle ORM schema, Neon HTTP client, config, and schema push to database
+- [ ] 06-02-PLAN.md -- Idempotent seed script, vitest test infrastructure, and data migration
 
 ### Phase 7: Storefront Migration
 **Goal**: Friends browse and shop from live database inventory with zero visible changes to the storefront experience
