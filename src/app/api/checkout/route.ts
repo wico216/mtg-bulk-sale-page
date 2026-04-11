@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { loadCardData } from "@/lib/load-cards";
+import { getCards } from "@/db/queries";
 import { buildOrderData } from "@/lib/order";
 import { notifyOrder } from "@/lib/notifications";
-import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
+import type { Card, CheckoutRequest, CheckoutResponse } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,9 +31,17 @@ export async function POST(request: NextRequest) {
       return Response.json({ success: false, error: "Server configuration error" }, { status: 500 });
     }
 
-    // Load card data for stock validation (D-08) and order building
-    const cardData = loadCardData();
-    const cards = cardData?.cards ?? [];
+    // Load card data from database for stock validation (D-08) and order building
+    let cards: Card[];
+    try {
+      cards = await getCards();
+    } catch (dbError) {
+      console.error("[CHECKOUT] Database error:", dbError);
+      return Response.json(
+        { success: false, error: "Unable to process order right now, please try again" },
+        { status: 503 },
+      );
+    }
     const cardMap = new Map(cards.map((c) => [c.id, c]));
 
     // Validate stock (D-08): check each item exists and requested qty <= available
