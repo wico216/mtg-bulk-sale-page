@@ -53,12 +53,12 @@ Source: Pre-populated from existing codebase patterns. No spacing changes in thi
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 16px (text-base) | 400 (font-normal) | 1.5 |
-| Label | 12px (text-xs) | 500 (font-medium) | 1.5 |
+| Body / Error body | 16px (text-base) / 18px (text-lg) | 400 (font-normal) | 1.5 |
 | Heading | 18px (text-lg) | 700 (font-bold, header brand) | 1.5 |
-| Error body | 18px (text-lg) | 400 (font-normal) | 1.5 |
 
-Source: Pre-populated from existing component styles (`header.tsx`, `card-tile.tsx`, `page.tsx`). No typography changes in this phase. The "Error body" role uses the same `text-lg` style already established for the existing empty state message.
+**Weight rationale:** This phase declares only the 2 weights used by migration-affected elements. The error/empty state body text inherits the default 400 weight (no explicit `font-*` class). The Header component rendered within the error page shell uses 700 for the "Viki" brand name. The broader codebase uses additional weights (font-medium 500, font-semibold 600, font-light 300) but those components are not modified in this phase and are documented in their respective phase specs.
+
+Source: Pre-populated from existing component styles (`header.tsx`, `page.tsx` error/empty states). No typography changes in this phase. The "Error body" role uses the same `text-lg` style already established for the existing empty state message.
 
 ---
 
