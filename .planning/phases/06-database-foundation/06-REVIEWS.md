@@ -1,6 +1,6 @@
 ---
 phase: 6
-reviewers: [opencode, gemini]
+reviewers: [opencode, gemini, codex]
 reviewed_at: 2026-04-11T12:00:00Z
 plans_reviewed: [06-01-PLAN.md, 06-02-PLAN.md]
 ---
@@ -106,25 +106,62 @@ The proposed plans provide a robust and idiomatically sound approach to transiti
 
 ---
 
-## Codex Review
+## Codex Review (GPT-5.4)
 
-*Codex CLI timed out after 10+ minutes with no output. Review not available.*
+### Summary
+
+The phase split is mostly sound. 06-01 contains the right foundation work, and 06-02 sensibly keeps the migration isolated from the storefront, which still reads JSON through `src/lib/load-cards.ts`. That matches the current build/runtime seam and keeps blast radius low while `package.json` and `scripts/generate-data.ts` continue to drive the existing JSON pipeline. The plans are implementation-ready, but they under-specify migration fidelity and one schema decision that will be expensive to change later.
+
+### Strengths
+- The scope boundary is disciplined: Phase 6 adds DB foundation without also switching the storefront read path
+- The schema choices for cards are coherent with the current app model: composite string ID, integer cents, and TEXT[] for colorIdentity
+- The seed plan uses chunked upserts, which is the right performance posture for Neon HTTP
+- Keeping generate-data.ts in place during this phase is the correct anti-scope-creep decision
+- Plans already include build verification, idempotency checks, and a human checkpoint for Neon provisioning
+
+### Concerns
+
+| Severity | Issue | Impact |
+|----------|-------|--------|
+| **HIGH** | 06-02 has a hidden prerequisite: `data/generated/cards.json` is not present in repo -- migration depends on regenerating it first via Scryfall-backed pipeline | DB-02 is not purely a DB migration task; blocked by external API/data-generation step |
+| **HIGH** | Migration completeness verified too weakly -- row-count parity alone does not prove "no data loss." Will miss stale rows, ID mismatches, or field-level mapping errors | Success criterion #4 cannot be confirmed |
+| **HIGH** | `orders.id` inherits collision risk from current order reference generator in `src/lib/order.ts` which only has minute-level precision -- two orders in same minute can collide | Future data integrity issue |
+| **MEDIUM** | `scryfall_id` added but seed writes null for every row, even though CSV source exposes Scryfall ID (currently ignored in csv-parser.ts) | D-07 only partially realized |
+| **MEDIUM** | Schema lacks DB-level integrity guards: non-negative checks for price and quantity, missing index on order_items.order_id | Will matter once admin/import flows arrive |
+| **MEDIUM** | VALIDATION.md expects `client.test.ts` but execution plans do not create it | Validation contract out of sync |
+| **LOW** | Schema tests coupled to Drizzle internals rather than outcome-level behavior | Brittle maintenance noise on dependency upgrades |
+| **LOW** | Single DATABASE_URL for both schema push and app runtime | Not ideal from least-privilege standpoint |
+
+### Suggestions
+- Make `cards.json` presence an explicit entry criterion for 06-02, or add a pre-step that generates and freezes the artifact before seeding
+- Tighten migration verification from "count matches" to "exact parity": fail if counts differ in either direction, compare source IDs against DB IDs
+- Consider UUID/ULID primary key for orders instead of minute-precision orderRef to avoid collision risk
+- Add basic DB constraints: non-negative price, non-negative quantity, index on order_items.order_id
+- Add a server-only guard to DB client so it cannot be imported into client code
+- Define the cents-to-dollars conversion contract now so Phase 7 cannot improvise it
+
+### Risk Assessment
+**MEDIUM** -- The plan is solid and likely executable, but the hidden dependency on generating cards.json, weak migration-verification story, and future orders.id collision risk are material. If corrected before implementation, drops closer to LOW.
 
 ---
 
 ## Consensus Summary
 
 ### Agreed Strengths
-- **Well-structured task decomposition** with appropriate human/automated boundaries (both reviewers)
-- **Sound TDD approach** for seed logic with price conversion tests (both reviewers)
-- **Correct batch processing** to handle PostgreSQL parameter limits (both reviewers)
-- **Adherence to locked decisions** D-01 through D-13 (both reviewers)
-- **Idempotent seeding** via ON CONFLICT DO UPDATE (both reviewers)
+- **Well-structured task decomposition** with appropriate human/automated boundaries (all 3 reviewers)
+- **Sound TDD approach** for seed logic with price conversion tests (all 3 reviewers)
+- **Correct batch processing** to handle PostgreSQL parameter limits (all 3 reviewers)
+- **Adherence to locked decisions** D-01 through D-13 (all 3 reviewers)
+- **Idempotent seeding** via ON CONFLICT DO UPDATE (all 3 reviewers)
+- **Disciplined scope boundary** -- DB foundation without switching storefront read path (Codex, Gemini)
 
 ### Agreed Concerns
-- **Data integrity verification gap** -- Both reviewers flag that the seed does not explicitly verify DB count matches cards.json count (HIGH/MEDIUM). This directly threatens success criterion #4 ("no data loss"). The seed script's final count query exists but isn't compared to source.
-- **Seed error handling** -- Both flag missing input validation and error handling for malformed or unexpected data in cards.json.
+- **Data integrity verification gap** -- All 3 reviewers flag that row-count parity alone does not prove "no data loss." The seed script's final count query exists but isn't rigorously compared to source. Codex specifically notes it will miss stale rows, ID mismatches, or field-level mapping errors.
+- **Seed error handling** -- OpenCode and Gemini flag missing input validation for malformed cards.json. Codex flags the hidden prerequisite that cards.json must be generated first.
+- **Migration verification weakness** -- Codex and OpenCode both rate this HIGH. Gemini rates MEDIUM but agrees verification should be enhanced.
 
 ### Divergent Views
-- **Overall risk level**: OpenCode rates phase as MEDIUM-HIGH, Gemini rates as LOW. The divergence stems from OpenCode's stricter interpretation of "no data loss" verification, while Gemini considers the existing count query and tests sufficient with minor enhancements.
-- **drizzle-kit push rollback**: OpenCode flags rollback as HIGH concern; Gemini doesn't mention it (likely because push to an empty DB is low-risk).
+- **Overall risk level**: OpenCode rates MEDIUM-HIGH, Codex rates MEDIUM, Gemini rates LOW. The divergence stems from how strictly "no data loss" verification is interpreted.
+- **drizzle-kit push rollback**: OpenCode flags as HIGH concern; Codex and Gemini don't flag it (push to empty DB is low-risk).
+- **orders.id collision risk**: Only Codex flags this (HIGH) -- suggests UUID/ULID instead of minute-precision orderRef. This is a forward-looking concern for Phase 11, not Phase 6.
+- **DB constraints (non-negative price/quantity)**: Only Codex raises this. Valid but arguably Phase 9+ scope when admin write paths are added.
