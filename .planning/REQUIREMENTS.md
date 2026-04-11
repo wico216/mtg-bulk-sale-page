@@ -1,7 +1,7 @@
-# Requirements: Viki — MTG Bulk Store
+# Requirements: Viki -- MTG Bulk Store
 
 **Defined:** 2026-04-02 (v1.0), updated 2026-04-11 (v1.1)
-**Core Value:** Friends can easily find and order cards from your bulk collection without friction — browse, pick, checkout, done.
+**Core Value:** Friends can easily find and order cards from your bulk collection without friction -- browse, pick, checkout, done.
 
 ## v1.0 Requirements (Complete)
 
@@ -99,7 +99,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 | Feature | Reason |
 |---------|--------|
-| Payment processing | Friends pay in person — no Stripe/payment complexity |
+| Payment processing | Friends pay in person -- no Stripe/payment complexity |
 | Multiple admin accounts | Single admin (seller) is sufficient |
 | Real-time price sync from Scryfall | Rate limits, seller sets own prices |
 | Incremental/merge CSV import | Merge logic too complex; full replace with Manabox as source of truth |
@@ -118,33 +118,33 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DB-01 | — | Pending |
-| DB-02 | — | Pending |
-| DB-03 | — | Pending |
-| DB-04 | — | Pending |
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| INV-01 | — | Pending |
-| INV-02 | — | Pending |
-| INV-03 | — | Pending |
-| INV-04 | — | Pending |
-| INV-05 | — | Pending |
-| INV-06 | — | Pending |
-| CSV-01 | — | Pending |
-| CSV-02 | — | Pending |
-| CSV-03 | — | Pending |
-| ORD-01 | — | Pending |
-| ORD-02 | — | Pending |
-| ORD-03 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
+| DB-01 | Phase 6 | Pending |
+| DB-02 | Phase 6 | Pending |
+| DB-03 | Phase 7 | Pending |
+| DB-04 | Phase 11 | Pending |
+| AUTH-01 | Phase 8 | Pending |
+| AUTH-02 | Phase 8 | Pending |
+| AUTH-03 | Phase 8 | Pending |
+| INV-01 | Phase 9 | Pending |
+| INV-02 | Phase 9 | Pending |
+| INV-03 | Phase 9 | Pending |
+| INV-04 | Phase 12 | Pending |
+| INV-05 | Phase 9 | Pending |
+| INV-06 | Phase 9 | Pending |
+| CSV-01 | Phase 10 | Pending |
+| CSV-02 | Phase 10 | Pending |
+| CSV-03 | Phase 9 | Pending |
+| ORD-01 | Phase 11 | Pending |
+| ORD-02 | Phase 11 | Pending |
+| ORD-03 | Phase 11 | Pending |
+| DASH-01 | Phase 12 | Pending |
+| DASH-02 | Phase 12 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02 (v1.0)*
-*Last updated: 2026-04-11 after v1.1 requirements definition*
+*Last updated: 2026-04-11 after v1.1 roadmap creation*
