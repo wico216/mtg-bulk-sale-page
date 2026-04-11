@@ -144,10 +144,11 @@ Plans:
   1. The storefront home page loads card data from the database (not static JSON)
   2. All existing storefront features work identically: browse, search, filter, sort, cart, checkout
   3. Card data updates in the database are reflected on the storefront after revalidation (no rebuild needed)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md -- Data access layer (queries.ts), Card type extension, and page migration to async DB queries
+- [ ] 07-02-PLAN.md -- Checkout API migration, queries unit tests, and build pipeline cleanup
 
 ### Phase 8: Authentication
 **Goal**: The admin panel is protected so only the seller can access inventory management
@@ -248,7 +249,7 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 | 4. Shopping Cart | v1.0 | 3/3 | Complete | 2026-04-08 |
 | 5. Checkout and Deploy | v1.0 | 3/3 | Complete | 2026-04-11 |
 | 6. Database Foundation | v1.1 | 0/2 | Not started | - |
-| 7. Storefront Migration | v1.1 | 0/1 | Not started | - |
+| 7. Storefront Migration | v1.1 | 0/2 | Not started | - |
 | 8. Authentication | v1.1 | 0/1 | Not started | - |
 | 9. Admin Inventory Management | v1.1 | 0/3 | Not started | - |
 | 10. CSV Import | v1.1 | 0/2 | Not started | - |
