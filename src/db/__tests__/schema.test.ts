@@ -18,8 +18,9 @@ describe("cards table schema", () => {
       "imageUrl", "oracleText", "rarity", "foil",
       "scryfallId", "createdAt", "updatedAt",
     ];
+    const colRecord = columns as Record<string, unknown>;
     for (const col of requiredColumns) {
-      expect(columns[col], `missing column: ${col}`).toBeDefined();
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
     expect(Object.keys(columns).length).toBe(16);
   });
@@ -58,8 +59,9 @@ describe("orders table schema", () => {
       "id", "buyerName", "buyerEmail", "message",
       "totalItems", "totalPrice", "status", "createdAt",
     ];
+    const colRecord = columns as Record<string, unknown>;
     for (const col of requiredColumns) {
-      expect(columns[col], `missing column: ${col}`).toBeDefined();
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
   });
 
@@ -78,8 +80,9 @@ describe("orderItems table schema", () => {
       "collectorNumber", "condition", "price", "quantity",
       "lineTotal", "imageUrl",
     ];
+    const colRecord = columns as Record<string, unknown>;
     for (const col of requiredColumns) {
-      expect(columns[col], `missing column: ${col}`).toBeDefined();
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
   });
 
