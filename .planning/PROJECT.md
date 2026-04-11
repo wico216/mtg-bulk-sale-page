@@ -13,7 +13,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 **Goal:** Replace the static CSV rebuild workflow with a live admin panel for managing inventory, backed by a real database.
 
 **Target features:**
-- Admin panel protected by GitHub OAuth
+- Admin panel protected by Google OAuth
 - Vercel Postgres database (migrate from static JSON)
 - Auto-decrement stock on checkout
 - Manually remove/edit cards (price, condition, quantity)
@@ -38,7 +38,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Active
 
-- [ ] Admin panel with GitHub OAuth authentication
+- [ ] Admin panel with Google OAuth authentication
 - [ ] Vercel Postgres database for live inventory
 - [ ] Auto-decrement stock on checkout
 - [ ] Edit individual card details (price, condition, quantity)
@@ -52,7 +52,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 ### Out of Scope
 
 - Payment processing — friends pay in person
-- Multiple user accounts — single admin, public storefront
+- Multiple admin accounts — single admin (seller), public storefront. Google OAuth chosen for future buyer order tracking.
 - Real-time collaborative editing — single admin user
 - Card grading beyond standard conditions (NM/LP/MP/HP/DMG)
 - Mobile app — web-only
@@ -63,7 +63,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 - Card images and metadata available via Scryfall API (free, no auth required)
 - Target audience is a small friend group, so scale is not a concern
 - No payment gateway needed — all transactions settled in person
-- Public storefront (no password) — admin panel is GitHub OAuth protected
+- Public storefront (no password) — admin panel is Google OAuth protected
 - v1.0 shipped: browse, search, filter, cart, email checkout — all static/build-time
 - v1.1 shifts from static JSON to Vercel Postgres for live inventory management
 
@@ -72,7 +72,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 - **Budget**: Free or minimal hosting costs preferred (Vercel free tier for Postgres + hosting)
 - **Complexity**: Keep it simple — this is a personal tool, not a business platform
 - **Data source**: Must work with Manabox CSV export format
-- **Auth**: GitHub OAuth for admin only — storefront stays public
+- **Auth**: Google OAuth for admin only — storefront stays public (Google chosen so friends can reuse accounts for future order tracking)
 
 ## Key Decisions
 
@@ -84,7 +84,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Scryfall API for card images | Free, comprehensive, no auth required | ✓ Good |
 | Public storefront access | No need to gate access for a friend store | ✓ Good |
 | Vercel Postgres | Free tier, same platform as hosting, managed | — Pending |
-| GitHub OAuth for admin | Single provider, simple, developer-friendly | — Pending |
+| Google OAuth for admin | Friends already have Google accounts — enables future buyer order tracking | — Pending |
 | Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
 | CSV import replaces inventory | Simple mental model — Manabox export is source of truth | — Pending |
 
