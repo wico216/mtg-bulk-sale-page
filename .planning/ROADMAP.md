@@ -133,8 +133,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Drizzle ORM schema, Neon HTTP client, config, and schema push to database
-- [ ] 06-02-PLAN.md -- Idempotent seed script, vitest test infrastructure, and data migration
+- [x] 06-01-PLAN.md -- Drizzle ORM schema, Neon HTTP client, config, and schema push to database
+- [x] 06-02-PLAN.md -- Idempotent seed script, vitest test infrastructure, and data migration
 
 ### Phase 7: Storefront Migration
 **Goal**: Friends browse and shop from live database inventory with zero visible changes to the storefront experience
