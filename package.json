@@ -7,9 +7,15 @@
     "generate": "tsx scripts/generate-data.ts",
     "build": "tsx scripts/generate-data.ts && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "dotenv": "^17.4.1",
+    "drizzle-orm": "^0.45.2",
     "lightningcss": "^1.32.0",
     "next": "16.2.2",
     "papaparse": "^5.5.3",
@@ -24,6 +30,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "fast-glob": "^3.3.3",
