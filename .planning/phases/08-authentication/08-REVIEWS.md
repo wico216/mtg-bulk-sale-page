@@ -1,9 +1,8 @@
 ---
 phase: 8
-reviewers: [gemini, opencode]
+reviewers: [gemini, codex, opencode]
 reviewed_at: 2026-04-12T00:00:00Z
 plans_reviewed: [08-01-PLAN.md, 08-02-PLAN.md]
-notes: "Codex CLI timed out after 10+ minutes with no output; excluded from review."
 ---
 
 # Cross-AI Plan Review -- Phase 8
@@ -46,6 +45,79 @@ The proposed plans are technically sophisticated and demonstrate a high level of
 
 **Justification:**
 The risk is low because the plan follows a "fail-closed" philosophy (unauthorized users are blocked by default at multiple layers). The technical research into Next.js 16's specific quirks is excellent, which mitigates the usual risks associated with using beta software. The inclusion of unit tests for the core authorization logic further lowers the risk of regressions or logic gaps. The primary remaining risks are minor UX frictions (button latency) and potential configuration errors (env vars), both of which are easily addressable during implementation.
+
+---
+
+## Codex Review
+
+### Plan 08-01: Auth Infrastructure
+
+#### Summary
+This is a strong foundation plan and it matches both the phase goals and the actual repo shape (`src/app`, no existing auth, Vitest in place). The three-layer model is the right one for Next.js 16: `proxy.ts` for optimistic redirects, `auth()` for authoritative page checks, and a dedicated API guard for `/api/admin`. The main gap is that the `/api/admin` behavior is still too ambiguous in the plan text, and that is the one place where AUTH-03 can be missed even if the rest is implemented correctly.
+
+#### Strengths
+- Uses the correct Next.js 16 convention with `src/proxy.ts` at the `src` root.
+- Separates concerns cleanly: Auth.js config, proxy protection, API guard, and tests.
+- Matches the user decisions well: Google OAuth, JWT sessions, 30-day duration, `ADMIN_EMAIL`, custom login page.
+- Keeps public storefront access intact by scoping protection to `/admin` and `/api/admin`.
+- Includes automated tests for both proxy logic and API authorization behavior, which is the right place to invest for this phase.
+
+#### Concerns
+- **[HIGH]** The proxy behavior for `/api/admin/*` is underspecified. If unauthenticated API requests are redirected to `/admin/login` instead of passing through to route handlers that return JSON `401/403`, AUTH-03 is not met.
+- **[MEDIUM]** The proxy test list does not include `/api/admin/*` cases, even though that path is part of the matcher and has the trickiest behavior.
+- **[MEDIUM]** There is no explicit fail-fast handling for missing `ADMIN_EMAIL`, `AUTH_SECRET`, or Google OAuth env vars. A bad deploy would fail closed, but probably with confusing runtime behavior.
+- **[MEDIUM]** `requireAdmin()` returning either `Response` or `AdminSession` is workable, but it creates a footgun for callers who forget the early return check.
+- **[LOW]** The threat model is useful, but it is more detailed than the current implementation/testing plan in the one area that matters most: actual API-path behavior.
+
+#### Suggestions
+- Make `/api/admin/*` handling explicit in the plan: proxy should `next()` those requests, and route handlers should be the only place returning JSON `401/403`.
+- Add proxy tests for unauthenticated and non-admin requests to `/api/admin/*`.
+- Add startup env validation for `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ADMIN_EMAIL`, with clear error messages.
+- Consider a small shared helper like `isAdminEmail(email)` so proxy, pages, and API code use the same comparison logic.
+- If possible, add one tiny protected admin API route in this phase, even just `/api/admin/session` or `/api/admin/health`, so AUTH-03 is proven end-to-end rather than only prepared for later.
+
+#### Risk Assessment: MEDIUM
+The overall design is correct and appropriately scoped, but the API-path ambiguity is a real delivery risk because it touches a stated success criterion directly.
+
+---
+
+### Plan 08-02: Admin UI Pages
+
+#### Summary
+This plan is a good second wave and it tracks the product decisions closely: branded login, access-denied page, minimal admin shell, placeholder dashboard, and a subtle storefront admin entry point. Using a form POST with CSRF instead of the `signIn()` server action is a pragmatic response to the documented Next.js 16/Auth.js issue. The remaining weaknesses are mostly edge-case and maintainability issues rather than fundamental design problems.
+
+#### Strengths
+- Covers all visible UX decisions for Phase 8 without adding unnecessary admin complexity.
+- Correctly avoids relying on the broken `signIn()` server action flow and uses the safer POST-based approach.
+- Preserves defense in depth by checking auth in both layout and page code.
+- Keeps login/access-denied experiences separate from the admin shell, which reduces redirect-loop risk.
+- Adds the storefront "Admin" link in a minimal way that does not affect public access rules.
+
+#### Concerns
+- **[MEDIUM]** The login page plan does not explicitly account for Next.js 16 page props behavior, where `searchParams` is asynchronous. If implemented with old synchronous assumptions, the error-state handling can be wrong or fragile.
+- **[MEDIUM]** Direct unauthenticated visits to `/admin/access-denied` are not clearly defined. The page expects a session email, but the proxy explicitly allows the route through.
+- **[MEDIUM]** Admin-check logic is duplicated across layout and page instead of being centralized, which will become drift-prone as soon as more admin pages exist.
+- **[MEDIUM]** `GoogleSignInButton` depends on fetching a CSRF token on mount, but the plan does not say what happens if that fetch fails or is still loading.
+- **[LOW]** The sign-out path assumes a server-action approach is safe on this stack, but only the sign-in issue is explicitly researched in the plan.
+- **[LOW]** There is no automated verification plan for login-page error rendering, access-denied rendering, or footer-link presence; only manual OAuth testing is called out.
+
+#### Suggestions
+- Specify the login page as an async Server Component and explicitly `await searchParams`; also treat `error` as `string | string[] | undefined`.
+- Define direct-hit behavior for `/admin/access-denied` when no session exists. Redirecting to `/admin/login` is the cleanest option.
+- Extract a shared page-side helper such as `getAdminUserOrRedirect()` or at least reuse `isAdminEmail()` so layout/page logic cannot drift.
+- In `GoogleSignInButton`, disable submission until the CSRF token is loaded and show a small inline error if token fetch fails.
+- Include `callbackUrl=/admin` in the sign-in POST so the successful flow is deterministic and aligned with D-03.
+- Verify the sign-out mechanism on Next.js 16/Auth.js v5 before locking the plan, or use the same explicit POST-with-CSRF pattern there too.
+
+#### Risk Assessment: MEDIUM
+The plan is directionally right and likely to work, but there are a few undefined request-state edges that could produce awkward auth UX or brittle implementation details.
+
+---
+
+### Cross-Plan Notes
+- The wave ordering is correct: 08-02 should not start until 08-01 lands.
+- Neither plan explicitly includes the non-code setup checklist for Google OAuth redirect URIs and local/prod callback URLs. That is a common source of "implementation looks right but login still fails."
+- If the team wants stronger proof that Phase 8 is complete, add one small real `/api/admin/*` route now and test it, rather than waiting for later admin API work.
 
 ---
 
@@ -159,17 +231,28 @@ All issues are addressable with minor tweaks before execution. The plans don't n
 ## Consensus Summary
 
 ### Agreed Strengths
-- **Three-layer defense model** -- Both reviewers praised the proxy.ts + server component + API route guard architecture as correctly matching Next.js 16 Partial Rendering patterns (Gemini: "Layered Security", OpenCode: "Three-layer defense")
-- **Correct handling of Next.js 16 pitfalls** -- Both highlighted the signIn server action workaround (form POST with CSRF) as a vital, well-researched decision
-- **Well-scoped JWT strategy** -- Both agreed JWT sessions without a database table are appropriate for single-admin use case
-- **Comprehensive testing plan** -- Both noted the unit tests for requireAdmin() and proxy redirect logic as a strength
+- **Three-layer defense model** -- All 3 reviewers praised the proxy.ts + server component + API route guard architecture as correctly matching Next.js 16 Partial Rendering patterns (Gemini: "Layered Security", Codex: "three-layer model is the right one", OpenCode: "Three-layer defense")
+- **Correct handling of Next.js 16 pitfalls** -- All 3 highlighted the signIn server action workaround (form POST with CSRF) as a vital, well-researched decision
+- **Well-scoped JWT strategy** -- All 3 agreed JWT sessions without a database table are appropriate for single-admin use case
+- **Clean separation of concerns** -- All 3 noted the wave ordering (infra first, UI second) and well-scoped deliverables as strengths
 
 ### Agreed Concerns
-- **CSRF token race condition on sign-in button** -- Both reviewers flagged this: the GoogleSignInButton renders before the CSRF token fetch completes, allowing premature form submission (Gemini: MEDIUM "latency", OpenCode: HIGH "race condition"). **Consensus: HIGH priority fix -- add `disabled={!csrfToken}` loading state**
-- **signOut server action may fail** -- Both flagged that signOut() may have the same Next.js 16 bug as signIn(), and no fallback is included in the plans (Gemini: "Sign-Out Consistency", OpenCode: HIGH "A1 fallback"). **Consensus: HIGH priority -- prepare form POST fallback for sign-out**
-- **Environment variable validation** -- Both noted risk of misconfigured ADMIN_EMAIL or missing auth env vars (Gemini: LOW "validation", OpenCode: LOW "AUTH_URL"). **Consensus: LOW priority but worth a startup check**
+
+1. **CSRF token race condition on sign-in button** -- All 3 reviewers flagged this: the GoogleSignInButton renders before the CSRF token fetch completes, allowing premature form submission (Gemini: MEDIUM "latency", Codex: MEDIUM "what happens if fetch fails or is still loading", OpenCode: HIGH "race condition"). **Consensus: HIGH priority fix -- add `disabled={!csrfToken}` loading state**
+
+2. **signOut server action may fail like signIn** -- All 3 flagged that signOut() may have the same Next.js 16 bug as signIn(), and no fallback is in the plans (Gemini: "Sign-Out Consistency", Codex: "verify or use same POST-with-CSRF pattern", OpenCode: HIGH "A1 fallback"). **Consensus: HIGH priority -- verify signOut works or prepare form POST fallback**
+
+3. **`/api/admin/*` proxy behavior underspecified** -- Codex (HIGH) and OpenCode (MEDIUM) both flagged that proxy.ts behavior for API routes is ambiguous -- must explicitly `next()` API requests so route handlers return JSON 401/403 instead of HTML redirects. Missing test coverage for this path. **Consensus: HIGH priority -- clarify and test API path behavior**
+
+4. **Environment variable validation** -- All 3 noted risk of misconfigured or missing env vars (Gemini: "Zod schema", Codex: "fail-fast handling", OpenCode: "AUTH_URL"). **Consensus: MEDIUM priority -- add startup validation**
+
+5. **Duplicate admin email check logic** -- Codex suggested `isAdminEmail()` shared helper, OpenCode noted duplication across 3 files is drift-prone. **Consensus: MEDIUM priority -- extract shared helper**
+
+6. **Access-denied page null session** -- Codex and OpenCode both flagged that direct visits to `/admin/access-denied` without a session would show empty email. **Consensus: MEDIUM priority -- add defensive redirect**
 
 ### Divergent Views
-- **Overall risk level** -- Gemini rates the plans as LOW risk, while OpenCode rates them as MEDIUM. The divergence stems from OpenCode identifying specific logic gaps (proxy.ts non-admin login-page bypass, untested auth config) that Gemini did not flag. Worth investigating the proxy.ts logic gap OpenCode identified.
-- **Proxy.ts logic gap** -- Only OpenCode flagged the non-admin login-page bypass where a non-admin user on `/admin/login` falls through without redirect to access-denied. Gemini noted general proxy complexity risk but didn't identify this specific case. Worth verifying this edge case.
-- **Automated test coverage for UI pages** -- Only OpenCode flagged the lack of automated tests for UI components. Gemini focused on the human verification checkpoint as sufficient. The human verification is blocking, but automated regression tests would provide ongoing protection.
+
+- **Overall risk level** -- Gemini: LOW, Codex: MEDIUM, OpenCode: MEDIUM. Gemini focused on the "fail-closed" philosophy as risk mitigation; Codex and OpenCode identified specific logic gaps that could cause AUTH-03 to not be met. The 2-to-1 consensus is MEDIUM.
+- **Async searchParams** -- Only Codex flagged that Next.js 16 makes `searchParams` asynchronous in Server Components, which affects the login page error handling. Neither Gemini nor OpenCode caught this. Worth verifying.
+- **Add a real `/api/admin` route now** -- Only Codex suggested adding a small admin API route (e.g., `/api/admin/health`) to prove AUTH-03 end-to-end in this phase rather than deferring to Phase 9. Pragmatic suggestion worth considering.
+- **proxy.ts non-admin login-page bypass** -- Only OpenCode identified the specific logic gap where non-admin users on `/admin/login` fall through without redirect. Codex focused on the API path gap instead. Both are valid proxy logic issues.
