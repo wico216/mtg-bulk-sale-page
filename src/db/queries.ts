@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, count, max, asc } from "drizzle-orm";
+import { eq, count, max, asc, desc, ilike, and, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { cards } from "@/db/schema";
 import type { Card, CardData } from "@/lib/types";
@@ -81,4 +81,113 @@ export async function getCardsMeta(): Promise<CardData["meta"]> {
     totalSkipped: 0,
     totalMissingPrices: 0,
   };
+}
+
+// --- Admin query types ---
+
+export interface AdminCardsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  set?: string;
+  condition?: string;
+  sortBy?: "name" | "price" | "quantity";
+  sortDir?: "asc" | "desc";
+}
+
+export interface AdminCardsResult {
+  cards: Card[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/** Fetch paginated, filtered, sorted cards for admin table */
+export async function getAdminCards(
+  params: AdminCardsParams = {},
+): Promise<AdminCardsResult> {
+  const {
+    page = 1,
+    limit = 50,
+    search = "",
+    set = "",
+    condition = "",
+    sortBy = "name",
+    sortDir = "asc",
+  } = params;
+
+  const conditions: SQL[] = [];
+  if (search) conditions.push(ilike(cards.name, `%${search}%`));
+  if (set) conditions.push(eq(cards.setCode, set));
+  if (condition) conditions.push(eq(cards.condition, condition));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const offset = (page - 1) * limit;
+  const sortColumn =
+    sortBy === "price"
+      ? cards.price
+      : sortBy === "quantity"
+        ? cards.quantity
+        : cards.name;
+  const sortOrder = sortDir === "desc" ? desc(sortColumn) : asc(sortColumn);
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select()
+      .from(cards)
+      .where(where)
+      .orderBy(sortOrder)
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() }).from(cards).where(where),
+  ]);
+
+  return {
+    cards: rows.map(rowToCard),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
+/**
+ * Update a card's editable fields.
+ * Price is in dollars (converted to cents for storage).
+ * Returns updated Card or null if not found.
+ */
+export async function updateCard(
+  id: string,
+  updates: { price?: number; quantity?: number; condition?: string },
+): Promise<Card | null> {
+  const dbUpdates: Record<string, unknown> = {};
+  if (updates.price !== undefined)
+    dbUpdates.price = Math.round(updates.price * 100);
+  if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
+  if (updates.condition !== undefined) dbUpdates.condition = updates.condition;
+
+  if (Object.keys(dbUpdates).length === 0) return null;
+
+  const result = await db
+    .update(cards)
+    .set(dbUpdates)
+    .where(eq(cards.id, id))
+    .returning();
+  return result.length > 0 ? rowToCard(result[0]) : null;
+}
+
+/** Delete a card by ID. Returns true if deleted, false if not found. */
+export async function deleteCard(id: string): Promise<boolean> {
+  const result = await db
+    .delete(cards)
+    .where(eq(cards.id, id))
+    .returning({ id: cards.id });
+  return result.length > 0;
+}
+
+/** Fetch all cards (unpaginated) for CSV export. Returns raw DB rows (not converted). */
+export async function getAllCardsForExport() {
+  return db.select().from(cards).orderBy(asc(cards.name));
 }
