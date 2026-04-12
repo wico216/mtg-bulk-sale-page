@@ -147,8 +147,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- Data access layer (queries.ts), Card type extension, and page migration to async DB queries
-- [ ] 07-02-PLAN.md -- Checkout API migration, queries unit tests, and build pipeline cleanup
+- [x] 07-01-PLAN.md -- Data access layer (queries.ts), Card type extension, and page migration to async DB queries
+- [x] 07-02-PLAN.md -- Checkout API migration, queries unit tests, and build pipeline cleanup
 
 ### Phase 8: Authentication
 **Goal**: The admin panel is protected so only the seller can access inventory management
@@ -159,10 +159,11 @@ Plans:
   2. Only the seller's specific Google account can access admin pages after login
   3. API routes under /api/admin reject requests without a valid admin session (returns 401/403)
   4. The public storefront remains fully accessible without any login
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md -- Auth.js v5 config, proxy.ts route protection, requireAdmin() API helper, and unit tests
+- [ ] 08-02-PLAN.md -- Login page, access-denied page, admin layout, admin placeholder, and storefront footer Admin link
 
 **UI hint**: yes
 
@@ -250,7 +251,7 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 | 5. Checkout and Deploy | v1.0 | 3/3 | Complete | 2026-04-11 |
 | 6. Database Foundation | v1.1 | 0/2 | Not started | - |
 | 7. Storefront Migration | v1.1 | 0/2 | Not started | - |
-| 8. Authentication | v1.1 | 0/1 | Not started | - |
+| 8. Authentication | v1.1 | 0/2 | Not started | - |
 | 9. Admin Inventory Management | v1.1 | 0/3 | Not started | - |
 | 10. CSV Import | v1.1 | 0/2 | Not started | - |
 | 11. Checkout Upgrade & Order History | v1.1 | 0/2 | Not started | - |
