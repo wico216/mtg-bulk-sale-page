@@ -6,6 +6,8 @@ import { conditionToAbbr } from "@/lib/condition-map";
 import { EditableCell } from "./editable-cell";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { Toast } from "./toast";
+import { ActionBar } from "./action-bar";
+import { Pagination } from "./pagination";
 
 type SortField = "name" | "price" | "quantity";
 type SortDir = "asc" | "desc";
@@ -233,13 +235,13 @@ export function InventoryTable() {
     if (hasFilters) {
       return (
         <>
-          <ActionBarInline
+          <ActionBar
             search={search}
             onSearchChange={setSearch}
             setFilter={setFilter}
-            onSetFilterChange={setSetFilter}
+            onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
             conditionFilter={conditionFilter}
-            onConditionFilterChange={setConditionFilter}
+            onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
             availableSets={availableSets}
             exporting={exporting}
             onExport={handleExport}
@@ -275,13 +277,13 @@ export function InventoryTable() {
 
   return (
     <>
-      <ActionBarInline
+      <ActionBar
         search={search}
         onSearchChange={setSearch}
         setFilter={setFilter}
-        onSetFilterChange={setSetFilter}
+        onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
         conditionFilter={conditionFilter}
-        onConditionFilterChange={setConditionFilter}
+        onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
         availableSets={availableSets}
         exporting={exporting}
         onExport={handleExport}
@@ -440,6 +442,16 @@ export function InventoryTable() {
         </table>
       </div>
 
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={50}
+          onPageChange={setPage}
+        />
+      )}
+
       {toastMessage && (
         <Toast
           message={toastMessage}
@@ -447,77 +459,5 @@ export function InventoryTable() {
         />
       )}
     </>
-  );
-}
-
-/**
- * Inline ActionBar placeholder -- will be replaced by the standalone ActionBar component in Task 2.
- * Provides basic search, filter, and export functionality.
- */
-function ActionBarInline({
-  search,
-  onSearchChange,
-  setFilter,
-  onSetFilterChange,
-  conditionFilter,
-  onConditionFilterChange,
-  availableSets,
-  exporting,
-  onExport,
-}: {
-  search: string;
-  onSearchChange: (v: string) => void;
-  setFilter: string;
-  onSetFilterChange: (v: string) => void;
-  conditionFilter: string;
-  onConditionFilterChange: (v: string) => void;
-  availableSets: string[];
-  exporting: boolean;
-  onExport: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 mb-6">
-      <input
-        type="text"
-        placeholder="Search by name..."
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        aria-label="Search cards by name"
-        className="w-64 rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-      />
-      <select
-        value={setFilter}
-        onChange={(e) => onSetFilterChange(e.target.value)}
-        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm"
-      >
-        <option value="">All sets</option>
-        {availableSets.map((s) => (
-          <option key={s} value={s}>
-            {s.toUpperCase()}
-          </option>
-        ))}
-      </select>
-      <select
-        value={conditionFilter}
-        onChange={(e) => onConditionFilterChange(e.target.value)}
-        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm"
-      >
-        <option value="">All conditions</option>
-        <option value="near_mint">NM</option>
-        <option value="lightly_played">LP</option>
-        <option value="moderately_played">MP</option>
-        <option value="heavily_played">HP</option>
-        <option value="damaged">DMG</option>
-      </select>
-      <button
-        onClick={onExport}
-        disabled={exporting}
-        className={`ml-auto px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
-          exporting ? "opacity-70 cursor-not-allowed" : ""
-        }`}
-      >
-        {exporting ? "Exporting..." : "Export CSV"}
-      </button>
-    </div>
   );
 }
