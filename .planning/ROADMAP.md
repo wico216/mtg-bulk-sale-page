@@ -162,8 +162,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md -- Auth.js v5 config, proxy.ts route protection, requireAdmin() API helper, and unit tests
-- [ ] 08-02-PLAN.md -- Login page, access-denied page, admin layout, admin placeholder, and storefront footer Admin link
+- [x] 08-01-PLAN.md -- Auth.js v5 config, proxy.ts route protection, requireAdmin() API helper, and unit tests
+- [x] 08-02-PLAN.md -- Login page, access-denied page, admin layout, admin placeholder, and storefront footer Admin link
 
 **UI hint**: yes
 
