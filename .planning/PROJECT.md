@@ -2,11 +2,25 @@
 
 ## What This Is
 
-A simple online store for selling Magic: The Gathering bulk cards to friends. Friends browse the inventory, search/filter cards, add them to a cart, and submit an order — no online payment needed. Orders are emailed to both the seller and buyer, and payment happens in person.
+A simple online store for selling Magic: The Gathering bulk cards to friends. Friends browse the inventory, search/filter cards, add them to a cart, and submit an order — no online payment needed. Orders are emailed to both the seller and buyer, and payment happens in person. The seller manages inventory through an admin panel with live editing, CSV import/export, and order tracking.
 
 ## Core Value
 
 Friends can easily find and order cards from your bulk collection without friction — browse, pick, checkout, done.
+
+## Current Milestone: v1.1 Admin Panel & Inventory Management
+
+**Goal:** Replace the static CSV rebuild workflow with a live admin panel for managing inventory, backed by a real database.
+
+**Target features:**
+- Admin panel protected by Google OAuth
+- Vercel Postgres database (migrate from static JSON)
+- Auto-decrement stock on checkout
+- Manually remove/edit cards (price, condition, quantity)
+- CSV import (full replace) and CSV export
+- Bulk select & delete cards
+- Order history
+- Inventory stats dashboard
 
 ## Requirements
 
@@ -17,21 +31,31 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Search cards by name — Validated in Phase 3: Search and Filters
 - [x] Filter cards by mana color — Validated in Phase 3: Search and Filters
 - [x] Shopping cart to collect desired cards — Validated in Phase 4: Shopping Cart
+- [x] Checkout sends order email to seller — Validated in Phase 5: Checkout and Deploy
+- [x] Checkout sends confirmation email to buyer — Validated in Phase 5: Checkout and Deploy
+- [x] Confirmation page shown after checkout — Validated in Phase 5: Checkout and Deploy
+- [x] Friend provides name/email at checkout (no account needed) — Validated in Phase 5: Checkout and Deploy
 
 ### Active
 
-- [ ] Checkout sends order email to seller (you)
-- [ ] Checkout sends confirmation email to buyer (friend)
-- [ ] Confirmation page shown to friend after checkout
-- [ ] Friend provides name/email at checkout (no account needed)
+- [ ] Admin panel with Google OAuth authentication
+- [ ] Vercel Postgres database for live inventory
+- [ ] Auto-decrement stock on checkout
+- [ ] Edit individual card details (price, condition, quantity)
+- [ ] Remove cards from inventory manually
+- [ ] CSV import (full replace) into database
+- [ ] CSV export of current inventory
+- [ ] Bulk select and delete cards
+- [ ] Order history dashboard
+- [ ] Inventory stats (total cards, value, breakdowns)
 
 ### Out of Scope
 
 - Payment processing — friends pay in person
-- User accounts/authentication — not needed for friend circle
-- Admin dashboard — CSV upload is sufficient for inventory management
-- Real-time inventory sync — manual CSV re-upload when stock changes
+- Multiple admin accounts — single admin (seller), public storefront. Google OAuth chosen for future buyer order tracking.
+- Real-time collaborative editing — single admin user
 - Card grading beyond standard conditions (NM/LP/MP/HP/DMG)
+- Mobile app — web-only
 
 ## Context
 
@@ -39,23 +63,47 @@ Friends can easily find and order cards from your bulk collection without fricti
 - Card images and metadata available via Scryfall API (free, no auth required)
 - Target audience is a small friend group, so scale is not a concern
 - No payment gateway needed — all transactions settled in person
-- Public access (no password) — anyone with the link can browse and order
+- Public storefront (no password) — admin panel is Google OAuth protected
+- v1.0 shipped: browse, search, filter, cart, email checkout — all static/build-time
+- v1.1 shifts from static JSON to Vercel Postgres for live inventory management
 
 ## Constraints
 
-- **Budget**: Free or minimal hosting costs preferred
+- **Budget**: Free or minimal hosting costs preferred (Vercel free tier for Postgres + hosting)
 - **Complexity**: Keep it simple — this is a personal tool, not a business platform
 - **Data source**: Must work with Manabox CSV export format
+- **Auth**: Google OAuth for admin only — storefront stays public (Google chosen so friends can reuse accounts for future order tracking)
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| No payment processing | Friends pay in person, avoids payment gateway complexity | — Pending |
-| No user accounts | Small friend circle, unnecessary friction | — Pending |
-| Manabox CSV as data source | Already using Manabox to catalog collection | — Pending |
-| Scryfall API for card images | Free, comprehensive, no auth required | — Pending |
-| Public access | No need to gate access for a friend store | — Pending |
+| No payment processing | Friends pay in person, avoids payment gateway complexity | ✓ Good |
+| No user accounts for buyers | Small friend circle, unnecessary friction | ✓ Good |
+| Manabox CSV as data source | Already using Manabox to catalog collection | ✓ Good |
+| Scryfall API for card images | Free, comprehensive, no auth required | ✓ Good |
+| Public storefront access | No need to gate access for a friend store | ✓ Good |
+| Vercel Postgres | Free tier, same platform as hosting, managed | — Pending |
+| Google OAuth for admin | Friends already have Google accounts — enables future buyer order tracking | — Pending |
+| Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
+| CSV import replaces inventory | Simple mental model — Manabox export is source of truth | — Pending |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after Phase 4 completion — cart fully verified*
+*Last updated: 2026-04-11 after milestone v1.1 started — admin panel & inventory management*
