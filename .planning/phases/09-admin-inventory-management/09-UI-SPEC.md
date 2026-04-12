@@ -54,17 +54,17 @@ Source: Inherited from Phase 8 UI-SPEC. Matches existing admin layout (`px-4`, `
 | Caption | 12px (`text-xs`) | 400 (regular) | 1.5 |
 | Body | 14px (`text-sm`) | 400 (regular) | 1.5 |
 | Label | 14px (`text-sm`) | 600 (semibold) | 1.5 |
-| Heading | 20px (`text-xl`) | 700 (bold) | 1.2 |
+| Heading | 20px (`text-xl`) | 600 (semibold) | 1.2 |
 
-Font weights used: 400 (regular) and 700 (bold), with 600 (semibold) for table column headers only.
+Font weights used: 400 (regular) and 600 (semibold).
 
 Role usage:
 - **Caption** (12px regular): Pagination info ("Showing 1-50 of 312"), low stock badge text, result counts, condition abbreviations in table
 - **Body** (14px regular): Table cell text (card name, set, price, quantity), search input text, filter dropdown text, inline edit input text
 - **Label** (14px semibold): Table column headers (Name, Set, Price, Condition, Qty, Actions), filter labels, "Export CSV" button text
-- **Heading** (20px bold): Page heading ("Inventory")
+- **Heading** (20px semibold): Page heading ("Inventory")
 
-Source: Inherited from Phase 8 UI-SPEC. Added Label role (14px semibold) for table column headers -- needed for data table visual hierarchy.
+Source: Inherited from Phase 8 UI-SPEC. Added Label role (14px semibold) for table column headers -- needed for data table visual hierarchy. Consolidated to 2 weights (400 + 600) by aligning page heading with semibold instead of bold.
 
 ---
 
@@ -77,7 +77,7 @@ Source: Inherited from Phase 8 UI-SPEC. Added Label role (14px semibold) for tab
 | Accent (10%) | `#4f46e5` (indigo-600) | Save success indicator, active sort column indicator, "Export CSV" button |
 | Accent hover | `#4338ca` (indigo-700) | Hover state for accent elements |
 | Accent light | `#eef2ff` (indigo-50) | Save success flash background on edited cells |
-| Destructive | `#dc2626` (red-600) | Delete button icon, delete confirmation "Confirm" button background, error toast text |
+| Destructive | `#dc2626` (red-600) | Delete button icon, delete confirmation "Delete Card" button background, error toast text |
 | Warning | `#d97706` (amber-600) | Low stock highlight: row left border accent and badge text for qty=1 cards |
 
 Accent reserved for: "Export CSV" button, sort direction indicator on active column header, success flash after inline save, pagination active page number.
@@ -129,15 +129,15 @@ Source: `globals.css` defines `--color-accent: #4f46e5`, `--color-accent-hover: 
 | Element | Copy |
 |---------|------|
 | Delete button | Trash icon (no text) |
-| Confirmation row | `Delete {card name}?` with `Confirm` and `Cancel` buttons |
+| Confirmation row | `Delete {card name}?` with `Delete Card` and `Keep Card` buttons |
 | Delete error toast | `Failed to delete card. Try again.` |
 
 ### Pagination
 
 | Element | Copy |
 |---------|------|
-| Previous button | `Previous` |
-| Next button | `Next` |
+| Previous button | `Previous Page` |
+| Next button | `Next Page` |
 | Page indicator | `Page {current} of {total}` |
 
 Source: CONTEXT.md decisions D-09, D-12, D-13, D-14. Empty states inferred from requirements (new admin with no inventory, search with no matches).
@@ -150,12 +150,14 @@ Source: CONTEXT.md decisions D-09, D-12, D-13, D-14. Empty states inferred from 
 
 Structure: Renders inside existing admin layout (header with "Viki Admin" badge and sign-out). Replaces the current placeholder page.
 
+Focal point: The data table is the primary focal point of this screen. The user's eye should land on the table body first (card rows), guided by the heading and action bar above it. The "Export CSV" accent-colored button serves as the secondary focal point in the action bar.
+
 ```
 +----------------------------------------------------------+
 | Viki  [Admin]                              [Sign out]    |  <- existing admin header
 +----------------------------------------------------------+
 |                                                          |
-|  Inventory                                               |  <- text-xl font-bold
+|  Inventory                                               |  <- text-xl font-semibold
 |                                                          |
 |  +------------------------------------------------------+|
 |  | [Search by name...]  [All sets v] [All conditions v] ||  <- action bar
@@ -171,16 +173,16 @@ Structure: Renders inside existing admin layout (header with "Viki Admin" badge 
 |  +------------------------------------------------------+|
 |  |[img]| Card C   | SLD    | [$1.00]| [NM] | [2]  | [x]||  <- editing state (cells become inputs)
 |  +------------------------------------------------------+|
-|  |     | Delete Card D?            [Confirm] [Cancel]    ||  <- delete confirmation row
+|  |     | Delete Card D?       [Delete Card] [Keep Card]  ||  <- delete confirmation row
 |  +------------------------------------------------------+|
 |                                                          |
-|  Showing 1-50 of 312 cards     [< Prev] 1 2 3 ... [Next]|  <- pagination
+|  Showing 1-50 of 312 cards  [< Prev Page] 1 2 ... [Next Page >]|  <- pagination
 |                                                          |
 +----------------------------------------------------------+
 ```
 
 - Container: inherits `max-w-7xl mx-auto px-4 pt-6` from admin layout
-- Page heading: `text-xl font-bold` with `mb-6` (24px gap to action bar)
+- Page heading: `text-xl font-semibold` with `mb-6` (24px gap to action bar)
 
 ### Action Bar
 
@@ -259,18 +261,18 @@ This dual treatment ensures low stock stands out at a glance in both full-width 
 When the admin clicks the delete (trash) icon:
 1. The entire row content is replaced with the confirmation state
 2. Row background changes to `bg-red-50 dark:bg-red-950/20`
-3. Row content: `Delete {card name}?` text (14px regular) with `Confirm` and `Cancel` buttons
+3. Row content: `Delete {card name}?` text (14px regular) with `Delete Card` and `Keep Card` buttons
 
-**Confirm button:** `px-3 py-1 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors`
-**Cancel button:** `px-3 py-1 text-sm font-semibold rounded-md border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors`
+**Delete Card button:** `px-3 py-1 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors`
+**Keep Card button:** `px-3 py-1 text-sm font-semibold rounded-md border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors`
 
-Clicking Cancel restores the original row. Clicking Confirm sends the delete request, shows a brief loading state (confirm button text changes to "Deleting..." with `opacity-70`), then removes the row from the table.
+Clicking Keep Card restores the original row. Clicking Delete Card sends the delete request, shows a brief loading state (button text changes to "Deleting..." with `opacity-70`), then removes the row from the table.
 
 ### Pagination Controls (D-03)
 
 ```
 +----------------------------------------------------------+
-| Showing 1-50 of 312 cards      [< Prev] 1 2 3 ... [Next>]|
+| Showing 1-50 of 312 cards  [< Previous Page] 1 2 3 ... [Next Page >]|
 +----------------------------------------------------------+
 ```
 
@@ -339,7 +341,7 @@ Click cycles: unsorted -> ascending -> descending -> unsorted.
 | Default | `text-zinc-400` trash icon (20px) |
 | Hover | `text-red-500` |
 | Confirming | Row replaced with confirmation bar (see Delete Confirmation Row) |
-| Deleting | Confirm button `opacity-70`, text "Deleting..." |
+| Deleting | Delete Card button `opacity-70`, text "Deleting..." |
 
 ### Export CSV Button
 
