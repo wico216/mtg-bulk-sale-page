@@ -178,12 +178,12 @@ Plans:
   4. Admin can search cards by name and filter by set or condition within the admin table
   5. Cards with quantity of 1 are visually highlighted as low stock in the table
   6. Admin can export the current inventory as a downloadable CSV file
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
-- [ ] 09-03: TBD
+- [ ] 09-01-PLAN.md -- Restore database layer (Drizzle ORM, Neon client, schema, queries) and migrate storefront back to DB
+- [ ] 09-02-PLAN.md -- Admin API routes (GET/PATCH/DELETE cards, CSV export), condition mapping, and unit tests
+- [ ] 09-03-PLAN.md -- Admin inventory table UI with inline editing, search/filters, pagination, and CSV export button
 
 **UI hint**: yes
 
