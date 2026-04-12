@@ -2,7 +2,6 @@ import { loadCardData } from "@/lib/load-cards";
 import Header from "@/components/header";
 import FilterBar from "@/components/filter-bar";
 import CardGrid from "@/components/card-grid";
-import Link from "next/link";
 
 export default function Home() {
   const data = loadCardData();
@@ -19,16 +18,6 @@ export default function Home() {
             </code>
           </p>
         </main>
-        <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-auto">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex justify-end">
-            <Link
-              href="/admin"
-              className="text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400"
-            >
-              Admin
-            </Link>
-          </div>
-        </footer>
       </div>
     );
   }
@@ -40,16 +29,6 @@ export default function Home() {
       <main className="pt-6">
         <CardGrid cards={data.cards} meta={data.meta} />
       </main>
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-end">
-          <Link
-            href="/admin"
-            className="text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400"
-          >
-            Admin
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }
