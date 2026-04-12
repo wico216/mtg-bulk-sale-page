@@ -38,7 +38,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Active
 
-- [ ] Admin panel with Google OAuth authentication
+- [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
 - [ ] Vercel Postgres database for live inventory
 - [ ] Auto-decrement stock on checkout
 - [ ] Edit individual card details (price, condition, quantity)
@@ -84,7 +84,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Scryfall API for card images | Free, comprehensive, no auth required | ✓ Good |
 | Public storefront access | No need to gate access for a friend store | ✓ Good |
 | Vercel Postgres | Free tier, same platform as hosting, managed | — Pending |
-| Google OAuth for admin | Friends already have Google accounts — enables future buyer order tracking | — Pending |
+| Google OAuth for admin | Friends already have Google accounts — enables future buyer order tracking | ✓ Good |
 | Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
 | CSV import replaces inventory | Simple mental model — Manabox export is source of truth | — Pending |
 
@@ -106,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-11 after milestone v1.1 started — admin panel & inventory management*
+*Last updated: 2026-04-12 after Phase 8 complete — Google OAuth admin authentication*
