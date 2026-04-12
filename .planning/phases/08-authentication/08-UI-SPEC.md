@@ -33,17 +33,19 @@ Declared values (must be multiples of 4):
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4px | Icon gaps, inline padding |
-| sm | 8px | Compact element spacing, input padding-y |
-| md | 16px | Default element spacing, container px |
-| lg | 24px | Section padding, form group gaps |
+| xs | 4px | Icon gaps, inline padding, badge vertical padding |
+| sm | 8px | Compact element spacing, input padding-y, icon-to-text gaps |
+| sm+ | 12px | Compact bar padding-y (header `py-3`), error alert inner padding |
+| md | 16px | Default element spacing, container px, button-to-link gaps |
+| md+ | 20px | Button horizontal padding (`px-5`), matching existing CTA pattern |
+| lg | 24px | Section padding, form group gaps, content area top padding |
 | xl | 32px | Layout gaps between major sections |
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level vertical centering offsets |
 
-Exceptions: none
+Exceptions: none. The `sm+` (12px) and `md+` (20px) tokens are non-standard 8-point values but are multiples of 4 and match established codebase patterns (`py-3` on headers, `px-5` on buttons throughout checkout and confirmation pages).
 
-Source: Derived from existing codebase patterns (`px-4` = 16px, `py-3` = 12px used for compact bars, `py-2` = 8px for inputs, `mb-6` = 24px for section gaps).
+Source: Derived from existing codebase patterns (`px-4` = 16px, `py-3` = 12px used for compact bars, `py-2` = 8px for inputs, `mb-6` = 24px for section gaps, `px-5` on all CTA buttons).
 
 ---
 
@@ -51,12 +53,20 @@ Source: Derived from existing codebase patterns (`px-4` = 16px, `py-3` = 12px us
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
+| Caption | 12px (`text-xs`) | 400 (regular) | 1.5 |
 | Body | 14px (`text-sm`) | 400 (regular) | 1.5 |
-| Label | 14px (`text-sm`) | 600 (semibold) | 1.5 |
-| Heading | 20px (`text-xl`) | 600 (semibold) | 1.2 |
-| Display | 18px (`text-lg`) | 700 (bold, store name only) | 1.2 |
+| Heading | 20px (`text-xl`) | 700 (bold) | 1.2 |
 
-Source: Existing storefront uses `text-sm` for body/labels, `text-xl font-semibold` for page headings, `text-lg font-bold` for the store name in the header.
+Font weights used: 400 (regular) and 700 (bold). Only two weights.
+
+Role usage:
+- **Caption** (12px regular): Admin badge text, storefront footer "Admin" link
+- **Body** (14px regular): Paragraph text, access notice, error messages, link text, form labels. Labels are distinguished by context (above inputs) not by weight.
+- **Heading** (20px bold): Page headings ("Access Denied", "Welcome, {name}"), store name display ("Viki MTG Bulk Store" on login page, "Viki" in admin header)
+
+Note: The existing storefront header uses `text-lg font-bold` (18px) for the store name and `text-xl font-semibold` (20px) for page headings. This phase unifies both under Heading (20px bold) for the admin-specific pages. The storefront header itself is not modified, so the existing 18px store name remains untouched.
+
+Source: Existing storefront uses `text-sm` for body/labels, `text-xl font-semibold` for page headings. Collapsed to 2 weights per design contract rules.
 
 ---
 
@@ -133,7 +143,7 @@ Structure: Vertically centered card on full-page background. No header, no foote
 ```
 +------------------------------------------+
 |                                          |
-|          [Viki MTG Bulk Store]           |  <- store name, same as header style
+|          [Viki MTG Bulk Store]           |  <- store name, text-xl font-bold
 |                                          |
 |     +----------------------------+       |
 |     |                            |       |
@@ -154,7 +164,7 @@ Structure: Vertically centered card on full-page background. No header, no foote
 
 - Container: `max-w-sm mx-auto`, centered vertically with `min-h-screen flex items-center justify-center`
 - Card area: no visible card border -- just centered content block with `text-center`
-- Google button: `w-full px-5 py-3 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors`
+- Google button: `w-full px-5 py-3 text-sm font-bold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors`
 - Google icon: inline SVG (24x24 Google "G" logo) placed left of button text, 8px gap
 
 ### Access Denied Page
@@ -166,10 +176,10 @@ Structure: Same centered layout as login page. No header.
 |                                          |
 |          [Viki MTG Bulk Store]           |
 |                                          |
-|          Access Denied                   |  <- text-xl font-semibold
+|          Access Denied                   |  <- text-xl font-bold
 |                                          |
 |     user@example.com does not have       |  <- text-sm, zinc-500
-|     admin access to this store.          |     email in font-medium
+|     admin access to this store.          |     email in font-bold
 |                                          |
 |     [Sign out]    Back to store          |  <- Sign out: accent bg button
 |                                          |     Back to store: text link
@@ -177,7 +187,7 @@ Structure: Same centered layout as login page. No header.
 ```
 
 - Same container as login: `max-w-sm mx-auto`, vertically centered
-- "Sign out" button: `px-5 py-2 text-sm font-semibold rounded-md bg-accent text-white`
+- "Sign out" button: `px-5 py-2 text-sm font-bold rounded-md bg-accent text-white`
 - "Back to store" link: `text-sm text-accent hover:underline`, 16px gap from button
 
 ### Admin Layout (header + content)
@@ -195,8 +205,8 @@ Structure: Full-width header bar, content area below. Matches storefront header 
 ```
 
 - Header: `border-b border-zinc-200 dark:border-zinc-800`, inner `max-w-7xl mx-auto px-4 py-3 flex items-center justify-between`
-- "Viki" text: `text-lg font-bold text-accent` (matches storefront header)
-- "Admin" badge: `ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-light text-accent` (indigo-50 bg, indigo-600 text)
+- "Viki" text: `text-xl font-bold text-accent` (admin header uses Heading size for store name)
+- "Admin" badge: `ml-2 text-xs font-bold px-2 py-1 rounded-full bg-accent-light text-accent` (indigo-50 bg, indigo-600 text)
 - "Sign out" button: `text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300` -- text-only button, no background
 - Content area: `max-w-7xl mx-auto px-4 pt-6`
 
@@ -209,14 +219,14 @@ Structure: Simple centered content within admin layout.
 | [Admin Header]                           |
 +------------------------------------------+
 |                                          |
-|  Welcome, Wiko                           |  <- text-xl font-semibold
+|  Welcome, Wiko                           |  <- text-xl font-bold
 |                                          |
 |  Inventory management coming soon.       |  <- text-sm, zinc-500
 |                                          |
 +------------------------------------------+
 ```
 
-- Heading: `text-xl font-semibold` (matches page heading pattern)
+- Heading: `text-xl font-bold` (matches Heading role)
 - Body: `text-sm text-zinc-500 dark:text-zinc-400 mt-2`
 
 ### Storefront Footer Addition
