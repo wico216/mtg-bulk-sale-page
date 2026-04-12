@@ -1,36 +1,21 @@
+import { loadCardData } from "@/lib/load-cards";
 import Header from "@/components/header";
 import CartPageClient from "./cart-page-client";
-import { getCards } from "@/db/queries";
 
 export const metadata = {
   title: "Cart -- Viki MTG Bulk Store",
 };
 
-export const dynamic = "force-dynamic";
+export default function CartPage() {
+  const data = loadCardData();
+  const cards = data?.cards ?? [];
 
-export default async function CartPage() {
-  try {
-    const cards = await getCards();
-
-    return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-        <Header />
-        <main className="pt-6 pb-24">
-          <CartPageClient cards={cards} />
-        </main>
-      </div>
-    );
-  } catch (error) {
-    console.error("[CART] Database error:", error);
-    return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-        <Header />
-        <main className="max-w-7xl mx-auto px-4 py-16 text-center">
-          <p className="text-lg text-zinc-600 dark:text-zinc-400">
-            Store temporarily unavailable, try again soon.
-          </p>
-        </main>
-      </div>
-    );
-  }
+  return (
+    <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <Header />
+      <main className="pt-6 pb-24">
+        <CartPageClient cards={cards} />
+      </main>
+    </div>
+  );
 }

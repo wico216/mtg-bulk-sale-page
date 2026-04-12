@@ -45,10 +45,6 @@ export interface Card {
   oracleText: string | null;
   rarity: string;
   foil: boolean;
-  // D-07: Optional DB fields (available for future phases)
-  scryfallId?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 /**
