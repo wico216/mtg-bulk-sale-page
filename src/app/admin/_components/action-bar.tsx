@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 interface ActionBarProps {
   search: string;
@@ -87,11 +88,19 @@ export function ActionBar({
         <option value="damaged">DMG</option>
       </select>
 
+      {/* D-02: Import CSV link (navigates — not a mutation — so it's a Link, not a button) */}
+      <Link
+        href="/admin/import"
+        className="ml-auto px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+      >
+        Import CSV
+      </Link>
+
       {/* Export CSV button (D-12) */}
       <button
         onClick={onExport}
         disabled={exporting}
-        className={`ml-auto px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
+        className={`px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
           exporting ? "opacity-70 cursor-not-allowed" : ""
         }`}
       >

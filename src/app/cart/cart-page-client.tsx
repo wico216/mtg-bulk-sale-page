@@ -34,6 +34,18 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
     [cards],
   );
 
+  // D-13: After import, the cards DB may have different IDs than what's in the
+  // buyer's localStorage cart. Silently drop any stale IDs — no visible "No longer
+  // available" warning. The buyer's cart just quietly shrinks to what still exists.
+  useEffect(() => {
+    if (!hydrated) return;
+    for (const [cardId] of items) {
+      if (!cardMap.has(cardId)) {
+        removeItem(cardId);
+      }
+    }
+  }, [hydrated, items, cardMap, removeItem]);
+
   // Convert Map to array for rendering
   const cartEntries = useMemo(() => [...items.entries()], [items]);
 

@@ -74,6 +74,7 @@ export function InventoryTable() {
   const [error, setError] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastVariant, setToastVariant] = useState<"success" | "error">("error");
   const [availableSets, setAvailableSets] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
 
@@ -106,6 +107,22 @@ export function InventoryTable() {
       setLoading(false);
     }
   }, [page, debouncedSearch, setFilter, conditionFilter, sortBy, sortDir]);
+
+  // D-15: Post-import success toast handoff via sessionStorage.
+  // import-client sets "admin-toast" to a JSON { message, variant: "success" } before router.push("/admin").
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem("admin-toast");
+    if (!raw) return;
+    window.sessionStorage.removeItem("admin-toast");
+    try {
+      const parsed = JSON.parse(raw) as { message: string; variant?: "success" | "error" };
+      setToastMessage(parsed.message);
+      setToastVariant(parsed.variant ?? "success");
+    } catch {
+      // malformed payload — ignore silently
+    }
+  }, []);
 
   // Fetch available sets on mount (all cards, no filter)
   useEffect(() => {
@@ -455,7 +472,11 @@ export function InventoryTable() {
       {toastMessage && (
         <Toast
           message={toastMessage}
-          onDismiss={() => setToastMessage(null)}
+          variant={toastVariant}
+          onDismiss={() => {
+            setToastMessage(null);
+            setToastVariant("error");
+          }}
         />
       )}
     </>
