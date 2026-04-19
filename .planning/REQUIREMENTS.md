@@ -67,8 +67,8 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ### CSV Operations
 
-- [ ] **CSV-01**: Admin can import a Manabox CSV to replace full inventory
-- [ ] **CSV-02**: Import shows a preview (cards to add, rows skipped) before committing
+- [x] **CSV-01**: Admin can import a Manabox CSV to replace full inventory
+- [x] **CSV-02**: Import shows a preview (cards to add, rows skipped) before committing
 - [ ] **CSV-03**: Admin can export current inventory as CSV
 
 ### Orders
@@ -131,8 +131,8 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | INV-04 | Phase 12 | Pending |
 | INV-05 | Phase 9 | Pending |
 | INV-06 | Phase 9 | Pending |
-| CSV-01 | Phase 10 | Pending |
-| CSV-02 | Phase 10 | Pending |
+| CSV-01 | Phase 10 | Complete |
+| CSV-02 | Phase 10 | Complete |
 | CSV-03 | Phase 9 | Pending |
 | ORD-01 | Phase 11 | Pending |
 | ORD-02 | Phase 11 | Pending |
