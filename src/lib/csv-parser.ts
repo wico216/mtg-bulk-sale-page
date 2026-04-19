@@ -4,6 +4,101 @@ import { globSync } from "fast-glob";
 import type { ManaboxRow, Card } from "./types";
 
 /**
+ * A row from the uploaded CSV that could not be converted to a Card.
+ * Row numbers are 1-indexed where the header line is row 1 and the first data
+ * row is row 2 (matches what a user sees in their spreadsheet app).
+ */
+export interface SkippedRow {
+  rowNumber: number;
+  reason: string;
+  name?: string;
+  setCode?: string;
+  collectorNumber?: string;
+}
+
+/** Return shape of parseManaboxCsvContent. */
+export interface ParseResult {
+  cards: Card[];
+  skippedRows: SkippedRow[];
+}
+
+/**
+ * Shared row -> Card mapper. Returns either a Card or a SkippedRow with a
+ * concrete reason so the admin import UI (Phase 10 D-05 zone 3) can show
+ * per-row feedback.
+ */
+function rowToCardOrSkip(
+  row: ManaboxRow,
+  rowNumber: number,
+): { card: Card } | { skipped: SkippedRow } {
+  const rawSetCode = row["Set code"];
+  const rawCollectorNumber = row["Collector number"];
+  const name = row.Name;
+
+  const bestEffortSetCode =
+    rawSetCode != null && rawSetCode !== ""
+      ? String(rawSetCode).toLowerCase()
+      : undefined;
+  const bestEffortCollectorNumber =
+    rawCollectorNumber != null && rawCollectorNumber !== ""
+      ? String(rawCollectorNumber)
+      : undefined;
+
+  if (!name) {
+    return {
+      skipped: {
+        rowNumber,
+        reason: "missing Name",
+        setCode: bestEffortSetCode,
+        collectorNumber: bestEffortCollectorNumber,
+      },
+    };
+  }
+  if (rawSetCode == null || rawSetCode === "") {
+    return {
+      skipped: {
+        rowNumber,
+        reason: "missing Set code",
+        name,
+        collectorNumber: bestEffortCollectorNumber,
+      },
+    };
+  }
+  if (rawCollectorNumber == null || rawCollectorNumber === "") {
+    return {
+      skipped: {
+        rowNumber,
+        reason: "missing Collector number",
+        name,
+        setCode: bestEffortSetCode,
+      },
+    };
+  }
+
+  const setCode = String(rawSetCode).toLowerCase();
+  const collectorNumber = String(rawCollectorNumber);
+  const foil = row.Foil === "foil";
+  const condition = row.Condition || "unknown";
+
+  const card: Card = {
+    id: `${setCode}-${collectorNumber}-${foil ? "foil" : "normal"}-${condition}`,
+    name,
+    setCode,
+    setName: row["Set name"] || "",
+    collectorNumber,
+    price: null,
+    condition,
+    quantity: row.Quantity ?? 1,
+    colorIdentity: [],
+    imageUrl: null,
+    oracleText: null,
+    rarity: row.Rarity || "unknown",
+    foil,
+  };
+  return { card };
+}
+
+/**
  * Parse a single Manabox CSV file into partial Card objects.
  * Enrichment fields (price, colorIdentity, imageUrl) are left as null/empty.
  */
@@ -22,31 +117,11 @@ function parseSingleCsv(filePath: string): Card[] {
   const cards: Card[] = [];
 
   for (const row of result.data) {
-    // Skip rows missing required fields
-    if (!row.Name || !row["Set code"] || !row["Collector number"]) {
-      continue;
-    }
-
-    const setCode = row["Set code"].toLowerCase();
-    const collectorNumber = String(row["Collector number"]);
-    const foil = row.Foil === "foil";
-    const condition = row.Condition || "unknown";
-
-    cards.push({
-      id: `${setCode}-${collectorNumber}-${foil ? "foil" : "normal"}-${condition}`,
-      name: row.Name,
-      setCode,
-      setName: row["Set name"] || "",
-      collectorNumber,
-      price: null,
-      condition,
-      quantity: row.Quantity ?? 1,
-      colorIdentity: [],
-      imageUrl: null,
-      oracleText: null,
-      rarity: row.Rarity || "unknown",
-      foil,
-    });
+    // Skip rows missing required fields (filesystem path preserves silent-skip
+    // behavior; the uploaded-content path uses parseManaboxCsvContent which
+    // records SkippedRow entries).
+    const outcome = rowToCardOrSkip(row, 0);
+    if ("card" in outcome) cards.push(outcome.card);
   }
 
   return cards;
@@ -98,4 +173,42 @@ export function parseAllCsvFiles(inventoryDir: string): Card[] {
   console.log(`Total: ${allCards.length} raw cards, ${merged.length} after deduplication`);
 
   return merged;
+}
+
+/**
+ * Parse Manabox CSV content from a string (used by the admin import Route
+ * Handler, Phase 10). Unlike parseAllCsvFiles, this function RECORDS each
+ * skipped row with a 1-indexed row number (header = row 1, first data row =
+ * row 2) and a concrete reason so the preview UI can display per-row feedback.
+ */
+export function parseManaboxCsvContent(content: string): ParseResult {
+  const result = Papa.parse<ManaboxRow>(content, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+  });
+
+  const cards: Card[] = [];
+  const skippedRows: SkippedRow[] = [];
+
+  result.data.forEach((row, index) => {
+    const rowNumber = index + 2; // header is row 1
+    const outcome = rowToCardOrSkip(row, rowNumber);
+    if ("card" in outcome) cards.push(outcome.card);
+    else skippedRows.push(outcome.skipped);
+  });
+
+  // PapaParse errors that couldn't even produce a row surface as SkippedRow
+  // entries too -- preserves the same row-number convention.
+  for (const err of result.errors) {
+    if (err.row != null) {
+      skippedRows.push({
+        rowNumber: err.row + 2,
+        reason: `parse error: ${err.message}`,
+      });
+    }
+  }
+
+  const merged = mergeCards(cards);
+  return { cards: merged, skippedRows };
 }
