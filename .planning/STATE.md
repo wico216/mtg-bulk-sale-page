@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Completed 10-01-PLAN.md (library primitives)
-last_updated: "2026-04-19T06:08:21.203Z"
+stopped_at: Completed 10-02-PLAN.md (route handlers + shared import contract)
+last_updated: "2026-04-19T06:15:18.982Z"
 last_activity: 2026-04-19
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 82
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 10 (csv-import) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-19
 
@@ -59,6 +59,7 @@ Progress: [████████░░] 82%
 | Phase 05 P01 | 5min | 2 tasks | 10 files |
 | Phase 05 P02 | 3min | 2 tasks | 5 files |
 | Phase 10 P01 | 4min | 3 tasks | 7 files |
+| Phase 10 P02 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,11 @@ Recent decisions affecting current work:
 - [Phase 10-01]: cardToRow imported from @/db/seed rather than extracted -- avoids refactor; seed.test.ts coverage remains authoritative
 - [Phase 10-01]: enrichCards onProgress fires on both success and skip paths (once per card, strict ascending) for accurate UI progress bar
 - [Phase 10-01]: CSV row numbers 1-indexed with header=row 1 (first data row=row 2) matching spreadsheet app convention
+- [Phase 10-02]: Client holds enriched Card[] between /preview and /commit -- serverless memory is not shared across invocations; token-based handoff would require a persistent store we don't need
+- [Phase 10-02]: NDJSON preview final message carries FULL cards[] (not just 20-card sample) so /commit receives the exact payload the admin approved
+- [Phase 10-02]: maxDuration=300 on preview only (Scryfall rate limit headroom); commit uses maxDuration=30 (DB-only path)
+- [Phase 10-02]: vi.hoisted() to pre-initialize mock fns used by vi.mock factories -- Vitest 4 hoists factories above top-level const declarations
+- [Phase 10-02]: Mock @/db/queries WITHOUT importActual -- @/db/client calls drizzle(DATABASE_URL) at module load and throws without env var
 
 ### Pending Todos
 
@@ -119,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-19T06:08:08.942Z
-Stopped at: Completed 10-01-PLAN.md (library primitives)
+Last session: 2026-04-19T06:15:18.979Z
+Stopped at: Completed 10-02-PLAN.md (route handlers + shared import contract)
 Resume file: None

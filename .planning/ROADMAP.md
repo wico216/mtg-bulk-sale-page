@@ -200,7 +200,7 @@ Plans:
 
 Plans:
 - [x] 10-01-PLAN.md -- Library foundations: parseManaboxCsvContent, enrichCards onProgress + scryfallMisses, replaceAllCards via db.batch, Wave 0 vitest stubs
-- [ ] 10-02-PLAN.md -- Route Handlers: POST /api/admin/import/preview (NDJSON stream) and /commit (atomic replace) + handler tests, shared import-contract.ts
+- [x] 10-02-PLAN.md -- Route Handlers: POST /api/admin/import/preview (NDJSON stream) and /commit (atomic replace) + handler tests, shared import-contract.ts
 - [ ] 10-03-PLAN.md -- Admin UI: /admin/import page with drag-drop, live progress, three-zone preview, destructive confirm, success toast, D-13 cart reconciliation
 
 **UI hint**: yes
@@ -254,6 +254,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 | 7. Storefront Migration | v1.1 | 0/2 | Not started | - |
 | 8. Authentication | v1.1 | 0/2 | Not started | - |
 | 9. Admin Inventory Management | v1.1 | 0/3 | Not started | - |
-| 10. CSV Import | v1.1 | 1/3 | In Progress|  |
+| 10. CSV Import | v1.1 | 2/3 | In Progress|  |
 | 11. Checkout Upgrade & Order History | v1.1 | 0/2 | Not started | - |
 | 12. Bulk Operations & Dashboard | v1.1 | 0/2 | Not started | - |
