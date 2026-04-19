@@ -3,6 +3,7 @@ import "server-only";
 import { eq, count, max, asc, desc, ilike, and, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { cards } from "@/db/schema";
+import { cardToRow } from "@/db/seed";
 import type { Card, CardData } from "@/lib/types";
 
 /**
@@ -190,4 +191,30 @@ export async function deleteCard(id: string): Promise<boolean> {
 /** Fetch all cards (unpaginated) for CSV export. Returns raw DB rows (not converted). */
 export async function getAllCardsForExport() {
   return db.select().from(cards).orderBy(asc(cards.name));
+}
+
+/**
+ * Atomic destructive replace of the entire cards table.
+ *
+ * CRITICAL: uses db.batch([...]) -- NOT db.transaction().
+ * Reason: drizzle-orm/neon-http does not support interactive transactions
+ * (source: node_modules/drizzle-orm/neon-http/session.js throws
+ * "No transactions support in neon-http driver"). db.batch() is routed through
+ * Neon's HTTP transaction() endpoint and is atomic end-to-end -- all statements
+ * commit together or nothing is written (Phase 10 CSV-01 "single transaction").
+ *
+ * Empty input is supported: replaceAllCards([]) wipes the table in a
+ * single-statement batch and returns { inserted: 0 }. The API layer should
+ * still block this at the UI (Pitfall 7) but the helper remains defensive.
+ */
+export async function replaceAllCards(
+  newCards: Card[],
+): Promise<{ inserted: number }> {
+  if (newCards.length === 0) {
+    await db.batch([db.delete(cards)]);
+    return { inserted: 0 };
+  }
+  const rows = newCards.map(cardToRow);
+  await db.batch([db.delete(cards), db.insert(cards).values(rows)]);
+  return { inserted: rows.length };
 }
