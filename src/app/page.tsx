@@ -1,6 +1,5 @@
 import Header from "@/components/header";
-import FilterBar from "@/components/filter-bar";
-import CardGrid from "@/components/card-grid";
+import StorefrontShell from "@/components/storefront-shell";
 import { getCards, getCardsMeta } from "@/db/queries";
 
 export const dynamic = "force-dynamic";
@@ -10,22 +9,42 @@ export default async function Home() {
     const [cards, meta] = await Promise.all([getCards(), getCardsMeta()]);
 
     return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ink)",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <Header />
-        <FilterBar />
-        <main className="pt-6">
-          <CardGrid cards={cards} meta={meta} />
-        </main>
+        <StorefrontShell cards={cards} meta={meta} />
       </div>
     );
   } catch (error) {
     console.error("[HOME] Database error:", error);
     return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ink)",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <Header />
-        <main className="max-w-7xl mx-auto px-4 py-16 text-center">
-          <p className="text-lg text-zinc-600 dark:text-zinc-400">
-            Store temporarily unavailable, try again soon.
+        <main
+          style={{
+            maxWidth: 720,
+            margin: "0 auto",
+            padding: "64px 24px",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: 18, color: "var(--muted)" }}>
+            The shop is briefly closed — try again soon.
           </p>
         </main>
       </div>

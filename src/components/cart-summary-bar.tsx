@@ -12,19 +12,66 @@ export default function CartSummaryBar({
   totalPrice,
 }: CartSummaryBarProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-3">
-      <div className="max-w-3xl mx-auto flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium">
-            {totalItems} {totalItems === 1 ? "card" : "cards"} &mdash; $
-            {totalPrice.toFixed(2)}
-          </p>
+    <div
+      style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 40,
+        borderTop: "1px solid var(--border)",
+        background: "var(--surface)",
+        padding: "14px 16px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 780,
+          margin: "0 auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+          <span
+            style={{
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontSize: 10,
+              color: "var(--muted)",
+            }}
+          >
+            {totalItems} {totalItems === 1 ? "card" : "cards"} · Subtotal
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 26,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            ${totalPrice.toFixed(2)}
+          </span>
         </div>
         <Link
           href="/checkout"
-          className="px-5 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+          style={{
+            background: "var(--accent)",
+            color: "var(--accent-fg)",
+            padding: "12px 22px",
+            borderRadius: 3,
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: "0.02em",
+            textDecoration: "none",
+            fontFamily: "inherit",
+          }}
         >
-          Checkout
+          Proceed to checkout
         </Link>
       </div>
     </div>

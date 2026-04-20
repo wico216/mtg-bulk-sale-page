@@ -3,7 +3,7 @@ import CartPageClient from "./cart-page-client";
 import { getCards } from "@/db/queries";
 
 export const metadata = {
-  title: "Cart -- Viki MTG Bulk Store",
+  title: "The Satchel — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";
@@ -13,9 +13,17 @@ export default async function CartPage() {
     const cards = await getCards();
 
     return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ink)",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <Header />
-        <main className="pt-6 pb-24">
+        <main style={{ paddingTop: 24, paddingBottom: 96 }}>
           <CartPageClient cards={cards} />
         </main>
       </div>
@@ -23,11 +31,19 @@ export default async function CartPage() {
   } catch (error) {
     console.error("[CART] Database error:", error);
     return (
-      <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ink)",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <Header />
-        <main className="max-w-7xl mx-auto px-4 py-16 text-center">
-          <p className="text-lg text-zinc-600 dark:text-zinc-400">
-            Store temporarily unavailable, try again soon.
+        <main style={{ maxWidth: 720, margin: "0 auto", padding: "64px 24px", textAlign: "center" }}>
+          <p style={{ fontSize: 18, color: "var(--muted)" }}>
+            The satchel is briefly mislaid — try again soon.
           </p>
         </main>
       </div>

@@ -11,7 +11,7 @@ interface CardGridProps {
   meta: CardData["meta"];
 }
 
-export default function CardGrid({ cards, meta }: CardGridProps) {
+export default function CardGrid({ cards }: CardGridProps) {
   const setAllCards = useFilterStore((s) => s.setAllCards);
   const clearFilters = useFilterStore((s) => s.clearFilters);
   const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
@@ -20,12 +20,23 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
   const selectedColors = useFilterStore((s) => s.selectedColors);
   const selectedSets = useFilterStore((s) => s.selectedSets);
   const selectedRarities = useFilterStore((s) => s.selectedRarities);
+  const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
+  const priceRange = useFilterStore((s) => s.priceRange);
   const sortBy = useFilterStore((s) => s.sortBy);
 
   const filteredCards = useMemo(
     () => getFilteredCards(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allCards, searchQuery, selectedColors, selectedSets, selectedRarities, sortBy],
+    [
+      allCards,
+      searchQuery,
+      selectedColors,
+      selectedSets,
+      selectedRarities,
+      selectedFinishes,
+      priceRange,
+      sortBy,
+    ],
   );
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -48,32 +59,70 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
 
   if (cards.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 pb-8">
-        <p className="text-center text-zinc-500 py-16">
-          No cards available. Run{" "}
-          <code className="bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-sm">
-            npm run generate
-          </code>{" "}
-          to build inventory.
-        </p>
+      <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 28,
+            color: "var(--ink)",
+            marginBottom: 8,
+            fontStyle: "italic",
+          }}
+        >
+          The shelves are bare.
+        </div>
+        <p style={{ fontSize: 13, margin: 0 }}>Run the inventory generator to stock up.</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pb-8">
-      {filteredCards.length === 0 && cards.length > 0 ? (
-        <div className="text-center py-16">
-          <p className="text-zinc-500 mb-3">No cards match your filters</p>
-          <button
-            onClick={clearFilters}
-            className="text-sm text-accent hover:text-accent-hover cursor-pointer"
+    <>
+      {filteredCards.length === 0 ? (
+        <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 28,
+              color: "var(--ink)",
+              marginBottom: 8,
+              fontStyle: "italic",
+            }}
           >
-            Clear filters
-          </button>
+            Nothing here.
+          </div>
+          <p style={{ fontSize: 13, margin: 0 }}>
+            Try widening the filters, or{" "}
+            <button
+              type="button"
+              onClick={clearFilters}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--accent)",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: "inherit",
+                padding: 0,
+              }}
+            >
+              clear all
+            </button>
+            .
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+            columnGap: 18,
+            rowGap: 28,
+            padding: "28px 32px 80px",
+          }}
+        >
           {filteredCards.map((card) => (
             <CardTile
               key={card.id}
@@ -97,7 +146,8 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
       )}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-[60] overflow-auto bg-black/90 touch-pinch-zoom"
+          className="fixed inset-0 z-[60] overflow-auto touch-pinch-zoom"
+          style={{ background: "rgba(0,0,0,0.9)" }}
           onClick={() => setLightboxUrl(null)}
         >
           <div className="min-h-full flex items-center justify-center p-4">
@@ -113,6 +163,6 @@ export default function CardGrid({ cards, meta }: CardGridProps) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

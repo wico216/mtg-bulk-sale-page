@@ -13,6 +13,31 @@ interface CartItemProps {
   maxStock: number;
 }
 
+const rowShell: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: 12,
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+};
+
+const stepBtn: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: "50%",
+  border: "1px solid var(--border-strong)",
+  background: "var(--bg)",
+  color: "var(--ink)",
+  cursor: "pointer",
+  fontSize: 14,
+  fontFamily: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
 export default function CartItem({
   cardId,
   quantity,
@@ -42,33 +67,50 @@ export default function CartItem({
     }
   }
 
-  // Stale cart item: card no longer in inventory
+  // Stale cart item: card no longer in inventory. Per D-13 we silently strip
+  // these in cart-page-client, but render defensively in case the effect
+  // hasn't fired yet.
   if (!card) {
     return (
-      <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-        <div className="w-12 h-[67px] rounded bg-zinc-200 dark:bg-zinc-700 flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-zinc-400 truncate">{cardId}</p>
-          <p className="text-xs text-red-500">No longer available</p>
+      <div style={rowShell}>
+        <div
+          style={{
+            width: 48,
+            height: 67,
+            borderRadius: 4,
+            background: "var(--surface-2)",
+            flexShrink: 0,
+          }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              fontFamily: "var(--font-display)",
+              color: "var(--muted)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {cardId}
+          </p>
         </div>
         <button
+          type="button"
           onClick={onRemove}
-          className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
           aria-label="Remove unavailable item"
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--muted)",
+            cursor: "pointer",
+            padding: 4,
+          }}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-5 h-5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18 18 6M6 6l12 12"
-            />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
@@ -76,44 +118,99 @@ export default function CartItem({
   }
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-      {/* Thumbnail */}
-      <div className="w-12 h-[67px] flex-shrink-0 relative">
+    <div style={rowShell}>
+      <div
+        style={{
+          position: "relative",
+          width: 48,
+          height: 67,
+          borderRadius: 3,
+          overflow: "hidden",
+          background: "var(--surface-2)",
+          flexShrink: 0,
+        }}
+      >
         {card.imageUrl ? (
           <Image
             src={card.imageUrl}
             alt={card.name}
             width={48}
             height={67}
-            className="rounded object-cover"
+            style={{ objectFit: "cover", display: "block" }}
           />
         ) : (
-          <div className="w-full h-full rounded bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-zinc-400 text-[8px]">
-            No img
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--muted)",
+              fontSize: 8,
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            no img
           </div>
         )}
       </div>
 
-      {/* Card info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{card.name}</p>
-        <p className="text-xs text-zinc-400 truncate">{card.setName}</p>
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
-          {card.price !== null ? `$${card.price.toFixed(2)}` : "N/A"}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-display)",
+            fontSize: 16,
+            fontWeight: 400,
+            lineHeight: 1.15,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={card.name}
+        >
+          {card.name}
+        </p>
+        <p
+          style={{
+            margin: "3px 0 0",
+            fontSize: 10,
+            color: "var(--muted)",
+            fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {card.setCode.toUpperCase()} · {card.setName}
+          {card.foil ? " · Foil" : ""}
+        </p>
+        <p
+          style={{
+            margin: "6px 0 0",
+            fontFamily: "var(--font-display)",
+            fontSize: 16,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {card.price != null ? `$${card.price.toFixed(2)}` : "—"}
         </p>
       </div>
 
-      {/* Quantity controls */}
-      <div className="flex-shrink-0">
-        <div className="flex items-center gap-1.5">
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
-            onClick={() =>
-              quantity <= 1 ? onRemove() : onQuantityChange(quantity - 1)
-            }
-            className="w-7 h-7 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            type="button"
+            onClick={() => (quantity <= 1 ? onRemove() : onQuantityChange(quantity - 1))}
+            style={stepBtn}
             aria-label="Decrease quantity"
           >
-            -
+            −
           </button>
           <input
             type="number"
@@ -121,10 +218,24 @@ export default function CartItem({
             min={1}
             max={maxStock}
             onChange={handleInputChange}
-            className="w-12 text-center text-sm border border-zinc-300 dark:border-zinc-600 rounded-md py-1 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             aria-label="Quantity"
+            style={{
+              width: 48,
+              textAlign: "center",
+              fontSize: 13,
+              border: "1px solid var(--border-strong)",
+              borderRadius: 4,
+              padding: "4px 0",
+              background: "var(--bg)",
+              color: "var(--ink)",
+              fontVariantNumeric: "tabular-nums",
+              fontFamily: "inherit",
+              appearance: "textfield",
+              MozAppearance: "textfield",
+            }}
           />
           <button
+            type="button"
             onClick={() => {
               if (quantity >= maxStock) {
                 showStockWarning();
@@ -133,42 +244,48 @@ export default function CartItem({
               }
             }}
             disabled={quantity >= maxStock}
-            className={`w-7 h-7 flex items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-600 text-sm font-medium transition-colors ${
-              quantity >= maxStock
-                ? "opacity-30 cursor-not-allowed"
-                : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            }`}
             aria-label="Increase quantity"
+            style={{
+              ...stepBtn,
+              opacity: quantity >= maxStock ? 0.3 : 1,
+              cursor: quantity >= maxStock ? "not-allowed" : "pointer",
+            }}
           >
             +
           </button>
         </div>
         {stockWarning && (
-          <p className="text-xs text-amber-600 mt-0.5 text-center">
+          <p
+            style={{
+              fontSize: 10,
+              color: "var(--accent)",
+              marginTop: 4,
+              textAlign: "center",
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+            }}
+          >
             Only {maxStock} available
           </p>
         )}
       </div>
 
-      {/* Remove button */}
       <button
+        type="button"
         onClick={onRemove}
-        className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors flex-shrink-0"
         aria-label="Remove from cart"
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--muted)",
+          cursor: "pointer",
+          padding: 6,
+          flexShrink: 0,
+        }}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="w-5 h-5"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M6 18 18 6M6 6l12 12"
-          />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
         </svg>
       </button>
     </div>

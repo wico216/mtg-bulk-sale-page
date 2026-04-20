@@ -82,14 +82,69 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
     );
   }
 
-  // Empty cart state
+  // Empty cart state — the Satchel is empty.
   if (items.size === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-4 text-center py-16">
-        <p className="text-lg text-zinc-500 mb-4">Your cart is empty</p>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "64px 24px", textAlign: "center" }}>
+        <svg width="160" height="120" viewBox="0 0 140 110" aria-hidden style={{ marginBottom: 24 }}>
+          <defs>
+            <pattern id="stripe" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(135)">
+              <rect width="3" height="6" fill="var(--surface-2)" />
+              <rect x="3" width="3" height="6" fill="var(--surface)" />
+            </pattern>
+          </defs>
+          <g transform="translate(18,28) rotate(-14)">
+            <rect width="46" height="66" rx="3" fill="url(#stripe)" stroke="var(--border-strong)" strokeWidth="1" />
+          </g>
+          <g transform="translate(48,20)">
+            <rect width="46" height="66" rx="3" fill="url(#stripe)" stroke="var(--border-strong)" strokeWidth="1" />
+          </g>
+          <g transform="translate(78,28) rotate(14)">
+            <rect width="46" height="66" rx="3" fill="url(#stripe)" stroke="var(--border-strong)" strokeWidth="1" />
+          </g>
+          <g transform="translate(110,18)" opacity="0.5">
+            <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z" fill="var(--accent)" />
+          </g>
+        </svg>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 28,
+            fontStyle: "italic",
+            color: "var(--ink)",
+            marginBottom: 8,
+          }}
+        >
+          The satchel is empty.
+        </div>
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--muted)",
+            margin: "0 auto 24px",
+            maxWidth: 280,
+            lineHeight: 1.6,
+            fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Choose a card — it will land here.
+        </p>
         <Link
           href="/"
-          className="inline-block px-5 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+          style={{
+            display: "inline-block",
+            background: "var(--accent)",
+            color: "var(--accent-fg)",
+            padding: "10px 18px",
+            borderRadius: 3,
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: "0.02em",
+            textDecoration: "none",
+            fontFamily: "inherit",
+          }}
         >
           Browse cards
         </Link>
@@ -99,14 +154,45 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
 
   // Cart with items
   return (
-    <div className="max-w-3xl mx-auto px-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">Your Cart</h1>
-        <button
-          onClick={handleClearCart}
-          className="text-sm text-zinc-400 hover:text-red-500 transition-colors"
+    <div style={{ maxWidth: 780, margin: "0 auto", padding: "0 24px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: 20,
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-display)",
+            fontSize: 32,
+            fontWeight: 400,
+            fontStyle: "italic",
+          }}
         >
-          Clear cart
+          The Satchel
+        </h1>
+        <button
+          type="button"
+          onClick={handleClearCart}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--muted)",
+            fontSize: 12,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+            fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          Empty the satchel
         </button>
       </div>
 
