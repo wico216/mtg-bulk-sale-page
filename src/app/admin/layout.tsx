@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
 
@@ -27,19 +28,27 @@ export default async function AdminLayout({
               Admin
             </span>
           </div>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/admin/login" });
-            }}
-          >
-            <button
-              type="submit"
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
               className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             >
-              Sign out
-            </button>
-          </form>
+              View store
+            </Link>
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/admin/login" });
+              }}
+            >
+              <button
+                type="submit"
+                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 pt-6">{children}</main>
