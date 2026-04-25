@@ -117,7 +117,7 @@ export default function CardGrid({ cards }: CardGridProps) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
             columnGap: 18,
             rowGap: 28,
             padding: "28px 32px 80px",
