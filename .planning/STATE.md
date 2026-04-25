@@ -139,7 +139,7 @@ Same-day UX fixes shipped to main while testing the live import:
 
 ### Pending Todos
 
-- **Multi-CSV import + Delete inventory button** — feature work the user asked about; deferred pending Phase 10.1 routing decision (insert-phase vs add-phase).
+- ~~Multi-CSV import + Delete inventory button~~ — closed by user 2026-04-25, not pursued. Combining multiple Manabox exports into a single CSV before upload is acceptable workflow; per-card delete via inventory table is sufficient for inventory cleanup.
 
 ### Blockers/Concerns
 
