@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Completed 10-02-PLAN.md (route handlers + shared import contract)
-last_updated: "2026-04-19T06:15:18.982Z"
-last_activity: 2026-04-19
+stopped_at: Completed Phase 10 (10-03 admin UI + post-launch hotfixes shipped to prod)
+last_updated: "2026-04-25T18:35:00.000Z"
+last_activity: 2026-04-25
 progress:
   total_phases: 7
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 82
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 10 — csv-import
+**Current focus:** Phase 10 complete — next up is Phase 11 (Checkout Upgrade & Order History) or a 10.1 insertion for multi-CSV import + delete-inventory
 
 ## Current Position
 
-Phase: 10 (csv-import) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-19
+Phase: 10 (csv-import) — COMPLETE
+Plan: 3 of 3 — DONE (committed 4afa7e6, dec5dbe; live on prod)
+Status: Phase 10 closed; awaiting routing decision for follow-up work
+Last activity: 2026-04-25
 
-Progress: [████████░░] 82%
+Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8, 9, 10)
 
 ## Performance Metrics
 
@@ -114,17 +114,40 @@ Recent decisions affecting current work:
 - [Phase 10-02]: maxDuration=300 on preview only (Scryfall rate limit headroom); commit uses maxDuration=30 (DB-only path)
 - [Phase 10-02]: vi.hoisted() to pre-initialize mock fns used by vi.mock factories -- Vitest 4 hoists factories above top-level const declarations
 - [Phase 10-02]: Mock @/db/queries WITHOUT importActual -- @/db/client calls drizzle(DATABASE_URL) at module load and throws without env var
+- [Phase 10-03]: Confirm button label IS the safeguard (D-12) — admin reads the destructive action verbatim before clicking
+- [Phase 10-03]: Client buffers the FULL enriched cards[] from preview's NDJSON result and POSTs it back to /commit unmodified
+- [Phase 10-03]: sessionStorage 'admin-toast' is the cross-route handoff for post-import success toast (router.push doesn't preserve client state)
+- [Phase 10-03]: D-13 cart reconciliation is silent (no banner) — friend-store UX prefers quiet correctness over scolding
+
+### Post-Phase 10 Hotfixes (2026-04-25)
+
+Real-user import on the deployed Vercel URL surfaced production-only issues. All shipped to main same day:
+
+- **`7b3f517` cache(setCache):** Vercel's serverless FS is read-only outside `/tmp`. `setCache` wrote to a project-relative path, throwing EROFS. The catch in scryfall.ts treated that as a Scryfall miss for every card → admin import showed "No valid cards parsed." Fix: swallow setCache failures (caching is an optimization, not correctness).
+- **`cdba6fa` scryfall(retry):** `fetchCard` returned null on any non-OK response, conflating 429 / 5xx / network errors with genuine 404 misses. Roughly 4% of a 600-card import was mislabeled as "not found on Scryfall." Fix: 404 still returns null; 429/5xx/network errors retry up to 3 times with exponential backoff (or `Retry-After` when provided). Base rate bumped 100ms → 120ms.
+- **`3fdc83d` enrichment(foil):** `getPrice` ignored the listing's foil flag. Foil rows displayed the cheaper non-foil USD price for any card with both finishes in Scryfall's payload. Fix: foil rows pull `usd_foil → usd_etched → usd`; non-foil rows keep the existing chain.
+
+### Post-Phase 10 Storefront Polish (2026-04-25)
+
+Same-day UX fixes shipped to main while testing the live import:
+
+- **`81ecc14`** (pre-hotfix-wave) — storefront redesigned as "Wiko's Spellbook" (predates this batch).
+- **`0851844` admin/View store:** added "View store" link in admin header so the seller can browse the storefront without signing out.
+- **`1443789` filters/subset:** color filter switched from OR (`some()`) to subset semantics (`every()`). Selecting W+U now yields mono-W, mono-U, and W+U cards — matches Scryfall `c<=` and every other MTG search tool. Colorless toggle unchanged.
+- **`7df5c8a` + `4469584` catalog/tile-size:** `gridTemplateColumns` minmax bumped 150px → 220px → 250px. Roughly 4–5 tiles per row on desktop instead of 8+.
+- **`70d30da` mobile/header+drawer:** iPhone Pro Max-class screens were clipping the header title (right-side controls + 32px padding pushed "Spellbook" past `overflow:hidden`) and treating the 248px sticky filter rail as "filter open by default" (it covered ~58% of the viewport). Below 767px the rail is now a right-side drawer triggered by a "Filter" button; below 640px the header tightens padding, shrinks mascot+title, and hides the tagline + Satchel label.
 
 ### Pending Todos
 
-None yet.
+- **Multi-CSV import + Delete inventory button** — feature work the user asked about; deferred pending Phase 10.1 routing decision (insert-phase vs add-phase).
 
 ### Blockers/Concerns
 
 - Resend free tier limits need verification at signup (Phase 5)
+- Branch hygiene: all 2026-04-25 hotfixes shipped directly to `main` because production was already broken. Future feature work should use feature branches → preview URLs → merge (production URL `wikos-spellbinder.vercel.app` is friends-facing).
 
 ## Session Continuity
 
-Last session: 2026-04-19T06:15:18.979Z
-Stopped at: Completed 10-02-PLAN.md (route handlers + shared import contract)
+Last session: 2026-04-25T18:35:00.000Z
+Stopped at: Phase 10 complete; production stable; awaiting decision on Phase 10.1 (multi-CSV + delete-inventory) vs Phase 11 (checkout upgrade & order history)
 Resume file: None

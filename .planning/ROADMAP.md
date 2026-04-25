@@ -112,10 +112,10 @@ Plans:
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 6: Database Foundation** - Neon Postgres schema, Drizzle ORM, and data migration from static JSON
-- [ ] **Phase 7: Storefront Migration** - Storefront reads live card data from database instead of static JSON
-- [ ] **Phase 8: Authentication** - Admin panel protected by Google OAuth with defense-in-depth access control
-- [ ] **Phase 9: Admin Inventory Management** - Searchable card table with inline editing, delete, and CSV export
-- [ ] **Phase 10: CSV Import** - Manabox CSV upload with preview, validation, and full-replace import
+- [x] **Phase 7: Storefront Migration** - Storefront reads live card data from database instead of static JSON
+- [x] **Phase 8: Authentication** - Admin panel protected by Google OAuth with defense-in-depth access control (completed 2026-04 — Phase 8 dir present)
+- [x] **Phase 9: Admin Inventory Management** - Searchable card table with inline editing, delete, and CSV export (completed 2026-04-19)
+- [x] **Phase 10: CSV Import** - Manabox CSV upload with preview, validation, and full-replace import (completed 2026-04-20; production hotfix wave 2026-04-25 — see STATE.md)
 - [ ] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking
 - [ ] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns
 
@@ -201,7 +201,7 @@ Plans:
 Plans:
 - [x] 10-01-PLAN.md -- Library foundations: parseManaboxCsvContent, enrichCards onProgress + scryfallMisses, replaceAllCards via db.batch, Wave 0 vitest stubs
 - [x] 10-02-PLAN.md -- Route Handlers: POST /api/admin/import/preview (NDJSON stream) and /commit (atomic replace) + handler tests, shared import-contract.ts
-- [ ] 10-03-PLAN.md -- Admin UI: /admin/import page with drag-drop, live progress, three-zone preview, destructive confirm, success toast, D-13 cart reconciliation
+- [x] 10-03-PLAN.md -- Admin UI: /admin/import page with drag-drop, live progress, three-zone preview, destructive confirm, success toast, D-13 cart reconciliation (completed 2026-04-20)
 
 **UI hint**: yes
 
