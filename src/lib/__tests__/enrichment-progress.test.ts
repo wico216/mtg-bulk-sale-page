@@ -135,6 +135,55 @@ describe("enrichCards onProgress + scryfallMisses", () => {
     expect(result.stats.skipped).toBe(2);
   });
 
+  it("foil cards prefer usd_foil over usd (Test E.foil)", async () => {
+    vi.mocked(fetchCard).mockResolvedValueOnce(
+      makeScryfallCard({
+        prices: { usd: "1.00", usd_foil: "5.00", usd_etched: "8.00" },
+      }),
+    );
+
+    const foilCard = makeCard({
+      id: "lea-232-foil-near_mint",
+      foil: true,
+    });
+
+    const result = await enrichCards([foilCard]);
+    expect(result.cards[0].price).toBe(5.0);
+  });
+
+  it("foil cards fall back to usd_etched then usd when usd_foil missing (Test E.foil-fallback)", async () => {
+    vi.mocked(fetchCard)
+      .mockResolvedValueOnce(
+        makeScryfallCard({
+          prices: { usd: "1.00", usd_foil: null, usd_etched: "8.00" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeScryfallCard({
+          prices: { usd: "1.00", usd_foil: null, usd_etched: null },
+        }),
+      );
+
+    const c1 = makeCard({ id: "lea-1-foil-near_mint", foil: true });
+    const c2 = makeCard({ id: "lea-2-foil-near_mint", foil: true });
+
+    const result = await enrichCards([c1, c2]);
+    expect(result.cards[0].price).toBe(8.0);
+    expect(result.cards[1].price).toBe(1.0);
+  });
+
+  it("non-foil cards still prefer usd over usd_foil (Test E.normal)", async () => {
+    vi.mocked(fetchCard).mockResolvedValueOnce(
+      makeScryfallCard({
+        prices: { usd: "1.00", usd_foil: "5.00", usd_etched: "8.00" },
+      }),
+    );
+
+    const normalCard = makeCard({ foil: false });
+    const result = await enrichCards([normalCard]);
+    expect(result.cards[0].price).toBe(1.0);
+  });
+
   it("applies USD price fallback chain and increments missingPrices when all null (Test E)", async () => {
     vi.mocked(fetchCard)
       // First card: usd null, usd_foil "2.00" -> price 2.00

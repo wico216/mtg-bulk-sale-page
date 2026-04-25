@@ -40,16 +40,21 @@ function getOracleText(card: ScryfallCard): string | null {
 }
 
 /**
- * Extract USD price with fallback chain: usd -> usd_foil -> usd_etched.
+ * Extract USD price preferring the printing finish that matches the listing.
+ * Foil rows pull usd_foil first (then usd_etched, then usd as a last resort);
+ * non-foil rows pull usd first. Without this, foil listings displayed the
+ * non-foil price for any card that had both finishes in Scryfall's payload.
  * Scryfall returns prices as strings like "16.05".
  */
-function getPrice(prices: ScryfallCard["prices"]): number | null {
-  const raw = prices.usd ?? prices.usd_foil ?? prices.usd_etched;
+function getPrice(
+  prices: ScryfallCard["prices"],
+  foil: boolean,
+): number | null {
+  const raw = foil
+    ? prices.usd_foil ?? prices.usd_etched ?? prices.usd
+    : prices.usd ?? prices.usd_foil ?? prices.usd_etched;
 
-  if (raw == null) {
-    return null;
-  }
-
+  if (raw == null) return null;
   const parsed = parseFloat(raw);
   return Number.isNaN(parsed) ? null : parsed;
 }
@@ -122,7 +127,7 @@ export async function enrichCards(
     }
 
     card.imageUrl = getImageUrl(scryfallData);
-    card.price = getPrice(scryfallData.prices);
+    card.price = getPrice(scryfallData.prices, card.foil);
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);
 
