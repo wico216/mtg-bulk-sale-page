@@ -167,6 +167,14 @@ export function PreviewPanel({ preview, currentTotal }: PreviewPanelProps) {
                 const identifier = `${row.setCode ?? "?"}-${row.collectorNumber ?? "?"}`;
                 return (
                   <li key={`parse-${i}`}>
+                    {row.filename && (
+                      <>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {row.filename}
+                        </span>
+                        {" — "}
+                      </>
+                    )}
                     Row {row.rowNumber} — {row.name ?? "(no name)"} (
                     <span className="font-mono text-xs">{identifier}</span>): {row.reason}
                   </li>
