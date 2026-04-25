@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
 stopped_at: Phase 10.1 context gathered
-last_updated: "2026-04-25T19:53:21.031Z"
+last_updated: "2026-04-25T20:01:12.952Z"
 last_activity: 2026-04-25 -- Phase 10.1 execution started
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
   percent: 43
 ---
 
@@ -62,6 +62,7 @@ Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8,
 | Phase 10 P02 | 3min | 2 tasks | 5 files |
 | Phase 10.1 P01 | 2min | 1 tasks | 3 files |
 | Phase 10.1 P02 | 3min | 1 tasks | 2 files |
+| Phase 10.1 P03 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,9 @@ Recent decisions affecting current work:
 - [Phase 10.1]: 10.1-02: DELETE /api/admin/inventory is a dedicated route (not a /commit query variant) — explicit intent in path/logs/audit
 - [Phase 10.1]: 10.1-02: response { success, deleted: N } — UI shows 'Deleted all N cards' without a second round trip (D-14)
 - [Phase 10.1]: 10.1-02: read getCardsMeta().totalCards BEFORE replaceAllCards([]) — replaceAllCards's empty path returns inserted:0, can't carry the deleted count
+- [Phase 10.1]: 10.1-03: preview route reads multiple CSV parts via formData.getAll(IMPORT_FILE_FIELD); single-file is just N=1 in the multi-file array — same code path, no special-case branch
+- [Phase 10.1]: 10.1-03: extension error string changed plural ('All files must be .csv') even when a single file was uploaded — matches the validation loop semantics, simpler client error rendering
+- [Phase 10.1]: 10.1-03: SkippedRow.filename flows through to PreviewPayload.skippedRows kind=parse via simple r.filename passthrough (no string surgery in the route) — D-08 provenance ready for 10.1-04 UI
 
 ### Post-Phase 10 Hotfixes (2026-04-25)
 
