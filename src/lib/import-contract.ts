@@ -67,6 +67,7 @@ export interface PreviewPayload {
         name?: SkippedRow["name"];
         setCode?: SkippedRow["setCode"];
         collectorNumber?: SkippedRow["collectorNumber"];
+        filename?: SkippedRow["filename"];
       }
     | {
         kind: "enrich";

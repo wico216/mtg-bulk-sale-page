@@ -14,6 +14,8 @@ export interface SkippedRow {
   name?: string;
   setCode?: string;
   collectorNumber?: string;
+  /** Source CSV filename (only set when produced by parseManaboxCsvFiles). */
+  filename?: string;
 }
 
 /** Return shape of parseManaboxCsvContent. */
@@ -211,4 +213,56 @@ export function parseManaboxCsvContent(content: string): ParseResult {
 
   const merged = mergeCards(cards);
   return { cards: merged, skippedRows };
+}
+
+/**
+ * Parse multiple Manabox CSV files in one pass (Phase 10.1 D-01..D-03 multi-CSV import).
+ *
+ * Each file is parsed independently with the same row-by-row logic as
+ * parseManaboxCsvContent. Skipped rows are tagged with the source `filename`
+ * so the preview UI (D-08) can show provenance per row. The returned cards[]
+ * is concatenated from all files and then run through the existing mergeCards
+ * dedup, so cross-file duplicates with the same composite ID
+ * (setCode-collectorNumber-foil-condition) sum their quantities — friend
+ * uploading "Binder 1.csv" with 1x Counterspell NM and "Binder 2.csv" with
+ * 2x Counterspell NM ends up with 3x in the merged inventory.
+ */
+export function parseManaboxCsvFiles(
+  files: { filename: string; content: string }[],
+): ParseResult {
+  const allCards: Card[] = [];
+  const allSkipped: SkippedRow[] = [];
+
+  for (const { filename, content } of files) {
+    const result = Papa.parse<ManaboxRow>(content, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+    });
+
+    result.data.forEach((row, index) => {
+      const rowNumber = index + 2; // header is row 1 within this file
+      const outcome = rowToCardOrSkip(row, rowNumber);
+      if ("card" in outcome) {
+        allCards.push(outcome.card);
+      } else {
+        allSkipped.push({ ...outcome.skipped, filename });
+      }
+    });
+
+    for (const err of result.errors) {
+      if (err.row != null) {
+        allSkipped.push({
+          rowNumber: err.row + 2,
+          reason: `parse error: ${err.message}`,
+          filename,
+        });
+      }
+    }
+  }
+
+  // Cross-file merge: same composite ID across files sums quantities (D-03).
+  // mergeCards already implements this via Map<id, Card> with `existing.quantity += card.quantity`.
+  const merged = mergeCards(allCards);
+  return { cards: merged, skippedRows: allSkipped };
 }
