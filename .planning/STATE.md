@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
 stopped_at: Phase 10.1 context gathered
-last_updated: "2026-04-25T20:01:12.952Z"
+last_updated: "2026-04-25T20:03:45.156Z"
 last_activity: 2026-04-25 -- Phase 10.1 execution started
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 13
   percent: 43
 ---
 
@@ -63,6 +63,8 @@ Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8,
 | Phase 10.1 P01 | 2min | 1 tasks | 3 files |
 | Phase 10.1 P02 | 3min | 1 tasks | 2 files |
 | Phase 10.1 P03 | 4min | 2 tasks | 2 files |
+| Phase 10.1 P04 | 7min | 4 tasks | 3 files |
+| Phase 10.1 P05 | 8min | 4 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -135,6 +137,11 @@ Recent decisions affecting current work:
 - [Phase 10.1]: 10.1-03: preview route reads multiple CSV parts via formData.getAll(IMPORT_FILE_FIELD); single-file is just N=1 in the multi-file array — same code path, no special-case branch
 - [Phase 10.1]: 10.1-03: extension error string changed plural ('All files must be .csv') even when a single file was uploaded — matches the validation loop semantics, simpler client error rendering
 - [Phase 10.1]: 10.1-03: SkippedRow.filename flows through to PreviewPayload.skippedRows kind=parse via simple r.filename passthrough (no string surgery in the route) — D-08 provenance ready for 10.1-04 UI
+- [Phase 10.1]: 10.1-04: Stage union swap to filenames:string[] + totalSize:number — preserves discriminated union strictness while letting render branches read a single tuple per stage
+- [Phase 10.1]: 10.1-04: whole-batch rejection on any non-.csv file mirrors the server's 'All files must be .csv' 400 — consistent rejection semantics on both sides of the network
+- [Phase 10.1]: 10.1-05: Toast handoff is parent-state callback (not sessionStorage) — Delete-all stays on /admin (no navigation), so cross-route storage round-trip is unneeded; sessionStorage 'admin-toast' remains the import-flow handoff
+- [Phase 10.1]: 10.1-05: hidden-not-disabled at currentTotal===0 (D-11) — Delete-all button conditionally rendered, not disabled; auto-unmounts after a successful delete sets total=0
+- [Phase 10.1]: 10.1-05: DeleteInventoryModal does NOT close itself on success — parent owns lifecycle; onSuccess(deletedCount) bubbles BEFORE setDeleteOpen(false) so the count is captured before unmount
 
 ### Post-Phase 10 Hotfixes (2026-04-25)
 
