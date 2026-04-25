@@ -43,12 +43,20 @@ export function getCached<T>(key: string): T | null {
 
 /**
  * Write a value to cache with the current timestamp.
+ *
+ * Failures are swallowed: caching is an optimization, not correctness.
+ * Vercel's serverless filesystem is read-only outside /tmp, so writes here
+ * throw EROFS in production — without this guard, the catch in scryfall.ts
+ * treats every fetched card as a Scryfall miss and the admin importer ends
+ * up with zero cards to import.
  */
 export function setCache<T>(key: string, data: T): void {
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
-
-  const filePath = path.join(CACHE_DIR, `${sanitizeKey(key)}.json`);
-  const entry: CacheEntry<T> = { timestamp: Date.now(), data };
-
-  fs.writeFileSync(filePath, JSON.stringify(entry), "utf-8");
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    const filePath = path.join(CACHE_DIR, `${sanitizeKey(key)}.json`);
+    const entry: CacheEntry<T> = { timestamp: Date.now(), data };
+    fs.writeFileSync(filePath, JSON.stringify(entry), "utf-8");
+  } catch {
+    // intentionally non-fatal
+  }
 }
