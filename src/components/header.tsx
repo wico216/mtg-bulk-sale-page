@@ -158,6 +158,7 @@ export default function Header() {
         <Link
           href="/"
           aria-label="Wiko's Spellbook home"
+          className="wiko-header-brand"
           style={{
             display: "flex",
             alignItems: "center",
@@ -165,11 +166,15 @@ export default function Header() {
             position: "relative",
             textDecoration: "none",
             color: "inherit",
+            minWidth: 0,
           }}
         >
-          <MageMascot />
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <span className="wiko-header-mascot" style={{ display: "block", flexShrink: 0 }}>
+            <MageMascot />
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
             <span
+              className="wiko-header-title"
               style={{
                 fontFamily: "var(--font-display)",
                 fontSize: 26,
@@ -177,12 +182,14 @@ export default function Header() {
                 letterSpacing: "-0.005em",
                 lineHeight: 1,
                 fontStyle: "italic",
+                whiteSpace: "nowrap",
               }}
             >
               Wiko&apos;s{" "}
               <span style={{ fontStyle: "normal" }}>Spellbook</span>
             </span>
             <span
+              className="wiko-header-tagline"
               style={{
                 fontSize: 10,
                 color: "var(--muted)",
@@ -196,7 +203,7 @@ export default function Header() {
           </div>
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+        <div className="wiko-header-actions" style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", flexShrink: 0 }}>
           <button
             type="button"
             onClick={toggleMode}
@@ -219,6 +226,7 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setShowLogin(true)}
+            className="wiko-header-admin-btn"
             style={{
               background: "none",
               border: "none",
@@ -250,6 +258,7 @@ export default function Header() {
           >
             <IconCart size={16} />
             <span
+              className="wiko-header-satchel-label"
               style={{
                 fontSize: 11,
                 fontVariantNumeric: "tabular-nums",

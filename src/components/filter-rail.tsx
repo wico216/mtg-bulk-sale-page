@@ -477,9 +477,11 @@ function SetFilter({
 export interface FilterRailProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /** When true, skip sticky/height styling so the rail flows inside a drawer. */
+  embedded?: boolean;
 }
 
-export default function FilterRail({ collapsed, onToggleCollapse }: FilterRailProps) {
+export default function FilterRail({ collapsed, onToggleCollapse, embedded = false }: FilterRailProps) {
   const allCards = useFilterStore((s) => s.allCards);
   const selectedColors = useFilterStore((s) => s.selectedColors);
   const selectedSets = useFilterStore((s) => s.selectedSets);
@@ -582,17 +584,25 @@ export default function FilterRail({ collapsed, onToggleCollapse }: FilterRailPr
 
   return (
     <aside
-      style={{
-        width: 248,
-        flexShrink: 0,
-        borderRight: "1px solid var(--border)",
-        padding: "20px 20px 40px",
-        position: "sticky",
-        top: 68,
-        height: "calc(100vh - 68px)",
-        overflowY: "auto",
-        background: "var(--bg)",
-      }}
+      style={
+        embedded
+          ? {
+              width: "100%",
+              padding: "8px 20px 40px",
+              background: "var(--bg)",
+            }
+          : {
+              width: 248,
+              flexShrink: 0,
+              borderRight: "1px solid var(--border)",
+              padding: "20px 20px 40px",
+              position: "sticky",
+              top: 68,
+              height: "calc(100vh - 68px)",
+              overflowY: "auto",
+              background: "var(--bg)",
+            }
+      }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <h2

@@ -163,3 +163,15 @@ a { color: inherit; }
     padding-top: 8px;
   }
 }
+
+/* Mobile header: tighten padding, shrink mascot/title, hide tagline + Satchel label so the title stops getting clipped on narrow screens. */
+@media (max-width: 640px) {
+  .wiko-header { padding: 12px 14px !important; gap: 8px; }
+  .wiko-header-mascot svg { width: 32px !important; height: 32px !important; }
+  .wiko-header-brand { gap: 10px !important; }
+  .wiko-header-title { font-size: 19px !important; }
+  .wiko-header-tagline { display: none !important; }
+  .wiko-header-satchel-label { display: none !important; }
+  .wiko-header-actions { gap: 6px !important; }
+  .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
+}
