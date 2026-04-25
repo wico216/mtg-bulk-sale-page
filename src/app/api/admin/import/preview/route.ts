@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
-import { parseManaboxCsvContent } from "@/lib/csv-parser";
+import { parseManaboxCsvFiles } from "@/lib/csv-parser";
 import { enrichCards } from "@/lib/enrichment";
 import {
   IMPORT_FILE_FIELD,
@@ -27,16 +27,27 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "Invalid multipart body" }, { status: 400 });
   }
 
-  const file = formData.get(IMPORT_FILE_FIELD);
-  if (!(file instanceof File)) {
+  // 10.1 D-01: accept ANY number of CSV parts under the same field name.
+  // Client appends each File via fd.append(IMPORT_FILE_FIELD, file) — so
+  // getAll() returns one entry per file in upload order.
+  const rawFiles = formData.getAll(IMPORT_FILE_FIELD);
+  const files = rawFiles.filter((f): f is File => f instanceof File);
+  if (files.length === 0) {
     return Response.json({ error: "No file uploaded" }, { status: 400 });
   }
-  if (!file.name.toLowerCase().endsWith(".csv")) {
-    return Response.json({ error: "File must be .csv" }, { status: 400 });
+  for (const f of files) {
+    if (!f.name.toLowerCase().endsWith(".csv")) {
+      return Response.json(
+        { error: "All files must be .csv" },
+        { status: 400 },
+      );
+    }
   }
 
-  const content = await file.text();
-  const parsed = parseManaboxCsvContent(content);
+  const fileContents = await Promise.all(
+    files.map(async (f) => ({ filename: f.name, content: await f.text() })),
+  );
+  const parsed = parseManaboxCsvFiles(fileContents);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -73,6 +84,7 @@ export async function POST(request: Request): Promise<Response> {
               name: r.name,
               setCode: r.setCode,
               collectorNumber: r.collectorNumber,
+              filename: r.filename, // 10.1 D-08: source CSV provenance for the UI
             })),
             ...scryfallMisses.map((m) => ({
               kind: "enrich" as const,
