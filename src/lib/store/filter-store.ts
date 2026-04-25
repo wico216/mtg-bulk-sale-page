@@ -137,11 +137,12 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       const wantsColorless = selectedColors.has("C");
       const colorCodes = [...selectedColors].filter((c) => c !== "C");
 
+      // Subset semantics (matches Scryfall's c<= operator): a card matches when
+      // its color identity is fully contained in the selected colors. Selecting
+      // W+U yields mono-W, mono-U, and W+U cards; not W+G or 3-color cards.
       result = result.filter((card) => {
-        if (wantsColorless && card.colorIdentity.length === 0) return true;
-        if (colorCodes.length > 0 && card.colorIdentity.some((ci) => colorCodes.includes(ci)))
-          return true;
-        return false;
+        if (card.colorIdentity.length === 0) return wantsColorless;
+        return card.colorIdentity.every((ci) => colorCodes.includes(ci));
       });
     }
 
