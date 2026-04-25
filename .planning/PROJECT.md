@@ -35,6 +35,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Checkout sends confirmation email to buyer — Validated in Phase 5: Checkout and Deploy
 - [x] Confirmation page shown after checkout — Validated in Phase 5: Checkout and Deploy
 - [x] Friend provides name/email at checkout (no account needed) — Validated in Phase 5: Checkout and Deploy
+- [x] CSV import (full replace) into database — Validated in Phase 10: CSV Import; multi-file upload + cross-file dedup added in Phase 10.1
+- [x] Wipe inventory in one action (typed-DELETE confirm) — Validated in Phase 10.1: Delete-all inventory UX
 
 ### Active
 
@@ -43,7 +45,6 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [ ] Auto-decrement stock on checkout
 - [ ] Edit individual card details (price, condition, quantity)
 - [ ] Remove cards from inventory manually
-- [ ] CSV import (full replace) into database
 - [ ] CSV export of current inventory
 - [ ] Bulk select and delete cards
 - [ ] Order history dashboard
@@ -106,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 after Phase 8 complete — Google OAuth admin authentication*
+*Last updated: 2026-04-25 after Phase 10.1 complete — Multi-CSV import (cross-file composite-ID dedup, filename-tagged skipped rows) + Delete-all inventory UX (typed-DELETE confirm)*
