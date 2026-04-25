@@ -210,7 +210,7 @@ Plans:
 **Goal**: Admin can upload multiple Manabox CSVs in one drag-drop (cross-file composite-ID duplicates sum quantities, skipped rows show source filename), and admin has a destructive "Delete all inventory" button on /admin behind a typed-DELETE modal that wipes the cards table atomically via the existing replaceAllCards([]) batch helper.
 **Requirements**: D-01..D-17 (locked decisions in 10.1-CONTEXT.md; no REQ-IDs in REQUIREMENTS.md for this phase)
 **Depends on:** Phase 10
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 10.1-01-PLAN.md — Library + contract: parseManaboxCsvFiles cross-file merge + filename on SkippedRow + PreviewPayload contract update (Wave 1)
@@ -218,7 +218,7 @@ Plans:
 - [x] 10.1-03-PLAN.md — Multi-file FormData on /preview route + updated preview.test.ts (Wave 2; depends 10.1-01)
 - [x] 10.1-04-PLAN.md — Multi-file UI: drop-zone multiple, plural copy, ImportClient File[] state, filename in skipped rows (Wave 2; depends 10.1-01)
 - [x] 10.1-05-PLAN.md — Delete-all button on /admin + typed-DELETE modal + post-delete green toast (Wave 2; depends 10.1-02)
-- [ ] 10.1-06-PLAN.md — Final regression sweep + manual smoke verification on Vercel preview URL (Wave 3; depends 10.1-03, 10.1-04, 10.1-05; autonomous=false)
+- [x] 10.1-06-PLAN.md — Final regression sweep + manual smoke verification on Vercel preview URL (Wave 3; depends 10.1-03, 10.1-04, 10.1-05; autonomous=false)
 
 ### Phase 11: Checkout Upgrade & Order History
 **Goal**: Checkout is transactional with stock protection, and the seller can review past orders
