@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
 stopped_at: Phase 10.1 context gathered
-last_updated: "2026-04-25T19:45:12.803Z"
+last_updated: "2026-04-25T19:53:21.031Z"
 last_activity: 2026-04-25 -- Phase 10.1 execution started
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 13
-  completed_plans: 8
+  completed_plans: 10
   percent: 43
 ---
 
@@ -61,6 +61,7 @@ Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8,
 | Phase 10 P01 | 4min | 3 tasks | 7 files |
 | Phase 10 P02 | 3min | 2 tasks | 5 files |
 | Phase 10.1 P01 | 2min | 1 tasks | 3 files |
+| Phase 10.1 P02 | 3min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 10.1-01]: SkippedRow.filename is optional and only set by the multi-file path — single-file parseManaboxCsvContent untouched for backward compat
 - [Phase 10.1-01]: Per-file row numbers (header=row 1 inside each file) — admins reading 'Row 142 of Blue Binder.csv' look at line 142 of THAT file, not a global counter
 - [Phase 10.1-01]: PreviewPayload.skippedRows kind=parse variant gains optional filename — type-only contract update, no route behavior change in this plan
+- [Phase 10.1]: 10.1-02: DELETE /api/admin/inventory is a dedicated route (not a /commit query variant) — explicit intent in path/logs/audit
+- [Phase 10.1]: 10.1-02: response { success, deleted: N } — UI shows 'Deleted all N cards' without a second round trip (D-14)
+- [Phase 10.1]: 10.1-02: read getCardsMeta().totalCards BEFORE replaceAllCards([]) — replaceAllCards's empty path returns inserted:0, can't carry the deleted count
 
 ### Post-Phase 10 Hotfixes (2026-04-25)
 
