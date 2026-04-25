@@ -205,6 +205,16 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 10.1: Multi-CSV import and delete-inventory button (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 10.1 to break down)
+
 ### Phase 11: Checkout Upgrade & Order History
 **Goal**: Checkout is transactional with stock protection, and the seller can review past orders
 **Depends on**: Phase 7 (storefront on DB), Phase 8 (auth for admin order pages)
