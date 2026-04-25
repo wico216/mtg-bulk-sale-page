@@ -14,32 +14,56 @@ type Stage =
   | { kind: "idle"; invalidExtension?: boolean }
   | {
       kind: "uploading";
-      filename: string;
-      size: number;
+      filenames: string[];
+      totalSize: number;
       done: number;
       total: number;
       indeterminate: boolean;
     }
-  | { kind: "preview"; filename: string; size: number; payload: PreviewPayload }
-  | { kind: "committing"; filename: string; size: number; payload: PreviewPayload }
-  | { kind: "error"; message: string; previousFilename?: string };
+  | {
+      kind: "preview";
+      filenames: string[];
+      totalSize: number;
+      payload: PreviewPayload;
+    }
+  | {
+      kind: "committing";
+      filenames: string[];
+      totalSize: number;
+      payload: PreviewPayload;
+    }
+  | { kind: "error"; message: string; previousFilenames?: string[] };
+
+function fileLabel(filenames: string[], totalSize: number): string {
+  const sizeKb = Math.max(1, Math.round(totalSize / 1024));
+  if (filenames.length === 1) return `${filenames[0]} · ${sizeKb} KB`;
+  return `${filenames.length} files · ${sizeKb} KB`;
+}
 
 export function ImportClient({ currentTotal }: { currentTotal: number }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
 
-  async function handleFile(file: File) {
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return;
+    const filenames = files.map((f) => f.name);
+    const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+
     setStage({
       kind: "uploading",
-      filename: file.name,
-      size: file.size,
+      filenames,
+      totalSize,
       done: 0,
       total: 0,
       indeterminate: true,
     });
 
     const fd = new FormData();
-    fd.append(IMPORT_FILE_FIELD, file);
+    // 10.1 D-01: append every file under the SAME field name; server uses
+    // formData.getAll(IMPORT_FILE_FIELD) to collect them all.
+    for (const f of files) {
+      fd.append(IMPORT_FILE_FIELD, f);
+    }
 
     let res: Response;
     try {
@@ -83,8 +107,8 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           if (msg.type === "progress") {
             setStage({
               kind: "uploading",
-              filename: file.name,
-              size: file.size,
+              filenames,
+              totalSize,
               done: msg.done,
               total: msg.total,
               indeterminate: msg.total === 0,
@@ -99,8 +123,8 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
       if (!finalPreview) throw new Error("Stream ended without a preview result");
       setStage({
         kind: "preview",
-        filename: file.name,
-        size: file.size,
+        filenames,
+        totalSize,
         payload: finalPreview,
       });
     } catch (err) {
@@ -113,8 +137,8 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
 
   async function handleConfirm() {
     if (stage.kind !== "preview") return;
-    const { payload, filename, size } = stage;
-    setStage({ kind: "committing", filename, size, payload });
+    const { payload, filenames, totalSize } = stage;
+    setStage({ kind: "committing", filenames, totalSize, payload });
 
     let res: Response;
     try {
@@ -137,7 +161,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
         const body = await res.json();
         if (body?.error) errMsg = body.error;
       } catch {}
-      setStage({ kind: "error", message: errMsg, previousFilename: filename });
+      setStage({ kind: "error", message: errMsg, previousFilenames: filenames });
       return;
     }
 
@@ -174,7 +198,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           </div>
         )}
         <DropZone
-          onFile={handleFile}
+          onFiles={handleFiles}
           onInvalidExtension={() => setStage({ kind: "idle", invalidExtension: true })}
         />
       </div>
@@ -182,11 +206,10 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   }
 
   if (stage.kind === "uploading") {
-    const sizeKb = Math.max(1, Math.round(stage.size / 1024));
     return (
       <div className="space-y-4">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {stage.filename} · {sizeKb} KB
+          {fileLabel(stage.filenames, stage.totalSize)}
         </p>
         <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           Fetching prices from Scryfall
@@ -210,7 +233,6 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   if (stage.kind === "preview" || stage.kind === "committing") {
     const committing = stage.kind === "committing";
     const payload = stage.payload;
-    const sizeKb = Math.max(1, Math.round(stage.size / 1024));
     const canConfirm = payload.toImport > 0;
     const confirmLabel = canConfirm
       ? `Confirm import — replace all ${currentTotal} current cards with ${payload.toImport} new cards`
@@ -219,7 +241,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     return (
       <div className="space-y-6">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {stage.filename} · {sizeKb} KB · ✓ Parsed
+          {fileLabel(stage.filenames, stage.totalSize)} · ✓ Parsed
         </p>
 
         {!canConfirm && (
