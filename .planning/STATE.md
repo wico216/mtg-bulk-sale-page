@@ -60,6 +60,7 @@ Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8,
 | Phase 05 P02 | 3min | 2 tasks | 5 files |
 | Phase 10 P01 | 4min | 3 tasks | 7 files |
 | Phase 10 P02 | 3min | 2 tasks | 5 files |
+| Phase 10.1 P01 | 2min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,10 @@ Recent decisions affecting current work:
 - [Phase 10-03]: Client buffers the FULL enriched cards[] from preview's NDJSON result and POSTs it back to /commit unmodified
 - [Phase 10-03]: sessionStorage 'admin-toast' is the cross-route handoff for post-import success toast (router.push doesn't preserve client state)
 - [Phase 10-03]: D-13 cart reconciliation is silent (no banner) — friend-store UX prefers quiet correctness over scolding
+- [Phase 10.1-01]: parseManaboxCsvFiles reuses existing mergeCards verbatim — cross-file sum semantics inherit from within-file dedup (D-03)
+- [Phase 10.1-01]: SkippedRow.filename is optional and only set by the multi-file path — single-file parseManaboxCsvContent untouched for backward compat
+- [Phase 10.1-01]: Per-file row numbers (header=row 1 inside each file) — admins reading 'Row 142 of Blue Binder.csv' look at line 142 of THAT file, not a global counter
+- [Phase 10.1-01]: PreviewPayload.skippedRows kind=parse variant gains optional filename — type-only contract update, no route behavior change in this plan
 
 ### Post-Phase 10 Hotfixes (2026-04-25)
 
