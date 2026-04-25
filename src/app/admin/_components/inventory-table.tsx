@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { Card } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
 import { conditionToAbbr } from "@/lib/condition-map";
@@ -61,6 +62,7 @@ function TrashIcon() {
 }
 
 export function InventoryTable() {
+  const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -205,6 +207,21 @@ export function InventoryTable() {
     }
   }
 
+  function handleDeleteSuccess(deletedCount: number) {
+    // Phase 10.1 D-14: green toast announcing the destructive action's outcome.
+    // Same component-state toast pattern as Phase 10-03's import-success path,
+    // except we DON'T need sessionStorage handoff — both producer (modal) and
+    // consumer (this table) live on /admin already, no navigation occurs.
+    setToastVariant("success");
+    setToastMessage(`Deleted all ${deletedCount} cards`);
+    // Re-fetch the (now empty) inventory so the table shows the empty state
+    // and the ActionBar's currentTotal === 0 hides the Delete-all button (D-11).
+    fetchCards();
+    // Belt-and-suspenders: invalidate server caches in case any RSC layer
+    // is reading the cards table elsewhere.
+    router.refresh();
+  }
+
   function handleSort(field: SortField) {
     if (sortBy !== field) {
       setSortBy(field);
@@ -262,6 +279,8 @@ export function InventoryTable() {
             availableSets={availableSets}
             exporting={exporting}
             onExport={handleExport}
+            currentTotal={total}
+            onDeleteSuccess={handleDeleteSuccess}
           />
           <div className="text-center py-12">
             <h2 className="text-lg font-semibold">No cards found</h2>
@@ -304,6 +323,8 @@ export function InventoryTable() {
         availableSets={availableSets}
         exporting={exporting}
         onExport={handleExport}
+        currentTotal={total}
+        onDeleteSuccess={handleDeleteSuccess}
       />
 
       <div className="w-full overflow-x-auto">
