@@ -283,12 +283,25 @@ export function InventoryTable() {
       );
     }
     return (
-      <div className="text-center py-12">
-        <h2 className="text-lg font-semibold">No cards in inventory</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Import a CSV file to add cards to your store.
-        </p>
-      </div>
+      <>
+        <ActionBar
+          search={search}
+          onSearchChange={setSearch}
+          setFilter={setFilter}
+          onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
+          conditionFilter={conditionFilter}
+          onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
+          availableSets={availableSets}
+          exporting={exporting}
+          onExport={handleExport}
+        />
+        <div className="text-center py-12">
+          <h2 className="text-lg font-semibold">No cards in inventory</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Import a CSV file to add cards to your store.
+          </p>
+        </div>
+      </>
     );
   }
 
