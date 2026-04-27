@@ -1,40 +1,71 @@
 import { NextRequest } from "next/server";
-import { getCards } from "@/db/queries";
-import { buildOrderData } from "@/lib/order";
-import { notifyOrder } from "@/lib/notifications";
-import type { Card, CheckoutRequest, CheckoutResponse } from "@/lib/types";
+import { placeCheckoutOrder } from "@/db/orders";
+import { generateOrderRef } from "@/lib/order";
+import { notifyOrder, type NotifyResult } from "@/lib/notifications";
+import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateCheckoutRequest(body: CheckoutRequest): string | null {
+  if (!body.buyerName || typeof body.buyerName !== "string" || !body.buyerName.trim()) {
+    return "Name is required";
+  }
+
+  if (!body.buyerEmail || !emailRegex.test(body.buyerEmail)) {
+    return "Valid email is required";
+  }
+
+  if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
+    return "Cart is empty";
+  }
+
+  for (const item of body.items) {
+    if (
+      !item ||
+      typeof item.cardId !== "string" ||
+      item.cardId.trim() === "" ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity <= 0
+    ) {
+      return "Invalid cart item";
+    }
+  }
+
+  return null;
+}
+
+async function notifyOrderAfterCommit(order: CheckoutResponse["order"]): Promise<NotifyResult> {
+  try {
+    return await notifyOrder(order);
+  } catch (error) {
+    console.error("[CHECKOUT] Notification failed after order commit:", error);
+    return { sellerEmailSent: false, buyerEmailSent: false };
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CheckoutRequest;
-
-    // Validate required fields
-    if (!body.buyerName || typeof body.buyerName !== "string" || !body.buyerName.trim()) {
-      return Response.json({ success: false, error: "Name is required" }, { status: 400 });
-    }
-    // D-09: server-side basic email regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!body.buyerEmail || !emailRegex.test(body.buyerEmail)) {
-      return Response.json({ success: false, error: "Valid email is required" }, { status: 400 });
-    }
-    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
-      return Response.json({ success: false, error: "Cart is empty" }, { status: 400 });
+    const validationError = validateCheckoutRequest(body);
+    if (validationError) {
+      return Response.json(
+        { success: false, error: validationError },
+        { status: 400 },
+      );
     }
 
-    // Validate env vars
-    if (!process.env.RESEND_API_KEY) {
-      console.error("[CHECKOUT] RESEND_API_KEY not configured");
-      return Response.json({ success: false, error: "Server configuration error" }, { status: 500 });
-    }
-    if (!process.env.SELLER_EMAIL) {
-      console.error("[CHECKOUT] SELLER_EMAIL not configured");
-      return Response.json({ success: false, error: "Server configuration error" }, { status: 500 });
-    }
-
-    // Load card data from database for stock validation (D-08) and order building
-    let cards: Card[];
+    let checkoutResult;
     try {
-      cards = await getCards();
+      checkoutResult = await placeCheckoutOrder({
+        orderRef: generateOrderRef(),
+        buyerName: body.buyerName.trim(),
+        buyerEmail: body.buyerEmail.trim(),
+        message: body.message?.trim() || undefined,
+        items: body.items.map((item) => ({
+          cardId: item.cardId,
+          quantity: item.quantity,
+        })),
+      });
     } catch (dbError) {
       console.error("[CHECKOUT] Database error:", dbError);
       return Response.json(
@@ -42,45 +73,28 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    const cardMap = new Map(cards.map((c) => [c.id, c]));
 
-    // Validate stock (D-08): check each item exists and requested qty <= available
-    const stockErrors: string[] = [];
-    for (const item of body.items) {
-      const card = cardMap.get(item.cardId);
-      if (!card) {
-        stockErrors.push(`Card "${item.cardId}" not found in inventory`);
-      } else if (item.quantity > card.quantity) {
-        stockErrors.push(`"${card.name}" only has ${card.quantity} available (requested ${item.quantity})`);
-      } else if (item.quantity <= 0) {
-        stockErrors.push(`Invalid quantity for "${item.cardId}"`);
-      }
-    }
-    if (stockErrors.length > 0) {
-      return Response.json({ success: false, error: stockErrors.join("; ") }, { status: 400 });
-    }
-
-    // Build order data (D-14: clean separation)
-    const orderData = buildOrderData(body, cards);
-
-    // Send notifications (D-17: seller priority, buyer best-effort)
-    const notifyResult = await notifyOrder(orderData);
-
-    if (!notifyResult.sellerEmailSent) {
-      // Seller email failed -- treat as order failure
+    if (!checkoutResult.ok) {
       return Response.json(
-        { success: false, error: "Something went wrong. Your order was not placed." },
-        { status: 500 },
+        {
+          success: false,
+          code: "stock_conflict",
+          error: "Some cards are no longer available.",
+          conflicts: checkoutResult.conflicts,
+        },
+        { status: 409 },
       );
     }
 
-    // Success (even if buyer email failed per D-17)
+    const notification = await notifyOrderAfterCommit(checkoutResult.order);
+
     const response: CheckoutResponse = {
       success: true,
-      orderRef: orderData.orderRef,
-      order: orderData,
+      orderRef: checkoutResult.order.orderRef,
+      order: checkoutResult.order,
+      notification,
     };
-    return Response.json(response);
+    return Response.json(response, { status: 201 });
   } catch (error) {
     console.error("[CHECKOUT] Unexpected error:", error);
     return Response.json(

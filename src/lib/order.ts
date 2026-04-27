@@ -14,14 +14,18 @@ export function escapeHtml(str: string): string {
 }
 
 /**
- * Generates a timestamp-based order reference (D-24).
- * Format: ORD-YYYYMMDD-HHMM using UTC time.
+ * Generates a compact, collision-resistant order reference (D-24).
+ * Format: ORD-YYYYMMDD-HHMMSS-XXXXXX using UTC time plus a random suffix.
  */
 export function generateOrderRef(): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const time = now.toISOString().slice(11, 16).replace(":", "");
-  return `ORD-${date}-${time}`;
+  const time = now.toISOString().slice(11, 19).replace(/:/g, "");
+  const suffix = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36))
+    .replace(/-/g, "")
+    .slice(0, 6)
+    .toUpperCase();
+  return `ORD-${date}-${time}-${suffix}`;
 }
 
 /**
@@ -54,6 +58,7 @@ export function buildOrderData(
       price,
       quantity: reqItem.quantity,
       lineTotal,
+      imageUrl: card?.imageUrl ?? null,
     };
   });
 

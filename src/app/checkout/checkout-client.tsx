@@ -3,13 +3,33 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Card } from "@/lib/types";
+import type { Card, StockConflict } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import OrderSummary from "@/components/order-summary";
 import type { OrderSummaryItem } from "@/components/order-summary";
 
 interface CheckoutClientProps {
   cards: Card[];
+}
+
+interface CheckoutErrorResponse {
+  error?: string;
+  code?: string;
+  conflicts?: StockConflict[];
+}
+
+function formatCheckoutError(data: CheckoutErrorResponse): string {
+  if (data.code === "stock_conflict" && data.conflicts?.length) {
+    const details = data.conflicts
+      .map(
+        (conflict) =>
+          `${conflict.name} requested ${conflict.requested}, available ${conflict.available}`,
+      )
+      .join("; ");
+    return `Some cards are no longer available: ${details}.`;
+  }
+
+  return data.error || "Something went wrong. Your order was not placed.";
 }
 
 export default function CheckoutClient({ cards }: CheckoutClientProps) {
@@ -90,11 +110,11 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(
-          data.error || "Something went wrong. Your order was not placed.",
-        );
+      const data = (await res.json()) as CheckoutErrorResponse & {
+        order?: unknown;
+        orderRef?: string;
+      };
+      if (!res.ok) throw new Error(formatCheckoutError(data));
 
       // D-20: Stash full order in sessionStorage BEFORE clearing cart (Pitfall 4)
       sessionStorage.setItem("lastOrder", JSON.stringify(data.order));

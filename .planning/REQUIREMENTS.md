@@ -48,7 +48,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 - [ ] **DB-01**: Vercel Postgres database with cards and orders schema
 - [ ] **DB-02**: Existing card inventory migrated from static JSON to database
 - [ ] **DB-03**: Storefront reads card data from database instead of static JSON
-- [ ] **DB-04**: Stock auto-decrements atomically when a friend checks out
+- [x] **DB-04**: Stock auto-decrements atomically when a friend checks out
 
 ### Authentication
 
@@ -75,9 +75,9 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ### Orders
 
-- [ ] **ORD-01**: Checkout stores order in database (buyer, items, totals, timestamp)
-- [ ] **ORD-02**: Admin can view order history in a table (buyer, date, total)
-- [ ] **ORD-03**: Admin can click into an order to see full line items and buyer info
+- [x] **ORD-01**: Checkout stores order in database (buyer, items, totals, timestamp)
+- [x] **ORD-02**: Admin can view order history in a table (buyer, date, total)
+- [x] **ORD-03**: Admin can click into an order to see full line items and buyer info
 
 ### Dashboard
 
@@ -123,7 +123,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | DB-01 | Phase 6 | Pending |
 | DB-02 | Phase 6 | Pending |
 | DB-03 | Phase 7 | Pending |
-| DB-04 | Phase 11 | Pending |
+| DB-04 | Phase 11 | Complete |
 | AUTH-01 | Phase 8 | Pending |
 | AUTH-02 | Phase 8 | Pending |
 | AUTH-03 | Phase 8 | Pending |
@@ -138,9 +138,9 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | CSV-02 | Phase 10 | Complete |
 | CSV-03 | Phase 9 | Pending |
 | CSV-04 | Phase 10.1 | Complete |
-| ORD-01 | Phase 11 | Pending |
-| ORD-02 | Phase 11 | Pending |
-| ORD-03 | Phase 11 | Pending |
+| ORD-01 | Phase 11 | Complete |
+| ORD-02 | Phase 11 | Complete |
+| ORD-03 | Phase 11 | Complete |
 | DASH-01 | Phase 12 | Pending |
 | DASH-02 | Phase 12 | Pending |
 
