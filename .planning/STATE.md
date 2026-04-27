@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Phase 11 Plan 01 complete; transactional checkout/order persistence verified with concurrent DB proof
-last_updated: "2026-04-26T23:05:00.000Z"
+stopped_at: Phase 11 complete; checkout persistence and admin order history verified end-to-end
+last_updated: "2026-04-26T23:15:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 10
-  percent: 50
+  completed_plans: 11
+  percent: 63
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 11 Plan 02 — admin order history list/detail APIs and UI
+**Current focus:** Phase 12 planning/execution — bulk operations and dashboard
 
 ## Current Position
 
-Phase: 11 (checkout-upgrade-order-history) — IN PROGRESS
-Plan: 1 of 2 — 11-01 DONE, 11-02 READY
-Status: Transactional checkout persistence is implemented and verified; next is admin order history list/detail
+Phase: 11 (checkout-upgrade-order-history) — COMPLETE
+Plan: 2 of 2 — DONE
+Status: Transactional checkout persistence and admin order history are implemented, verified, and cleaned up after disposable DB/browser proofs
 Last activity: 2026-04-26
 
-Progress: [█████░░░░░] 50% phases (4 of 8 v1.1 phases shipped, 1 phase in progress)
+Progress: [██████░░░░] 63% phases (5 of 8 v1.1 phases shipped)
 
 ## Performance Metrics
 
@@ -163,10 +163,20 @@ Implemented transactional checkout persistence on branch `phase-11-checkout-orde
 - Checkout UI preserves cart/form data on errors and formats stock conflicts with requested/available quantities.
 - Verification: `git diff --check`, `npm test` (149/149), `npm run build`, and a disposable remote Neon concurrent checkout proof all passed. The proof created one sentinel card with quantity 1, ran two concurrent checkout writes, observed one success and one `stock_conflict`, confirmed final quantity 0, and cleaned up sentinel card/order rows.
 
+### Phase 11 Completion (2026-04-26)
+
+Implemented Phase 11 across two local commits on branch `phase-11-checkout-order-history`:
+
+- Plan 01: `placeCheckoutOrder()` performs one atomic DB write for stock decrement + order/order_item snapshots; checkout route returns 201/409/503 appropriately; notification emails are post-commit side effects.
+- Plan 02: `/admin/orders` and `/admin/orders/[id]` show seller-facing order history/detail from snapshot rows; admin order APIs are auth-gated; admin nav exposes Orders.
+- Checkout page now reads DB card data, matching `/cart` and the checkout API source of truth.
+- Header cart badge waits for persisted cart hydration, removing the browser-observed localStorage hydration mismatch.
+- Verification: `git diff --check`, `npx tsc --noEmit`, `npm test` (163/163), `npm run build`, remote Neon concurrent checkout proof, and browser checkout → admin orders → detail → inventory decrement proof all passed. Disposable DB rows were cleaned up.
+
 ### Pending Todos
 
-- Continue Phase 11 Plan 02: admin order history list/detail APIs and UI.
-- Commit Phase 11 Plan 01 if final review is acceptable.
+- Review/commit Phase 11 Plan 02.
+- Decide whether to push/open PR for Phase 11 or continue into Phase 12 planning.
 
 ### Blockers/Concerns
 
@@ -175,6 +185,6 @@ Implemented transactional checkout persistence on branch `phase-11-checkout-orde
 
 ## Session Continuity
 
-Last session: 2026-04-26T23:05:00.000Z
-Stopped at: Phase 11 Plan 01 complete and verified; next action is commit/review then Phase 11 Plan 02
-Resume file: .planning/phases/11-checkout-upgrade-order-history/11-01-SUMMARY.md
+Last session: 2026-04-26T23:15:00.000Z
+Stopped at: Phase 11 complete and verified; next action is commit Phase 11 Plan 02 and decide PR/push vs Phase 12
+Resume file: .planning/phases/11-checkout-upgrade-order-history/11-02-SUMMARY.md

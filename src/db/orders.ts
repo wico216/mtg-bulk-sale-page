@@ -111,6 +111,81 @@ function parseSqlPayload(raw: unknown): CheckoutSqlPayload {
   throw new Error("Checkout write returned no result");
 }
 
+export type OrderStatus = "pending" | "confirmed" | "completed";
+
+export interface AdminOrdersParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminOrderSummary {
+  id: string;
+  buyerName: string;
+  buyerEmail: string;
+  totalItems: number;
+  totalPrice: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+
+export interface AdminOrdersResult {
+  orders: AdminOrderSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type AdminOrderDetail = OrderData & { status: OrderStatus };
+
+interface AdminOrderRow {
+  [key: string]: unknown;
+  id: string;
+  buyerName: string;
+  buyerEmail: string;
+  message?: string | null;
+  totalItems: number;
+  totalPrice: number;
+  status: OrderStatus | string;
+  createdAt: string | Date;
+}
+
+interface AdminOrderItemRow extends PersistedOrderItem {
+  [key: string]: unknown;
+}
+
+function normalizePage(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) return 1;
+  return Math.max(1, Math.trunc(value));
+}
+
+function normalizeLimit(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) return 25;
+  return Math.min(100, Math.max(1, Math.trunc(value)));
+}
+
+function numberFromDb(value: number | string | null | undefined): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number.parseInt(value, 10);
+  return 0;
+}
+
+function normalizeStatus(value: string): OrderStatus {
+  return value === "confirmed" || value === "completed" ? value : "pending";
+}
+
+function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
+  return {
+    id: row.id,
+    buyerName: row.buyerName,
+    buyerEmail: row.buyerEmail,
+    totalItems: row.totalItems,
+    totalPrice: row.totalPrice / 100,
+    status: normalizeStatus(row.status),
+    createdAt: toIsoString(row.createdAt),
+  };
+}
+
 export async function placeCheckoutOrder(input: {
   orderRef: string;
   buyerName: string;
@@ -294,4 +369,105 @@ export async function placeCheckoutOrder(input: {
   }
 
   return { ok: true, order: normalizeOrder(payload.order) };
+}
+
+export async function getAdminOrders(
+  params: AdminOrdersParams = {},
+): Promise<AdminOrdersResult> {
+  const page = normalizePage(params.page);
+  const limit = normalizeLimit(params.limit);
+  const offset = (page - 1) * limit;
+
+  const [ordersResult, countResult] = await Promise.all([
+    db.execute<AdminOrderRow>(sql`
+      SELECT
+        id,
+        buyer_name AS "buyerName",
+        buyer_email AS "buyerEmail",
+        total_items AS "totalItems",
+        total_price AS "totalPrice",
+        status,
+        created_at AS "createdAt"
+      FROM orders
+      ORDER BY created_at DESC, id DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `),
+    db.execute<{ total: number | string }>(sql`
+      SELECT COUNT(*)::integer AS total
+      FROM orders
+    `),
+  ]);
+
+  const total = numberFromDb(countResult.rows[0]?.total);
+
+  return {
+    orders: ordersResult.rows.map(normalizeAdminOrderSummary),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
+export async function getOrderById(
+  id: string,
+): Promise<AdminOrderDetail | null> {
+  const orderResult = await db.execute<AdminOrderRow>(sql`
+    SELECT
+      id,
+      buyer_name AS "buyerName",
+      buyer_email AS "buyerEmail",
+      message,
+      total_items AS "totalItems",
+      total_price AS "totalPrice",
+      status,
+      created_at AS "createdAt"
+    FROM orders
+    WHERE id = ${id}
+    LIMIT 1
+  `);
+
+  const order = orderResult.rows[0];
+  if (!order) return null;
+
+  const itemsResult = await db.execute<AdminOrderItemRow>(sql`
+    SELECT
+      card_id AS "cardId",
+      name,
+      set_name AS "setName",
+      set_code AS "setCode",
+      collector_number AS "collectorNumber",
+      condition,
+      price,
+      quantity,
+      line_total AS "lineTotal",
+      image_url AS "imageUrl"
+    FROM order_items
+    WHERE order_id = ${id}
+    ORDER BY id ASC
+  `);
+
+  return {
+    orderRef: order.id,
+    buyerName: order.buyerName,
+    buyerEmail: order.buyerEmail,
+    message: order.message ?? undefined,
+    totalItems: order.totalItems,
+    totalPrice: order.totalPrice / 100,
+    status: normalizeStatus(order.status),
+    createdAt: toIsoString(order.createdAt),
+    items: itemsResult.rows.map((item) => ({
+      cardId: item.cardId,
+      name: item.name,
+      setName: item.setName,
+      setCode: item.setCode,
+      collectorNumber: item.collectorNumber,
+      condition: item.condition,
+      price: centsToDollars(item.price),
+      quantity: item.quantity,
+      lineTotal: centsToDollars(item.lineTotal),
+      imageUrl: item.imageUrl,
+    })),
+  };
 }

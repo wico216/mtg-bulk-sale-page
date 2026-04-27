@@ -116,8 +116,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Authentication** - Admin panel protected by Google OAuth with defense-in-depth access control (completed 2026-04 — Phase 8 dir present)
 - [x] **Phase 9: Admin Inventory Management** - Searchable card table with inline editing, delete, and CSV export (completed 2026-04-19)
 - [x] **Phase 10: CSV Import** - Manabox CSV upload with preview, validation, and full-replace import (completed 2026-04-20; production hotfix wave 2026-04-25 — see STATE.md)
-- [x] **Phase 10.1: Multi-CSV Import & Delete Inventory** - INSERTED: multi-file full-replace import and explicit delete-all inventory action (PR open/verified 2026-04-26; pending merge/deploy)
-- [ ] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking
+- [x] **Phase 10.1: Multi-CSV Import & Delete Inventory** - INSERTED: multi-file full-replace import and explicit delete-all inventory action (merged/deployed 2026-04-26)
+- [x] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking (completed 2026-04-26)
 - [ ] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns
 
 ## Phase Details
@@ -219,7 +219,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [x] 10.1-01-PLAN.md -- Multi-CSV import parser/route/UI and delete-all inventory route/UI (PR open/verified 2026-04-26; pending merge/deploy)
+- [x] 10.1-01-PLAN.md -- Multi-CSV import parser/route/UI and delete-all inventory route/UI (merged/deployed 2026-04-26)
 
 **UI hint**: yes
 
@@ -236,7 +236,7 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md -- Transactional checkout persistence, atomic stock decrement, and buyer stock-conflict UX
-- [ ] 11-02-PLAN.md -- Admin order history list/detail APIs and UI
+- [x] 11-02-PLAN.md -- Admin order history list/detail APIs and UI
 
 **UI hint**: yes
 
@@ -273,6 +273,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
 | 8. Authentication | v1.1 | 0/2 | Not started | - |
 | 9. Admin Inventory Management | v1.1 | 0/3 | Not started | - |
 | 10. CSV Import | v1.1 | 3/3 | Complete | 2026-04-20 |
-| 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | PR open/green | 2026-04-26 |
-| 11. Checkout Upgrade & Order History | v1.1 | 0/2 | Not started | - |
+| 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete | 2026-04-26 |
+| 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
 | 12. Bulk Operations & Dashboard | v1.1 | 0/2 | Not started | - |

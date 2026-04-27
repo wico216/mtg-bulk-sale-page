@@ -132,8 +132,17 @@ function useMode(): [Mode, () => void] {
 
 export default function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [mode, toggleMode] = useMode();
+
+  useEffect(() => {
+    const unsub = useCartStore.persist.onFinishHydration(() =>
+      setCartHydrated(true),
+    );
+    if (useCartStore.persist.hasHydrated()) setCartHydrated(true);
+    return unsub;
+  }, []);
 
   return (
     <>
@@ -268,7 +277,7 @@ export default function Header() {
             >
               Satchel
             </span>
-            {totalItems > 0 && (
+            {cartHydrated && totalItems > 0 && (
               <span
                 style={{
                   background: "var(--accent)",

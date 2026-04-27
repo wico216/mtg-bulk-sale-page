@@ -37,6 +37,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Friend provides name/email at checkout (no account needed) — Validated in Phase 5: Checkout and Deploy
 - [x] Auto-decrement stock on checkout — Validated in Phase 11 Plan 01 with concurrent checkout proof
 - [x] Checkout stores order records in the database — Validated in Phase 11 Plan 01
+- [x] Admin can view order history and order details — Validated in Phase 11 Plan 02 browser proof
 - [x] Admin can import one or more Manabox CSV files as a full inventory replacement — Validated locally in Phase 10/10.1
 - [x] Admin can delete the full inventory with explicit confirmation — Validated locally in Phase 10.1
 
