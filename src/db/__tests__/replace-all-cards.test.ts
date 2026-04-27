@@ -4,7 +4,10 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 // Shared builder stubs that surface as the batch() arguments.
-const deleteBuilder = { __kind: "delete" as const };
+const deleteBuilder = {
+  __kind: "delete" as const,
+  returning: vi.fn().mockResolvedValue([{ id: "a" }, { id: "b" }]),
+};
 const insertBuilder = {
   __kind: "insert" as const,
   values: vi.fn().mockReturnThis(),
@@ -20,7 +23,7 @@ vi.mock("@/db/client", () => ({
 }));
 
 import { db } from "@/db/client";
-import { replaceAllCards } from "../queries";
+import { replaceAllCards, deleteAllCards } from "../queries";
 import type { Card } from "@/lib/types";
 
 function makeCard(overrides: Partial<Card> = {}): Card {
@@ -47,6 +50,8 @@ beforeEach(() => {
   vi.mocked(db.batch).mockResolvedValue([] as never);
   vi.mocked(db.delete).mockClear();
   vi.mocked(db.insert).mockClear();
+  deleteBuilder.returning.mockClear();
+  deleteBuilder.returning.mockResolvedValue([{ id: "a" }, { id: "b" }]);
   insertBuilder.values.mockClear();
 });
 
@@ -108,5 +113,23 @@ describe("replaceAllCards", () => {
   it("calls db.batch exactly once (double-check for Test A pattern)", async () => {
     await replaceAllCards([makeCard()]);
     expect(db.batch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("deleteAllCards", () => {
+  it("deletes every card and reports the deleted row count", async () => {
+    deleteBuilder.returning.mockResolvedValueOnce([
+      { id: "lea-232-normal-near_mint" },
+      { id: "mh2-45-foil-lightly_played" },
+      { id: "sld-1-normal-near_mint" },
+    ]);
+
+    const result = await deleteAllCards();
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(deleteBuilder.returning).toHaveBeenCalledWith({
+      id: expect.anything(),
+    });
+    expect(result).toEqual({ deleted: 3 });
   });
 });

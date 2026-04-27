@@ -218,3 +218,11 @@ export async function replaceAllCards(
   await db.batch([db.delete(cards), db.insert(cards).values(rows)]);
   return { inserted: rows.length };
 }
+
+/** Delete every card from inventory. Returns the number of rows removed. */
+export async function deleteAllCards(): Promise<{ deleted: number }> {
+  const deletedRows = await db
+    .delete(cards)
+    .returning({ id: cards.id });
+  return { deleted: deletedRows.length };
+}

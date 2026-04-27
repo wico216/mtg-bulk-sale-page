@@ -116,6 +116,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Authentication** - Admin panel protected by Google OAuth with defense-in-depth access control (completed 2026-04 — Phase 8 dir present)
 - [x] **Phase 9: Admin Inventory Management** - Searchable card table with inline editing, delete, and CSV export (completed 2026-04-19)
 - [x] **Phase 10: CSV Import** - Manabox CSV upload with preview, validation, and full-replace import (completed 2026-04-20; production hotfix wave 2026-04-25 — see STATE.md)
+- [x] **Phase 10.1: Multi-CSV Import & Delete Inventory** - INSERTED: multi-file full-replace import and explicit delete-all inventory action (completed locally 2026-04-26; pending commit/deploy)
 - [ ] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking
 - [ ] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns
 
@@ -205,6 +206,23 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 10.1: Multi-CSV Import & Delete Inventory
+**Goal**: The seller can import multiple Manabox CSV exports in one full-replace batch and intentionally clear inventory when needed
+**Depends on**: Phase 10
+**Requirements**: CSV-04, INV-07
+**Success Criteria** (what must be TRUE):
+  1. Admin can select or drag-drop more than one `.csv` file on `/admin/import`
+  2. Duplicate card listings across uploaded CSV files merge by composite ID and sum quantities before enrichment
+  3. Preview shows source-file parse counts and identifies parse skipped rows by filename
+  4. Admin can delete the entire current inventory from `/admin` only after an inline destructive confirmation
+  5. Delete-all is auth-gated through `/api/admin/cards` and reports how many rows were removed
+**Plans**: 1 plan
+
+Plans:
+- [x] 10.1-01-PLAN.md -- Multi-CSV import parser/route/UI and delete-all inventory route/UI (completed locally 2026-04-26; pending commit/deploy)
+
+**UI hint**: yes
+
 ### Phase 11: Checkout Upgrade & Order History
 **Goal**: Checkout is transactional with stock protection, and the seller can review past orders
 **Depends on**: Phase 7 (storefront on DB), Phase 8 (auth for admin order pages)
@@ -241,7 +259,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
+Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -254,6 +272,7 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 | 7. Storefront Migration | v1.1 | 0/2 | Not started | - |
 | 8. Authentication | v1.1 | 0/2 | Not started | - |
 | 9. Admin Inventory Management | v1.1 | 0/3 | Not started | - |
-| 10. CSV Import | v1.1 | 2/3 | In Progress|  |
+| 10. CSV Import | v1.1 | 3/3 | Complete | 2026-04-20 |
+| 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete locally | 2026-04-26 |
 | 11. Checkout Upgrade & Order History | v1.1 | 0/2 | Not started | - |
 | 12. Bulk Operations & Dashboard | v1.1 | 0/2 | Not started | - |

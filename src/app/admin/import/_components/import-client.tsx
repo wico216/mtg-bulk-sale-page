@@ -10,36 +10,55 @@ import { DropZone } from "./drop-zone";
 import { ProgressBar } from "./progress-bar";
 import { PreviewPanel } from "./preview-panel";
 
+type SelectedFile = { name: string; size: number };
+
 type Stage =
   | { kind: "idle"; invalidExtension?: boolean }
   | {
       kind: "uploading";
-      filename: string;
-      size: number;
+      files: SelectedFile[];
       done: number;
       total: number;
       indeterminate: boolean;
     }
-  | { kind: "preview"; filename: string; size: number; payload: PreviewPayload }
-  | { kind: "committing"; filename: string; size: number; payload: PreviewPayload }
-  | { kind: "error"; message: string; previousFilename?: string };
+  | { kind: "preview"; files: SelectedFile[]; payload: PreviewPayload }
+  | { kind: "committing"; files: SelectedFile[]; payload: PreviewPayload }
+  | { kind: "error"; message: string; previousFiles?: SelectedFile[] };
+
+function summarizeFiles(files: File[]): SelectedFile[] {
+  return files.map((file) => ({ name: file.name, size: file.size }));
+}
+
+function totalSizeKb(files: SelectedFile[]): number {
+  return Math.max(
+    1,
+    Math.round(files.reduce((total, file) => total + file.size, 0) / 1024),
+  );
+}
+
+function fileSummary(files: SelectedFile[]): string {
+  if (files.length === 1) return `${files[0].name} · ${totalSizeKb(files)} KB`;
+  return `${files.length} files · ${totalSizeKb(files)} KB`;
+}
 
 export function ImportClient({ currentTotal }: { currentTotal: number }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
 
-  async function handleFile(file: File) {
+  async function handleFiles(files: File[]) {
+    const selectedFiles = summarizeFiles(files);
     setStage({
       kind: "uploading",
-      filename: file.name,
-      size: file.size,
+      files: selectedFiles,
       done: 0,
       total: 0,
       indeterminate: true,
     });
 
     const fd = new FormData();
-    fd.append(IMPORT_FILE_FIELD, file);
+    for (const file of files) {
+      fd.append(IMPORT_FILE_FIELD, file);
+    }
 
     let res: Response;
     try {
@@ -58,14 +77,28 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
         setStage({
           kind: "error",
           message: body?.error ?? `Upload failed (${res.status})`,
+          previousFiles: selectedFiles,
         });
       } catch {
-        setStage({ kind: "error", message: `Upload failed (${res.status})` });
+        setStage({
+          kind: "error",
+          message: `Upload failed (${res.status})`,
+          previousFiles: selectedFiles,
+        });
       }
       return;
     }
 
-    const reader = res.body!.getReader();
+    if (!res.body) {
+      setStage({
+        kind: "error",
+        message: "Upload failed: empty response stream",
+        previousFiles: selectedFiles,
+      });
+      return;
+    }
+
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let finalPreview: PreviewPayload | null = null;
@@ -83,8 +116,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           if (msg.type === "progress") {
             setStage({
               kind: "uploading",
-              filename: file.name,
-              size: file.size,
+              files: selectedFiles,
               done: msg.done,
               total: msg.total,
               indeterminate: msg.total === 0,
@@ -96,25 +128,26 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           }
         }
       }
+      if (buffer.trim()) {
+        const msg = JSON.parse(buffer) as ImportStreamMessage;
+        if (msg.type === "result") finalPreview = msg.preview;
+        if (msg.type === "error") throw new Error(msg.message);
+      }
       if (!finalPreview) throw new Error("Stream ended without a preview result");
-      setStage({
-        kind: "preview",
-        filename: file.name,
-        size: file.size,
-        payload: finalPreview,
-      });
+      setStage({ kind: "preview", files: selectedFiles, payload: finalPreview });
     } catch (err) {
       setStage({
         kind: "error",
         message: err instanceof Error ? err.message : "Stream error",
+        previousFiles: selectedFiles,
       });
     }
   }
 
   async function handleConfirm() {
     if (stage.kind !== "preview") return;
-    const { payload, filename, size } = stage;
-    setStage({ kind: "committing", filename, size, payload });
+    const { payload, files } = stage;
+    setStage({ kind: "committing", files, payload });
 
     let res: Response;
     try {
@@ -127,6 +160,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
       setStage({
         kind: "error",
         message: err instanceof Error ? err.message : "Network error",
+        previousFiles: files,
       });
       return;
     }
@@ -137,7 +171,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
         const body = await res.json();
         if (body?.error) errMsg = body.error;
       } catch {}
-      setStage({ kind: "error", message: errMsg, previousFilename: filename });
+      setStage({ kind: "error", message: errMsg, previousFiles: files });
       return;
     }
 
@@ -145,8 +179,8 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     const totalSkipped = payload.parseSkipped + payload.scryfallSkipped;
     const message =
       totalSkipped > 0
-        ? `Imported ${body.inserted} cards (${totalSkipped} skipped)`
-        : `Imported ${body.inserted} cards`;
+        ? `Imported ${body.inserted} cards from ${files.length} file${files.length === 1 ? "" : "s"} (${totalSkipped} skipped)`
+        : `Imported ${body.inserted} cards from ${files.length} file${files.length === 1 ? "" : "s"}`;
     try {
       window.sessionStorage.setItem(
         "admin-toast",
@@ -170,11 +204,11 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
             role="alert"
             className="mb-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 text-sm text-red-600 dark:text-red-400"
           >
-            Only .csv files are supported. Please export a CSV from Manabox and try again.
+            Only .csv files are supported. Please export CSV files from Manabox and try again.
           </div>
         )}
         <DropZone
-          onFile={handleFile}
+          onFiles={handleFiles}
           onInvalidExtension={() => setStage({ kind: "idle", invalidExtension: true })}
         />
       </div>
@@ -182,12 +216,18 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   }
 
   if (stage.kind === "uploading") {
-    const sizeKb = Math.max(1, Math.round(stage.size / 1024));
     return (
       <div className="space-y-4">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {stage.filename} · {sizeKb} KB
+          {fileSummary(stage.files)}
         </p>
+        {stage.files.length > 1 && (
+          <ul className="text-xs text-zinc-500 dark:text-zinc-400 list-disc pl-5 space-y-0.5">
+            {stage.files.map((file, index) => (
+              <li key={`${file.name}-${index}`}>{file.name}</li>
+            ))}
+          </ul>
+        )}
         <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           Fetching prices from Scryfall
         </p>
@@ -210,7 +250,6 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   if (stage.kind === "preview" || stage.kind === "committing") {
     const committing = stage.kind === "committing";
     const payload = stage.payload;
-    const sizeKb = Math.max(1, Math.round(stage.size / 1024));
     const canConfirm = payload.toImport > 0;
     const confirmLabel = canConfirm
       ? `Confirm import — replace all ${currentTotal} current cards with ${payload.toImport} new cards`
@@ -219,7 +258,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     return (
       <div className="space-y-6">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {stage.filename} · {sizeKb} KB · ✓ Parsed
+          {fileSummary(stage.files)} · ✓ Parsed
         </p>
 
         {!canConfirm && (
@@ -229,7 +268,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           >
             <p className="font-semibold mb-1">No valid cards parsed</p>
             <p>
-              This CSV did not contain any importable Manabox rows. Check that you exported
+              These CSV files did not contain any importable Manabox rows. Check that you exported
               directly from Manabox and try again.
             </p>
           </div>

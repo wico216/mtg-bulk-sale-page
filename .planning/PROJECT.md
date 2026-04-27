@@ -35,6 +35,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Checkout sends confirmation email to buyer — Validated in Phase 5: Checkout and Deploy
 - [x] Confirmation page shown after checkout — Validated in Phase 5: Checkout and Deploy
 - [x] Friend provides name/email at checkout (no account needed) — Validated in Phase 5: Checkout and Deploy
+- [x] Admin can import one or more Manabox CSV files as a full inventory replacement — Validated locally in Phase 10/10.1
+- [x] Admin can delete the full inventory with explicit confirmation — Validated locally in Phase 10.1
 
 ### Active
 
@@ -43,7 +45,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [ ] Auto-decrement stock on checkout
 - [ ] Edit individual card details (price, condition, quantity)
 - [ ] Remove cards from inventory manually
-- [ ] CSV import (full replace) into database
+- [x] CSV import (full replace) into database — Validated locally in Phase 10/10.1
 - [ ] CSV export of current inventory
 - [ ] Bulk select and delete cards
 - [ ] Order history dashboard
@@ -85,8 +87,10 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Public storefront access | No need to gate access for a friend store | ✓ Good |
 | Vercel Postgres | Free tier, same platform as hosting, managed | — Pending |
 | Google OAuth for admin | Friends already have Google accounts — enables future buyer order tracking | ✓ Good |
+| Username/password admin fallback | Google OAuth can reject local automation/browser contexts; credentials provider is enabled only outside production while ADMIN_EMAIL remains the authorization gate | ✓ Good |
 | Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
-| CSV import replaces inventory | Simple mental model — Manabox export is source of truth | — Pending |
+| CSV import replaces inventory | Simple mental model — Manabox export is source of truth | ✓ Good |
+| Multi-CSV import still full-replaces inventory | Multiple Manabox exports are merged into one preview batch before replacing DB rows; no incremental merge semantics | ✓ Good |
 
 ## Evolution
 
@@ -106,4 +110,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 after Phase 8 complete — Google OAuth admin authentication*
+*Last updated: 2026-04-26 after Phase 10.1 local completion and admin credentials fallback*

@@ -1,12 +1,13 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Use vi.hoisted() pattern for mock variables (established in Phase 8)
-const { mockRequireAdmin, mockGetAdminCards, mockUpdateCard, mockDeleteCard } =
+const { mockRequireAdmin, mockGetAdminCards, mockUpdateCard, mockDeleteCard, mockDeleteAllCards } =
   vi.hoisted(() => ({
     mockRequireAdmin: vi.fn(),
     mockGetAdminCards: vi.fn(),
     mockUpdateCard: vi.fn(),
     mockDeleteCard: vi.fn(),
+    mockDeleteAllCards: vi.fn(),
   }));
 
 // Mock server-only
@@ -22,9 +23,10 @@ vi.mock("@/db/queries", () => ({
   getAdminCards: mockGetAdminCards,
   updateCard: mockUpdateCard,
   deleteCard: mockDeleteCard,
+  deleteAllCards: mockDeleteAllCards,
 }));
 
-import { GET } from "../route";
+import { GET, DELETE as DELETE_ALL } from "../route";
 import { PATCH, DELETE } from "../[id]/route";
 
 // Helper to create a Request for GET with query params
@@ -138,6 +140,44 @@ describe("GET /api/admin/cards", () => {
 
     const response = await GET(makeGetRequest());
     expect(response.status).toBe(403);
+  });
+});
+
+describe("DELETE /api/admin/cards", () => {
+  beforeEach(() => {
+    mockRequireAdmin.mockReset();
+    mockDeleteAllCards.mockReset();
+    mockRequireAdmin.mockResolvedValue(adminSession);
+  });
+
+  it("deletes all cards and returns the deleted count", async () => {
+    mockDeleteAllCards.mockResolvedValue({ deleted: 42 });
+
+    const response = await DELETE_ALL();
+    const data = await response.json();
+
+    expect(data).toEqual({ success: true, deleted: 42 });
+    expect(mockDeleteAllCards).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 401 when requireAdmin returns 401 Response", async () => {
+    mockRequireAdmin.mockResolvedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const response = await DELETE_ALL();
+    expect(response.status).toBe(401);
+    expect(mockDeleteAllCards).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when deleteAllCards rejects", async () => {
+    mockDeleteAllCards.mockRejectedValue(new Error("DB is down"));
+
+    const response = await DELETE_ALL();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Delete inventory failed — inventory unchanged",
+    });
   });
 });
 

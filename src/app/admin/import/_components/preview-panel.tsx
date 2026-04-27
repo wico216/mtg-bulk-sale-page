@@ -8,7 +8,7 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({ preview, currentTotal }: PreviewPanelProps) {
-  const { toImport, parseSkipped, scryfallSkipped, missingPrices, sample, skippedRows } = preview;
+  const { toImport, parseSkipped, scryfallSkipped, missingPrices, sample, skippedRows, sourceFiles } = preview;
   const totalSkipped = parseSkipped + scryfallSkipped;
 
   return (
@@ -63,6 +63,23 @@ export function PreviewPanel({ preview, currentTotal }: PreviewPanelProps) {
         <p className="text-xs text-zinc-500 dark:text-zinc-400 pt-2">
           This will replace your current inventory of {currentTotal} cards.
         </p>
+        {sourceFiles.length > 1 && (
+          <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">
+              Source files
+            </p>
+            <ul className="grid gap-1 text-xs text-zinc-600 dark:text-zinc-400 sm:grid-cols-2">
+              {sourceFiles.map((file) => (
+                <li key={file.name} className="flex justify-between gap-3 rounded bg-zinc-50 dark:bg-zinc-900 px-2 py-1">
+                  <span className="truncate">{file.name}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {file.parsedCards} parsed / {file.skippedRows} skipped
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {/* Zone 2: Sample */}
@@ -167,7 +184,7 @@ export function PreviewPanel({ preview, currentTotal }: PreviewPanelProps) {
                 const identifier = `${row.setCode ?? "?"}-${row.collectorNumber ?? "?"}`;
                 return (
                   <li key={`parse-${i}`}>
-                    Row {row.rowNumber} — {row.name ?? "(no name)"} (
+                    {row.fileName ? `${row.fileName} ` : ""}Row {row.rowNumber} — {row.name ?? "(no name)"} (
                     <span className="font-mono text-xs">{identifier}</span>): {row.reason}
                   </li>
                 );

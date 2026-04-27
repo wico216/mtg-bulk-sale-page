@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Completed Phase 10 (10-03 admin UI + post-launch hotfixes shipped to prod)
-last_updated: "2026-04-25T18:35:00.000Z"
-last_activity: 2026-04-25
+stopped_at: Completed Phase 10.1 locally (multi-CSV import + delete inventory); awaiting commit/deploy or Phase 11 planning
+last_updated: "2026-04-26T13:25:04.000Z"
+last_activity: 2026-04-26
 progress:
-  total_phases: 7
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 8
+  completed_phases: 4
+  total_plans: 9
+  completed_plans: 9
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 10 complete — next up is Phase 11 (Checkout Upgrade & Order History) or a 10.1 insertion for multi-CSV import + delete-inventory
+**Current focus:** Phase 10.1 complete locally — next up is commit/deploy for 10.1, then Phase 11 (Checkout Upgrade & Order History)
 
 ## Current Position
 
-Phase: 10 (csv-import) — COMPLETE
-Plan: 3 of 3 — DONE (committed 4afa7e6, dec5dbe; live on prod)
-Status: Phase 10 closed; awaiting routing decision for follow-up work
-Last activity: 2026-04-25
+Phase: 10.1 (multi-csv-delete-inventory) — COMPLETE LOCALLY
+Plan: 1 of 1 — DONE (branch `phase-10.1-import-delete-inventory`; not pushed/deployed)
+Status: Phase 10.1 implementation verified locally; commit/deploy decision pending
+Last activity: 2026-04-26
 
-Progress: [██████░░░░] 43% phases (3 of 7 phases shipped: 8, 9, 10)
+Progress: [█████░░░░░] 50% phases (4 of 8 v1.1 phases shipped or complete locally: 8, 9, 10, 10.1)
 
 ## Performance Metrics
 
@@ -118,6 +118,11 @@ Recent decisions affecting current work:
 - [Phase 10-03]: Client buffers the FULL enriched cards[] from preview's NDJSON result and POSTs it back to /commit unmodified
 - [Phase 10-03]: sessionStorage 'admin-toast' is the cross-route handoff for post-import success toast (router.push doesn't preserve client state)
 - [Phase 10-03]: D-13 cart reconciliation is silent (no banner) — friend-store UX prefers quiet correctness over scolding
+- [Phase 10.1]: Multi-CSV import is still a full-replace operation — multiple files are merged together before preview, not merged incrementally into existing inventory
+- [Phase 10.1]: Duplicate card IDs across uploaded CSV files sum quantities via the existing composite ID dedupe rule
+- [Phase 10.1]: Parse skipped rows carry optional fileName so the admin can locate bad rows in multi-file uploads without changing single-file behavior
+- [Phase 10.1]: Delete inventory uses a dedicated deleteAllCards helper and DELETE /api/admin/cards so the UI can report deleted count; it does not overload replaceAllCards([])
+- [Phase 10.1 Auth]: Username/password admin login is local-only through Auth.js Credentials because Google OAuth can reject local automation contexts; production disables the provider via `NODE_ENV=production`, `ADMIN_EMAIL` remains the authorization identity, and `ADMIN_USERNAME`/`ADMIN_PASSWORD` are env-backed secrets.
 
 ### Post-Phase 10 Hotfixes (2026-04-25)
 
@@ -137,9 +142,20 @@ Same-day UX fixes shipped to main while testing the live import:
 - **`7df5c8a` + `4469584` catalog/tile-size:** `gridTemplateColumns` minmax bumped 150px → 220px → 250px. Roughly 4–5 tiles per row on desktop instead of 8+.
 - **`70d30da` mobile/header+drawer:** iPhone Pro Max-class screens were clipping the header title (right-side controls + 32px padding pushed "Spellbook" past `overflow:hidden`) and treating the 248px sticky filter rail as "filter open by default" (it covered ~58% of the viewport). Below 767px the rail is now a right-side drawer triggered by a "Filter" button; below 640px the header tightens padding, shrinks mascot+title, and hides the tagline + Satchel label.
 
+### Phase 10.1 Local Completion (2026-04-26)
+
+User chose the 10.1 insertion before Phase 11. Implemented locally on branch `phase-10.1-import-delete-inventory`:
+
+- Multi-CSV import: `/admin/import` accepts multiple `.csv` files; preview route parses repeated multipart `file` fields; parser merges duplicate composite IDs across files and preserves per-file skipped-row context.
+- Delete inventory: `/admin` action bar has a destructive `Delete inventory` button; confirmation is inline; DELETE `/api/admin/cards` is auth-gated and returns deleted row count.
+- Browser verification: authenticated admin session reached `/admin`; `/admin/import` accepted two CSV files; preview showed 3 unique imported cards after duplicate merge, 1 skipped row with filename, per-file parse counts, and correct destructive confirm label. Returned to `/admin`; empty-inventory state showed `Delete inventory` disabled. No console or failed network logs during final browser checks.
+- Verification: focused tests 41/41 pass; auth/proxy focused tests 24/24 pass; `npx tsc --noEmit` passes; full `npm test` 135/135 passes; touched-file eslint has no errors; `npm run build` passes after local auth/database env keys were collected securely.
+- Project-wide `npm run lint` still fails on pre-existing issues outside this change (React set-state-in-effect, JSX in try/catch, test `any` types). Touched files only have existing admin table warnings.
+
 ### Pending Todos
 
-- **Multi-CSV import + Delete inventory button** — feature work the user asked about; deferred pending Phase 10.1 routing decision (insert-phase vs add-phase).
+- Commit/deploy Phase 10.1 after review.
+- Phase 11: checkout upgrade and order history.
 
 ### Blockers/Concerns
 
@@ -148,6 +164,6 @@ Same-day UX fixes shipped to main while testing the live import:
 
 ## Session Continuity
 
-Last session: 2026-04-25T18:35:00.000Z
-Stopped at: Phase 10 complete; production stable; awaiting decision on Phase 10.1 (multi-CSV + delete-inventory) vs Phase 11 (checkout upgrade & order history)
-Resume file: None
+Last session: 2026-04-26T13:25:04.000Z
+Stopped at: Phase 10.1 complete locally; commit/deploy pending, then Phase 11 checkout upgrade & order history
+Resume file: .planning/phases/10.1-multi-csv-delete-inventory/10.1-01-SUMMARY.md

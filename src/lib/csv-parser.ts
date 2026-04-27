@@ -14,12 +14,19 @@ export interface SkippedRow {
   name?: string;
   setCode?: string;
   collectorNumber?: string;
+  /** Optional source filename when multiple uploaded CSVs are parsed together. */
+  fileName?: string;
 }
 
 /** Return shape of parseManaboxCsvContent. */
 export interface ParseResult {
   cards: Card[];
   skippedRows: SkippedRow[];
+  sourceFiles?: Array<{
+    name: string;
+    parsedCards: number;
+    skippedRows: number;
+  }>;
 }
 
 /**
@@ -181,7 +188,10 @@ export function parseAllCsvFiles(inventoryDir: string): Card[] {
  * skipped row with a 1-indexed row number (header = row 1, first data row =
  * row 2) and a concrete reason so the preview UI can display per-row feedback.
  */
-export function parseManaboxCsvContent(content: string): ParseResult {
+export function parseManaboxCsvContent(
+  content: string,
+  fileName?: string,
+): ParseResult {
   const result = Papa.parse<ManaboxRow>(content, {
     header: true,
     dynamicTyping: true,
@@ -195,7 +205,13 @@ export function parseManaboxCsvContent(content: string): ParseResult {
     const rowNumber = index + 2; // header is row 1
     const outcome = rowToCardOrSkip(row, rowNumber);
     if ("card" in outcome) cards.push(outcome.card);
-    else skippedRows.push(outcome.skipped);
+    else {
+      skippedRows.push(
+        fileName
+          ? { ...outcome.skipped, fileName }
+          : outcome.skipped,
+      );
+    }
   });
 
   // PapaParse errors that couldn't even produce a row surface as SkippedRow
@@ -205,10 +221,55 @@ export function parseManaboxCsvContent(content: string): ParseResult {
       skippedRows.push({
         rowNumber: err.row + 2,
         reason: `parse error: ${err.message}`,
+        ...(fileName ? { fileName } : {}),
       });
     }
   }
 
   const merged = mergeCards(cards);
-  return { cards: merged, skippedRows };
+  return {
+    cards: merged,
+    skippedRows,
+    ...(fileName
+      ? {
+          sourceFiles: [
+            {
+              name: fileName,
+              parsedCards: merged.length,
+              skippedRows: skippedRows.length,
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
+/**
+ * Parse multiple uploaded Manabox CSV files as one import batch.
+ *
+ * Each file preserves spreadsheet-style row numbers for its own skipped rows
+ * and adds fileName so the admin preview can point the seller at the exact
+ * source file. Valid cards are merged across files by the same composite ID
+ * used by the original build-time parser, so overlapping binders sum quantity
+ * instead of creating duplicate rows.
+ */
+export function parseManaboxCsvContents(
+  files: Array<{ fileName: string; content: string }>,
+): ParseResult {
+  const cards: Card[] = [];
+  const skippedRows: SkippedRow[] = [];
+  const sourceFiles: NonNullable<ParseResult["sourceFiles"]> = [];
+
+  for (const file of files) {
+    const parsed = parseManaboxCsvContent(file.content, file.fileName);
+    cards.push(...parsed.cards);
+    skippedRows.push(...parsed.skippedRows);
+    sourceFiles.push({
+      name: file.fileName,
+      parsedCards: parsed.cards.length,
+      skippedRows: parsed.skippedRows.length,
+    });
+  }
+
+  return { cards: mergeCards(cards), skippedRows, sourceFiles };
 }

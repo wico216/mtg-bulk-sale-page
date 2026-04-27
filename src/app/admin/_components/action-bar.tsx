@@ -11,6 +11,9 @@ interface ActionBarProps {
   availableSets: string[];
   exporting: boolean;
   onExport: () => void;
+  deletingAll: boolean;
+  deleteDisabled: boolean;
+  onRequestDeleteAll: () => void;
 }
 
 export function ActionBar({
@@ -23,6 +26,9 @@ export function ActionBar({
   availableSets,
   exporting,
   onExport,
+  deletingAll,
+  deleteDisabled,
+  onRequestDeleteAll,
 }: ActionBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -88,24 +94,38 @@ export function ActionBar({
         <option value="damaged">DMG</option>
       </select>
 
-      {/* D-02: Import CSV link (navigates — not a mutation — so it's a Link, not a button) */}
-      <Link
-        href="/admin/import"
-        className="ml-auto px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
-      >
-        Import CSV
-      </Link>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onRequestDeleteAll}
+          disabled={deleteDisabled || deletingAll}
+          className={`px-4 py-1.5 text-sm font-semibold rounded-md border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors ${
+            deleteDisabled || deletingAll ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {deletingAll ? "Deleting..." : "Delete inventory"}
+        </button>
 
-      {/* Export CSV button (D-12) */}
-      <button
-        onClick={onExport}
-        disabled={exporting}
-        className={`px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
-          exporting ? "opacity-70 cursor-not-allowed" : ""
-        }`}
-      >
-        {exporting ? "Exporting..." : "Export CSV"}
-      </button>
+        {/* D-02: Import CSV link (navigates — not a mutation — so it's a Link, not a button) */}
+        <Link
+          href="/admin/import"
+          className="px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+        >
+          Import CSV
+        </Link>
+
+        {/* Export CSV button (D-12) */}
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={exporting}
+          className={`px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
+            exporting ? "opacity-70 cursor-not-allowed" : ""
+          }`}
+        >
+          {exporting ? "Exporting..." : "Export CSV"}
+        </button>
+      </div>
     </div>
   );
 }
