@@ -33,13 +33,15 @@ export default async function LoginPage({
 
         {passwordLoginEnabled && <CredentialsSignInForm />}
 
-        {passwordLoginEnabled && googleConfigured && (
-          <div className="mt-5">
-            <div className="flex items-center gap-3 mb-5" aria-hidden="true">
-              <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-              <span className="text-xs uppercase tracking-wide text-zinc-400">or</span>
-              <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-            </div>
+        {googleConfigured && (
+          <div className={passwordLoginEnabled ? "mt-5" : undefined}>
+            {passwordLoginEnabled && (
+              <div className="flex items-center gap-3 mb-5" aria-hidden="true">
+                <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                <span className="text-xs uppercase tracking-wide text-zinc-400">or</span>
+                <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+            )}
             <GoogleSignInButton />
           </div>
         )}
