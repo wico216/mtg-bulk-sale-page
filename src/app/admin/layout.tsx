@@ -30,6 +30,18 @@ export default async function AdminLayout({
           </div>
           <div className="flex items-center gap-4">
             <Link
+              href="/admin"
+              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
+            >
+              Inventory
+            </Link>
+            <Link
+              href="/admin/orders"
+              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
+            >
+              Orders
+            </Link>
+            <Link
               href="/"
               className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             >

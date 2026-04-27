@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Completed Phase 10.1 locally (multi-CSV import + delete inventory); awaiting commit/deploy or Phase 11 planning
-last_updated: "2026-04-26T13:25:04.000Z"
+stopped_at: Phase 11 complete; checkout persistence and admin order history verified end-to-end
+last_updated: "2026-04-26T23:15:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 8
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 50
+  completed_phases: 5
+  total_plans: 11
+  completed_plans: 11
+  percent: 63
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 10.1 complete locally — next up is commit/deploy for 10.1, then Phase 11 (Checkout Upgrade & Order History)
+**Current focus:** Phase 12 planning/execution — bulk operations and dashboard
 
 ## Current Position
 
-Phase: 10.1 (multi-csv-delete-inventory) — COMPLETE LOCALLY
-Plan: 1 of 1 — DONE (branch `phase-10.1-import-delete-inventory`; not pushed/deployed)
-Status: Phase 10.1 implementation verified locally; commit/deploy decision pending
+Phase: 11 (checkout-upgrade-order-history) — COMPLETE
+Plan: 2 of 2 — DONE
+Status: Transactional checkout persistence and admin order history are implemented, verified, and cleaned up after disposable DB/browser proofs
 Last activity: 2026-04-26
 
-Progress: [█████░░░░░] 50% phases (4 of 8 v1.1 phases shipped or complete locally: 8, 9, 10, 10.1)
+Progress: [██████░░░░] 63% phases (5 of 8 v1.1 phases shipped)
 
 ## Performance Metrics
 
@@ -151,11 +151,32 @@ User chose the 10.1 insertion before Phase 11. Implemented locally on branch `ph
 - Browser verification: authenticated admin session reached `/admin`; `/admin/import` accepted two CSV files; preview showed 3 unique imported cards after duplicate merge, 1 skipped row with filename, per-file parse counts, and correct destructive confirm label. Returned to `/admin`; empty-inventory state showed `Delete inventory` disabled. No console or failed network logs during final browser checks.
 - Verification: focused tests 41/41 pass; auth/proxy focused tests 24/24 pass; `npx tsc --noEmit` passes; full `npm test` 135/135 passes; touched-file eslint has no errors; `npm run build` passes after local auth/database env keys were collected securely.
 - Project-wide `npm run lint` still fails on pre-existing issues outside this change (React set-state-in-effect, JSX in try/catch, test `any` types). Touched files only have existing admin table warnings.
+- PR status: Phase 10.1 is pushed as PR #1; Vercel preview checks are green; preview verification caught and fixed a production-login regression so Google sign-in remains visible when local password login is disabled.
+
+### Phase 11 Plan 01 Completion (2026-04-26)
+
+Implemented transactional checkout persistence on branch `phase-11-checkout-order-history`:
+
+- `placeCheckoutOrder()` now performs one atomic database write that locks requested cards, rejects missing/short stock, decrements stock, inserts the order, and inserts denormalized item snapshots.
+- `POST /api/checkout` now returns HTTP 201 on persisted order success, HTTP 409 with `code: "stock_conflict"` for stale carts, and HTTP 503 when the DB write fails before notifications.
+- Notification emails are post-commit side effects; seller/buyer email failure no longer erases a persisted order.
+- Checkout UI preserves cart/form data on errors and formats stock conflicts with requested/available quantities.
+- Verification: `git diff --check`, `npm test` (149/149), `npm run build`, and a disposable remote Neon concurrent checkout proof all passed. The proof created one sentinel card with quantity 1, ran two concurrent checkout writes, observed one success and one `stock_conflict`, confirmed final quantity 0, and cleaned up sentinel card/order rows.
+
+### Phase 11 Completion (2026-04-26)
+
+Implemented Phase 11 across two local commits on branch `phase-11-checkout-order-history`:
+
+- Plan 01: `placeCheckoutOrder()` performs one atomic DB write for stock decrement + order/order_item snapshots; checkout route returns 201/409/503 appropriately; notification emails are post-commit side effects.
+- Plan 02: `/admin/orders` and `/admin/orders/[id]` show seller-facing order history/detail from snapshot rows; admin order APIs are auth-gated; admin nav exposes Orders.
+- Checkout page now reads DB card data, matching `/cart` and the checkout API source of truth.
+- Header cart badge waits for persisted cart hydration, removing the browser-observed localStorage hydration mismatch.
+- Verification: `git diff --check`, `npx tsc --noEmit`, `npm test` (163/163), `npm run build`, remote Neon concurrent checkout proof, and browser checkout → admin orders → detail → inventory decrement proof all passed. Disposable DB rows were cleaned up.
 
 ### Pending Todos
 
-- Commit/deploy Phase 10.1 after review.
-- Phase 11: checkout upgrade and order history.
+- Review/commit Phase 11 Plan 02.
+- Decide whether to push/open PR for Phase 11 or continue into Phase 12 planning.
 
 ### Blockers/Concerns
 
@@ -164,6 +185,6 @@ User chose the 10.1 insertion before Phase 11. Implemented locally on branch `ph
 
 ## Session Continuity
 
-Last session: 2026-04-26T13:25:04.000Z
-Stopped at: Phase 10.1 complete locally; commit/deploy pending, then Phase 11 checkout upgrade & order history
-Resume file: .planning/phases/10.1-multi-csv-delete-inventory/10.1-01-SUMMARY.md
+Last session: 2026-04-26T23:15:00.000Z
+Stopped at: Phase 11 complete and verified; next action is commit Phase 11 Plan 02 and decide PR/push vs Phase 12
+Resume file: .planning/phases/11-checkout-upgrade-order-history/11-02-SUMMARY.md
