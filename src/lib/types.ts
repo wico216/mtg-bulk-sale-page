@@ -104,6 +104,14 @@ export interface OrderItem {
   price: number | null;
   quantity: number;
   lineTotal: number | null;
+  imageUrl?: string | null;
+}
+
+export interface StockConflict {
+  cardId: string;
+  name: string;
+  requested: number;
+  available: number;
 }
 
 /** Complete order data -- consumed by email templates and future thermal printer (D-14) */
@@ -131,4 +139,8 @@ export interface CheckoutResponse {
   success: boolean;
   orderRef: string;
   order: OrderData;
+  notification?: {
+    sellerEmailSent: boolean;
+    buyerEmailSent: boolean;
+  };
 }

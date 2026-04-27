@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Phase 10.1 PR open and verified; Phase 11 planning artifacts drafted locally
-last_updated: "2026-04-26T21:15:00.000Z"
+stopped_at: Phase 11 Plan 01 complete; transactional checkout/order persistence verified with concurrent DB proof
+last_updated: "2026-04-26T23:05:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 50
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 10.1 PR is open/verified; Phase 11 planning artifacts are drafted locally for checkout upgrade and order history
+**Current focus:** Phase 11 Plan 02 — admin order history list/detail APIs and UI
 
 ## Current Position
 
-Phase: 11 (checkout-upgrade-order-history) — PLANNED LOCALLY
-Plan: 0 of 2 — READY (blocked on Phase 10.1 PR merge before execution)
-Status: Phase 11 context and two execution plans drafted; Phase 10.1 PR #1 is open, pushed, preview-verified, and green
+Phase: 11 (checkout-upgrade-order-history) — IN PROGRESS
+Plan: 1 of 2 — 11-01 DONE, 11-02 READY
+Status: Transactional checkout persistence is implemented and verified; next is admin order history list/detail
 Last activity: 2026-04-26
 
-Progress: [█████░░░░░] 50% phases (4 of 8 v1.1 phases shipped or PR-ready: 8, 9, 10, 10.1)
+Progress: [█████░░░░░] 50% phases (4 of 8 v1.1 phases shipped, 1 phase in progress)
 
 ## Performance Metrics
 
@@ -153,10 +153,20 @@ User chose the 10.1 insertion before Phase 11. Implemented locally on branch `ph
 - Project-wide `npm run lint` still fails on pre-existing issues outside this change (React set-state-in-effect, JSX in try/catch, test `any` types). Touched files only have existing admin table warnings.
 - PR status: Phase 10.1 is pushed as PR #1; Vercel preview checks are green; preview verification caught and fixed a production-login regression so Google sign-in remains visible when local password login is disabled.
 
+### Phase 11 Plan 01 Completion (2026-04-26)
+
+Implemented transactional checkout persistence on branch `phase-11-checkout-order-history`:
+
+- `placeCheckoutOrder()` now performs one atomic database write that locks requested cards, rejects missing/short stock, decrements stock, inserts the order, and inserts denormalized item snapshots.
+- `POST /api/checkout` now returns HTTP 201 on persisted order success, HTTP 409 with `code: "stock_conflict"` for stale carts, and HTTP 503 when the DB write fails before notifications.
+- Notification emails are post-commit side effects; seller/buyer email failure no longer erases a persisted order.
+- Checkout UI preserves cart/form data on errors and formats stock conflicts with requested/available quantities.
+- Verification: `git diff --check`, `npm test` (149/149), `npm run build`, and a disposable remote Neon concurrent checkout proof all passed. The proof created one sentinel card with quantity 1, ran two concurrent checkout writes, observed one success and one `stock_conflict`, confirmed final quantity 0, and cleaned up sentinel card/order rows.
+
 ### Pending Todos
 
-- Phase 11: checkout upgrade and order history is planned locally in `.planning/phases/11-checkout-upgrade-order-history/`.
-- Merge/deploy Phase 10.1 before executing Phase 11.
+- Continue Phase 11 Plan 02: admin order history list/detail APIs and UI.
+- Commit Phase 11 Plan 01 if final review is acceptable.
 
 ### Blockers/Concerns
 
@@ -165,6 +175,6 @@ User chose the 10.1 insertion before Phase 11. Implemented locally on branch `ph
 
 ## Session Continuity
 
-Last session: 2026-04-26T21:15:00.000Z
-Stopped at: Phase 10.1 PR open/green and preview-verified; Phase 11 checkout upgrade/order-history plans drafted locally
-Resume file: .planning/phases/11-checkout-upgrade-order-history/11-CONTEXT.md
+Last session: 2026-04-26T23:05:00.000Z
+Stopped at: Phase 11 Plan 01 complete and verified; next action is commit/review then Phase 11 Plan 02
+Resume file: .planning/phases/11-checkout-upgrade-order-history/11-01-SUMMARY.md

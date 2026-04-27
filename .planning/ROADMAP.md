@@ -235,7 +235,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md -- Transactional checkout persistence, atomic stock decrement, and buyer stock-conflict UX
+- [x] 11-01-PLAN.md -- Transactional checkout persistence, atomic stock decrement, and buyer stock-conflict UX
 - [ ] 11-02-PLAN.md -- Admin order history list/detail APIs and UI
 
 **UI hint**: yes

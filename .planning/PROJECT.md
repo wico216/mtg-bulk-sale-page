@@ -35,6 +35,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Checkout sends confirmation email to buyer — Validated in Phase 5: Checkout and Deploy
 - [x] Confirmation page shown after checkout — Validated in Phase 5: Checkout and Deploy
 - [x] Friend provides name/email at checkout (no account needed) — Validated in Phase 5: Checkout and Deploy
+- [x] Auto-decrement stock on checkout — Validated in Phase 11 Plan 01 with concurrent checkout proof
+- [x] Checkout stores order records in the database — Validated in Phase 11 Plan 01
 - [x] Admin can import one or more Manabox CSV files as a full inventory replacement — Validated locally in Phase 10/10.1
 - [x] Admin can delete the full inventory with explicit confirmation — Validated locally in Phase 10.1
 
@@ -42,7 +44,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 - [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
 - [ ] Vercel Postgres database for live inventory
-- [ ] Auto-decrement stock on checkout
+- [x] Auto-decrement stock on checkout — Validated in Phase 11 Plan 01
 - [ ] Edit individual card details (price, condition, quantity)
 - [ ] Remove cards from inventory manually
 - [x] CSV import (full replace) into database — Validated locally in Phase 10/10.1
@@ -91,7 +93,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
 | CSV import replaces inventory | Simple mental model — Manabox export is source of truth | ✓ Good |
 | Multi-CSV import still full-replaces inventory | Multiple Manabox exports are merged into one preview batch before replacing DB rows; no incremental merge semantics | ✓ Good |
-| Checkout database commit is source of truth | Phase 11 will treat the atomic stock decrement + order insert as the placed order; notification emails are post-commit side effects so email failure does not erase persisted inventory/order state | — Planned |
+| Checkout database commit is source of truth | Phase 11 treats the atomic stock decrement + order insert as the placed order; notification emails are post-commit side effects so email failure does not erase persisted inventory/order state | ✓ Good |
 
 ## Evolution
 

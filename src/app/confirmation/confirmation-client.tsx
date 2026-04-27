@@ -59,7 +59,7 @@ export default function ConfirmationClient() {
     ? fullOrder.items.map((item) => ({
         name: item.name,
         setName: item.setName,
-        imageUrl: null, // OrderData items don't carry imageUrl
+        imageUrl: item.imageUrl ?? null,
         price: item.price,
         quantity: item.quantity,
       }))
