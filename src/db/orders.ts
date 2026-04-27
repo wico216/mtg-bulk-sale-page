@@ -111,11 +111,50 @@ function parseSqlPayload(raw: unknown): CheckoutSqlPayload {
   throw new Error("Checkout write returned no result");
 }
 
-export type OrderStatus = "pending" | "confirmed" | "completed";
+function parseCancelOrderPayload(raw: unknown): CancelOrderPayload {
+  const payload =
+    typeof raw === "string"
+      ? (JSON.parse(raw) as RawCancelOrderPayload)
+      : (raw as RawCancelOrderPayload | undefined);
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Cancel order returned no result");
+  }
+
+  const skippedItems =
+    typeof payload.skippedItems === "string"
+      ? (JSON.parse(payload.skippedItems) as CancelSkippedItem[])
+      : (payload.skippedItems ?? []);
+
+  return {
+    found: Boolean(payload.found),
+    completed: Boolean(payload.completed),
+    alreadyCancelled: Boolean(payload.alreadyCancelled),
+    restoredQuantity: numberFromDb(payload.restoredQuantity),
+    restoredRows: numberFromDb(payload.restoredRows),
+    skippedItems,
+  };
+}
+
+export type OrderWorkflowStatus = "pending" | "confirmed" | "completed";
+export type OrderStatus = OrderWorkflowStatus | "cancelled";
+
+export const ORDER_WORKFLOW_STATUSES: readonly OrderWorkflowStatus[] = [
+  "pending",
+  "confirmed",
+  "completed",
+];
+
+export const ORDER_STATUSES: readonly OrderStatus[] = [
+  ...ORDER_WORKFLOW_STATUSES,
+  "cancelled",
+];
 
 export interface AdminOrdersParams {
   page?: number;
   limit?: number;
+  q?: string;
+  status?: OrderStatus | "all";
 }
 
 export interface AdminOrderSummary {
@@ -136,7 +175,42 @@ export interface AdminOrdersResult {
   totalPages: number;
 }
 
-export type AdminOrderDetail = OrderData & { status: OrderStatus };
+export type AdminOrderDetail = OrderData & {
+  status: OrderStatus;
+  adminNote?: string | null;
+};
+
+export interface UpdateOrderWorkflowInput {
+  orderId: string;
+  status?: OrderWorkflowStatus;
+  adminNote?: string | null;
+}
+
+export interface CancelOrderInput {
+  orderId: string;
+  restoreInventory: boolean;
+}
+
+export interface CancelSkippedItem {
+  cardId: string;
+  name: string;
+  quantity: number;
+}
+
+export type CancelOrderResult =
+  | {
+      ok: true;
+      order: AdminOrderDetail;
+      alreadyCancelled: boolean;
+      restoredQuantity: number;
+      restoredRows: number;
+      skippedItems: CancelSkippedItem[];
+    }
+  | {
+      ok: false;
+      code: "not_found" | "completed_order";
+      message: string;
+    };
 
 interface AdminOrderRow {
   [key: string]: unknown;
@@ -144,6 +218,7 @@ interface AdminOrderRow {
   buyerName: string;
   buyerEmail: string;
   message?: string | null;
+  adminNote?: string | null;
   totalItems: number;
   totalPrice: number;
   status: OrderStatus | string;
@@ -152,6 +227,24 @@ interface AdminOrderRow {
 
 interface AdminOrderItemRow extends PersistedOrderItem {
   [key: string]: unknown;
+}
+
+interface RawCancelOrderPayload {
+  found?: boolean;
+  completed?: boolean;
+  alreadyCancelled?: boolean;
+  restoredQuantity?: number | string | null;
+  restoredRows?: number | string | null;
+  skippedItems?: CancelSkippedItem[] | string | null;
+}
+
+interface CancelOrderPayload {
+  found: boolean;
+  completed: boolean;
+  alreadyCancelled: boolean;
+  restoredQuantity: number;
+  restoredRows: number;
+  skippedItems: CancelSkippedItem[];
 }
 
 function normalizePage(value: number | undefined): number {
@@ -171,7 +264,72 @@ function numberFromDb(value: number | string | null | undefined): number {
 }
 
 function normalizeStatus(value: string): OrderStatus {
-  return value === "confirmed" || value === "completed" ? value : "pending";
+  if (
+    value === "confirmed" ||
+    value === "completed" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  return "pending";
+}
+
+function normalizeStatusFilter(
+  value: AdminOrdersParams["status"],
+): OrderStatus | undefined {
+  if (!value || value === "all") return undefined;
+  return ORDER_STATUSES.includes(value) ? value : undefined;
+}
+
+function normalizeSearch(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function buildOrderFilters(params: AdminOrdersParams) {
+  const filters = [];
+  const search = normalizeSearch(params.q);
+  const status = normalizeStatusFilter(params.status);
+
+  if (search) {
+    const pattern = `%${search}%`;
+    filters.push(sql`(
+      id ILIKE ${pattern}
+      OR buyer_name ILIKE ${pattern}
+      OR buyer_email ILIKE ${pattern}
+    )`);
+  }
+
+  if (status) {
+    filters.push(sql`status = ${status}::order_status`);
+  }
+
+  return filters.length > 0 ? sql`WHERE ${sql.join(filters, sql` AND `)}` : sql``;
+}
+
+function normalizeAdminNote(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function buildWorkflowSetClauses(input: UpdateOrderWorkflowInput) {
+  const clauses = [];
+
+  if (input.status !== undefined) {
+    clauses.push(sql`status = ${input.status}::order_status`);
+  }
+
+  if ("adminNote" in input) {
+    clauses.push(sql`admin_note = ${normalizeAdminNote(input.adminNote)}`);
+  }
+
+  if (clauses.length === 0) {
+    throw new Error("Order workflow update requires at least one field");
+  }
+
+  return sql.join(clauses, sql`, `);
 }
 
 function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
@@ -377,6 +535,7 @@ export async function getAdminOrders(
   const page = normalizePage(params.page);
   const limit = normalizeLimit(params.limit);
   const offset = (page - 1) * limit;
+  const whereClause = buildOrderFilters(params);
 
   const [ordersResult, countResult] = await Promise.all([
     db.execute<AdminOrderRow>(sql`
@@ -389,6 +548,7 @@ export async function getAdminOrders(
         status,
         created_at AS "createdAt"
       FROM orders
+      ${whereClause}
       ORDER BY created_at DESC, id DESC
       LIMIT ${limit}
       OFFSET ${offset}
@@ -396,6 +556,7 @@ export async function getAdminOrders(
     db.execute<{ total: number | string }>(sql`
       SELECT COUNT(*)::integer AS total
       FROM orders
+      ${whereClause}
     `),
   ]);
 
@@ -419,6 +580,7 @@ export async function getOrderById(
       buyer_name AS "buyerName",
       buyer_email AS "buyerEmail",
       message,
+      admin_note AS "adminNote",
       total_items AS "totalItems",
       total_price AS "totalPrice",
       status,
@@ -453,6 +615,7 @@ export async function getOrderById(
     buyerName: order.buyerName,
     buyerEmail: order.buyerEmail,
     message: order.message ?? undefined,
+    adminNote: order.adminNote ?? null,
     totalItems: order.totalItems,
     totalPrice: order.totalPrice / 100,
     status: normalizeStatus(order.status),
@@ -469,5 +632,128 @@ export async function getOrderById(
       lineTotal: centsToDollars(item.lineTotal),
       imageUrl: item.imageUrl,
     })),
+  };
+}
+
+export async function updateOrderWorkflow(
+  input: UpdateOrderWorkflowInput,
+): Promise<AdminOrderDetail | null> {
+  const setClauses = buildWorkflowSetClauses(input);
+
+  const result = await db.execute<{ id: string }>(sql`
+    UPDATE orders
+    SET ${setClauses}
+    WHERE id = ${input.orderId}
+    RETURNING id
+  `);
+
+  if (!result.rows[0]) return null;
+
+  return getOrderById(input.orderId);
+}
+
+export async function cancelOrder(
+  input: CancelOrderInput,
+): Promise<CancelOrderResult> {
+  const result = await db.execute<{ result: unknown }>(sql`
+    WITH target_order AS (
+      SELECT id, status
+      FROM orders
+      WHERE id = ${input.orderId}
+      FOR UPDATE
+    ),
+    cancellable_order AS (
+      SELECT id
+      FROM target_order
+      WHERE status IN ('pending'::order_status, 'confirmed'::order_status)
+    ),
+    updated_order AS (
+      UPDATE orders
+      SET status = 'cancelled'::order_status
+      WHERE id IN (SELECT id FROM cancellable_order)
+      RETURNING id
+    ),
+    items_for_restore AS (
+      SELECT
+        order_items.card_id,
+        order_items.name,
+        order_items.quantity
+      FROM order_items
+      WHERE order_items.order_id = ${input.orderId}
+        AND ${input.restoreInventory}
+        AND EXISTS (SELECT 1 FROM updated_order)
+    ),
+    restored AS (
+      UPDATE cards
+      SET
+        quantity = cards.quantity + items_for_restore.quantity,
+        updated_at = now()
+      FROM items_for_restore
+      WHERE cards.id = items_for_restore.card_id
+      RETURNING cards.id AS card_id, items_for_restore.quantity
+    ),
+    skipped_items AS (
+      SELECT
+        items_for_restore.card_id,
+        items_for_restore.name,
+        items_for_restore.quantity
+      FROM items_for_restore
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM restored
+        WHERE restored.card_id = items_for_restore.card_id
+      )
+    )
+    SELECT jsonb_build_object(
+      'found', EXISTS (SELECT 1 FROM target_order),
+      'completed', EXISTS (
+        SELECT 1
+        FROM target_order
+        WHERE status = 'completed'::order_status
+      ),
+      'alreadyCancelled', EXISTS (
+        SELECT 1
+        FROM target_order
+        WHERE status = 'cancelled'::order_status
+      ),
+      'restoredQuantity', COALESCE((SELECT SUM(quantity)::integer FROM restored), 0),
+      'restoredRows', COALESCE((SELECT COUNT(*)::integer FROM restored), 0),
+      'skippedItems', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'cardId', skipped_items.card_id,
+          'name', skipped_items.name,
+          'quantity', skipped_items.quantity
+        ) ORDER BY skipped_items.card_id)
+        FROM skipped_items
+      ), '[]'::jsonb)
+    ) AS result
+  `);
+
+  const payload = parseCancelOrderPayload(result.rows[0]?.result);
+
+  if (!payload.found) {
+    return { ok: false, code: "not_found", message: "Order not found" };
+  }
+
+  if (payload.completed) {
+    return {
+      ok: false,
+      code: "completed_order",
+      message: "Completed orders cannot be cancelled",
+    };
+  }
+
+  const order = await getOrderById(input.orderId);
+  if (!order) {
+    return { ok: false, code: "not_found", message: "Order not found" };
+  }
+
+  return {
+    ok: true,
+    order,
+    alreadyCancelled: payload.alreadyCancelled,
+    restoredQuantity: payload.restoredQuantity,
+    restoredRows: payload.restoredRows,
+    skippedItems: payload.skippedItems,
   };
 }

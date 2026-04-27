@@ -3,7 +3,8 @@
 ## Milestones
 
 - v1.0 MVP - Phases 1-5 (shipped 2026-04-11)
-- v1.1 Admin Panel & Inventory Management - Phases 6-12 (in progress)
+- v1.1 Admin Panel & Inventory Management - Phases 6-12 (shipped 2026-04-27)
+- v1.2 Store Operations & Hardening - Phases 13-15 (in progress)
 
 ## Phases
 
@@ -118,7 +119,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: CSV Import** - Manabox CSV upload with preview, validation, and full-replace import (completed 2026-04-20; production hotfix wave 2026-04-25 — see STATE.md)
 - [x] **Phase 10.1: Multi-CSV Import & Delete Inventory** - INSERTED: multi-file full-replace import and explicit delete-all inventory action (merged/deployed 2026-04-26)
 - [x] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking (completed 2026-04-26)
-- [ ] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns
+- [x] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns (completed 2026-04-27)
+
+### v1.2 Store Operations & Hardening (In Progress)
+
+**Milestone Goal:** Help the seller operate the store after checkout, preserve a clear history of high-impact changes, and harden production before wider sharing.
+
+- [x] **Phase 13: Admin Order Workflow** - Status changes, private notes, order search/filter, and cancellation with optional inventory restore (completed 2026-04-27 on feature branch)
+- [ ] **Phase 14: Inventory Audit Trail** - Audit logs, import history, and admin-visible mutation history
+- [ ] **Phase 15: Production Hardening** - Rate limits, structured logs, health checks, production smoke, docs, and security review
 
 ## Phase Details
 
@@ -251,15 +260,70 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 12-01-PLAN.md -- Admin dashboard stats and inventory breakdowns on /admin
-- [ ] 12-02-PLAN.md -- Bulk row selection and selected-card delete workflow
+- [x] 12-01-PLAN.md -- Admin dashboard stats and inventory breakdowns on /admin
+- [x] 12-02-PLAN.md -- Bulk row selection and selected-card delete workflow
+
+**UI hint**: yes
+
+### Phase 13: Admin Order Workflow
+**Goal**: The seller can process orders end-to-end after checkout
+**Depends on**: Phase 12
+**Requirements**: ORD-04, ORD-05, ORD-06
+**Success Criteria** (what must be TRUE):
+  1. Admin can search order history by order ref, buyer name, or buyer email
+  2. Admin can filter order history by status
+  3. Admin can change an order's status through the order detail page
+  4. Admin can save a private internal note on an order
+  5. Admin can cancel a pending or confirmed order without deleting its order record
+  6. Admin can explicitly choose whether cancellation restores inventory quantities for existing card rows
+**Plans**: 2 plans
+
+Plans:
+- [x] 13-01-PLAN.md -- Order search/filter, status updates, and internal notes
+- [x] 13-02-PLAN.md -- Cancel order workflow with optional inventory restore
+
+**UI hint**: yes
+
+### Phase 14: Inventory Audit Trail
+**Goal**: High-impact admin changes leave a durable, admin-visible history
+**Depends on**: Phase 13
+**Requirements**: AUD-01, AUD-02, AUD-03, AUD-04
+**Success Criteria** (what must be TRUE):
+  1. Inventory edits, deletes, bulk deletes, delete-all, imports, order status changes, and cancellations create audit entries
+  2. Import commits create durable import history with safe file and row-count metadata
+  3. Admin can view audit and import history from the admin panel
+  4. Audit metadata avoids secrets, raw CSV bodies, and unbounded payloads
+  5. Destructive actions continue to give clear export/backup guidance
+**Plans**: 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md -- Audit schema/helper and mutation coverage
+- [ ] 14-02-PLAN.md -- Import history and admin audit/history page
+
+**UI hint**: yes
+
+### Phase 15: Production Hardening
+**Goal**: The store has production guardrails, diagnostics, and repeatable verification before wider sharing
+**Depends on**: Phase 14
+**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05
+**Success Criteria** (what must be TRUE):
+  1. Checkout and admin mutation APIs have production-compatible rate limits
+  2. Critical workflows emit safe structured logs for success and failure states
+  3. Admin can inspect operational health without exposing secrets
+  4. Production smoke checks are repeatable through a checked-in script
+  5. Admin/API surfaces have a documented security review with concrete follow-ups
+**Plans**: 2 plans
+
+Plans:
+- [ ] 15-01-PLAN.md -- Rate limits and structured operational logs
+- [ ] 15-02-PLAN.md -- Health page, production smoke script, runbook docs, and security review
 
 **UI hint**: yes
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
+Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12 -> 13 -> 14 -> 15
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -275,5 +339,7 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
 | 10. CSV Import | v1.1 | 3/3 | Complete | 2026-04-20 |
 | 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete | 2026-04-26 |
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
-| 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-26 |
-|
+| 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-27 |
+| 13. Admin Order Workflow | v1.2 | 2/2 | Complete | 2026-04-27 |
+| 14. Inventory Audit Trail | v1.2 | 0/2 | Planned | - |
+| 15. Production Hardening | v1.2 | 0/2 | Planned | - |

@@ -14,6 +14,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "confirmed",
   "completed",
+  "cancelled",
 ]);
 
 // Cards table
@@ -66,6 +67,7 @@ export const orders = pgTable(
     buyerName: text("buyer_name").notNull(),
     buyerEmail: text("buyer_email").notNull(),
     message: text("message"),
+    adminNote: text("admin_note"),
     totalItems: integer("total_items").notNull(),
     // Price stored as integer cents
     totalPrice: integer("total_price").notNull(),

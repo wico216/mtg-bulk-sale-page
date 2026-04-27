@@ -13,7 +13,7 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
-import { getAdminOrders, getOrderById } from "../orders";
+import { cancelOrder, getAdminOrders, getOrderById, updateOrderWorkflow } from "../orders";
 
 const orderRows = [
   {
@@ -44,6 +44,7 @@ const detailOrderRow = {
   totalItems: 3,
   totalPrice: 425,
   status: "pending",
+  adminNote: "Pull from blue binder.",
   createdAt: "2026-04-27T02:03:04.000Z",
 };
 
@@ -115,10 +116,35 @@ describe("getAdminOrders", () => {
     expect(result.totalPages).toBe(3);
   });
 
+  it("accepts search and status filters for centralized query handling", async () => {
+    mockExecute
+      .mockResolvedValueOnce({ rows: [orderRows[0]] })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] });
+
+    const result = await getAdminOrders({
+      page: 1,
+      limit: 25,
+      q: "viki@example.com",
+      status: "pending",
+    });
+
+    expect(result.orders).toHaveLength(1);
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+  });
+
   it("orders list SQL newest first", () => {
     const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
 
     expect(source).toContain("ORDER BY created_at DESC");
+  });
+
+  it("filters orders by search text and status in SQL", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
+
+    expect(source).toContain("ILIKE");
+    expect(source).toContain("status =");
+    expect(source).toContain("buyer_email");
+    expect(source).toContain("buyer_name");
   });
 });
 
@@ -139,6 +165,7 @@ describe("getOrderById", () => {
       buyerName: detailOrderRow.buyerName,
       buyerEmail: detailOrderRow.buyerEmail,
       message: detailOrderRow.message,
+      adminNote: detailOrderRow.adminNote,
       totalItems: 3,
       totalPrice: 4.25,
       status: "pending",
@@ -163,5 +190,185 @@ describe("getOrderById", () => {
 
     expect(source).toContain("FROM order_items");
     expect(source).not.toContain("getCardById");
+  });
+});
+
+describe("cancelOrder", () => {
+  beforeEach(() => {
+    mockExecute.mockReset();
+  });
+
+  it("cancels an order without restoring inventory", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: false,
+              restoredQuantity: 0,
+              restoredRows: 0,
+              skippedItems: [],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: false,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      alreadyCancelled: false,
+      restoredQuantity: 0,
+      restoredRows: 0,
+      skippedItems: [],
+      order: { orderRef: detailOrderRow.id, status: "cancelled" },
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(3);
+  });
+
+  it("restores existing inventory rows and reports skipped missing rows", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: false,
+              restoredQuantity: 3,
+              restoredRows: 1,
+              skippedItems: [
+                {
+                  cardId: "missing-card",
+                  name: "Missing Snapshot",
+                  quantity: 2,
+                },
+              ],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      restoredQuantity: 3,
+      restoredRows: 1,
+      skippedItems: [
+        { cardId: "missing-card", name: "Missing Snapshot", quantity: 2 },
+      ],
+    });
+  });
+
+  it("rejects completed orders without returning order detail", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        {
+          result: {
+            found: true,
+            completed: true,
+            alreadyCancelled: false,
+            restoredQuantity: 0,
+            restoredRows: 0,
+            skippedItems: [],
+          },
+        },
+      ],
+    });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "completed_order",
+      message: "Completed orders cannot be cancelled",
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns not_found when the order does not exist", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        {
+          result: {
+            found: false,
+            completed: false,
+            alreadyCancelled: false,
+            restoredQuantity: 0,
+            restoredRows: 0,
+            skippedItems: [],
+          },
+        },
+      ],
+    });
+
+    const result = await cancelOrder({
+      orderId: "missing-order",
+      restoreInventory: false,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "not_found",
+      message: "Order not found",
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats already-cancelled orders as idempotent and does not restore twice", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: true,
+              restoredQuantity: 0,
+              restoredRows: 0,
+              skippedItems: [],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      alreadyCancelled: true,
+      restoredQuantity: 0,
+      restoredRows: 0,
+      order: { status: "cancelled" },
+    });
+  });
+
+  it("guards restore work behind the first successful cancellation update", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
+
+    expect(source).toContain("FOR UPDATE");
+    expect(source).toContain("status IN ('pending'::order_status, 'confirmed'::order_status)");
+    expect(source).toContain("EXISTS (SELECT 1 FROM updated_order)");
   });
 });
