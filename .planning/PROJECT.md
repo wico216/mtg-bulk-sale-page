@@ -91,6 +91,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Auto-decrement on checkout | Keeps inventory accurate without manual work | — Pending |
 | CSV import replaces inventory | Simple mental model — Manabox export is source of truth | ✓ Good |
 | Multi-CSV import still full-replaces inventory | Multiple Manabox exports are merged into one preview batch before replacing DB rows; no incremental merge semantics | ✓ Good |
+| Checkout database commit is source of truth | Phase 11 will treat the atomic stock decrement + order insert as the placed order; notification emails are post-commit side effects so email failure does not erase persisted inventory/order state | — Planned |
 
 ## Evolution
 
