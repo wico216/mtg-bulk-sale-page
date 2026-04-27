@@ -78,11 +78,29 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 - [x] **ORD-01**: Checkout stores order in database (buyer, items, totals, timestamp)
 - [x] **ORD-02**: Admin can view order history in a table (buyer, date, total)
 - [x] **ORD-03**: Admin can click into an order to see full line items and buyer info
+- [ ] **ORD-04**: Admin can update order status through the order detail workflow
+- [ ] **ORD-05**: Admin can search and filter order history by status, order ref, buyer name, and buyer email
+- [ ] **ORD-06**: Admin can cancel orders with an explicit optional inventory restore
 
 ### Dashboard
 
-- [ ] **DASH-01**: Admin sees inventory stats at a glance (total cards, total value, unique count)
-- [ ] **DASH-02**: Admin sees inventory breakdown by set, color, and rarity
+- [x] **DASH-01**: Admin sees inventory stats at a glance (total cards, total value, unique count)
+- [x] **DASH-02**: Admin sees inventory breakdown by set, color, and rarity
+
+### Audit & Import Safety
+
+- [ ] **AUD-01**: High-impact admin mutations create durable audit log entries
+- [ ] **AUD-02**: Import commits create durable import history with safe file and row-count metadata
+- [ ] **AUD-03**: Admin can view audit and import history from the admin panel
+- [ ] **AUD-04**: Destructive inventory actions preserve clear backup/export guidance and leave an explainable history
+
+### Operations & Hardening
+
+- [ ] **OPS-01**: Checkout and admin mutation APIs have production-compatible rate limits
+- [ ] **OPS-02**: Critical checkout/admin workflows emit safe structured logs for success and failure states
+- [ ] **OPS-03**: Admin can inspect operational health without exposing secrets
+- [ ] **OPS-04**: A repeatable production smoke script is checked into the repo
+- [ ] **OPS-05**: Admin/API surfaces have a documented security review with concrete follow-ups
 
 ## Future Requirements
 
@@ -130,7 +148,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | INV-01 | Phase 9 | Pending |
 | INV-02 | Phase 9 | Pending |
 | INV-03 | Phase 9 | Pending |
-| INV-04 | Phase 12 | Pending |
+| INV-04 | Phase 12 | Complete |
 | INV-05 | Phase 9 | Pending |
 | INV-06 | Phase 9 | Pending |
 | INV-07 | Phase 10.1 | Complete |
@@ -141,12 +159,24 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | ORD-01 | Phase 11 | Complete |
 | ORD-02 | Phase 11 | Complete |
 | ORD-03 | Phase 11 | Complete |
-| DASH-01 | Phase 12 | Pending |
-| DASH-02 | Phase 12 | Pending |
+| ORD-04 | Phase 13 | Planned |
+| ORD-05 | Phase 13 | Planned |
+| ORD-06 | Phase 13 | Planned |
+| DASH-01 | Phase 12 | Complete |
+| DASH-02 | Phase 12 | Complete |
+| AUD-01 | Phase 14 | Planned |
+| AUD-02 | Phase 14 | Planned |
+| AUD-03 | Phase 14 | Planned |
+| AUD-04 | Phase 14 | Planned |
+| OPS-01 | Phase 15 | Planned |
+| OPS-02 | Phase 15 | Planned |
+| OPS-03 | Phase 15 | Planned |
+| OPS-04 | Phase 15 | Planned |
+| OPS-05 | Phase 15 | Planned |
 
 **Coverage:**
-- v1.1 requirements: 23 total
-- Mapped to phases: 23
+- v1.1/v1.2 requirements: 35 total
+- Mapped to phases: 35
 - Unmapped: 0
 
 ---

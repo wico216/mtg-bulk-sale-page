@@ -1,223 +1,92 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Admin Panel & Inventory Management
-status: executing
-stopped_at: Phase 12 complete locally; next action is review/commit/push sequencing after PR #2 decision
-last_updated: "2026-04-26T23:59:00.000Z"
-last_activity: 2026-04-26
+milestone: v1.2
+milestone_name: Store Operations & Hardening
+status: planning
+stopped_at: Phase 13-15 planning drafted; no implementation started
+last_updated: "2026-04-27T00:00:00.000Z"
+last_activity: 2026-04-27
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 13
-  percent: 75
+  total_phases: 15
+  completed_phases: 12
+  total_plans: 34
+  completed_plans: 28
+  percent: 80
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-02)
+See: .planning/PROJECT.md
 
-**Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 12 complete locally — await PR #2 / Phase 12 branch sequencing decision
+**Core value:** Friends can easily find and order cards from the bulk collection without friction.
+**Current focus:** Plan the next operational phases after Phase 12 shipped: order workflow, audit trail, and production hardening.
 
 ## Current Position
 
-Phase: 12 (bulk-operations-dashboard) — COMPLETE LOCALLY
-Plan: 2 of 2 — DONE
-Status: Admin dashboard stats and bulk selected-row delete are implemented, verified, and cleaned up after disposable DB/browser proofs
-Last activity: 2026-04-26
+Phase: 13 (admin-order-workflow) — PLANNED
+Plan: 0 of 2 — NOT STARTED
+Status: Phase 13/14/15 planning artifacts are drafted. No implementation branch or code changes have started for these phases.
+Last activity: 2026-04-27
 
-Progress: [███████░░░] 75% phases (6 of 8 v1.1 phases shipped locally; Phase 11 PR #2 still awaits merge)
+## Recently Completed
 
-## Performance Metrics
+- Phase 11 was merged into `main` and deployed: transactional checkout, stock-safe order persistence, admin order list/detail.
+- Phase 12 was merged into `main` and deployed: inventory dashboard stats, breakdowns, selected-row bulk delete.
+- Full local browser/DB system test passed after Phase 12 merge:
+  - storefront add-to-cart and checkout
+  - persisted order and order item
+  - admin order list/detail
+  - inventory stock decrement
+  - dashboard refresh
+  - selected-row bulk delete
+  - cleanup back to empty sentinel state
+- Production smoke passed on the Phase 12 production deployment:
+  - app shell loads
+  - Google admin sign-in visible
+  - local password login hidden in production
+  - unauthenticated `/admin` redirects
+  - unauthenticated bulk-delete API returns 401
 
-**Velocity:**
+## Planned Next Phases
 
-- Total plans completed: 2
-- Average duration: -
-- Total execution time: 0 hours
+### Phase 13: Admin Order Workflow
 
-**By Phase:**
+Goal: The seller can process orders end-to-end after checkout.
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01 | 3 | 8min | 2.7min |
-| 02 | 3 | 15min | 5min |
-| 03 | 3 | 24min | 8min |
-| 04 | 2 | 5min | 2.5min |
-| 08 | 2 | - | - |
+Plans:
+- 13-01: Order search/filter, status updates, and internal notes
+- 13-02: Cancel order workflow with optional inventory restore
 
-**Recent Trend:**
+Key rule: cancellation preserves order history. Inventory restore is explicit and only increments existing card rows by order item `cardId`; missing inventory rows are reported, not recreated from partial snapshots.
 
-- Last 5 plans: 03-01 (2min), 03-02 (1min), 03-03 (21min), 04-01 (3min), 04-02 (2min)
-- Trend: stable
+### Phase 14: Inventory Audit Trail
 
-*Updated after each plan completion*
-| Phase 05 P01 | 5min | 2 tasks | 10 files |
-| Phase 05 P02 | 3min | 2 tasks | 5 files |
-| Phase 10 P01 | 4min | 3 tasks | 7 files |
-| Phase 10 P02 | 3min | 2 tasks | 5 files |
+Goal: High-impact admin changes leave a durable, admin-visible history.
 
-## Accumulated Context
+Plans:
+- 14-01: Audit schema/helper and mutation coverage
+- 14-02: Import history and admin audit/history page
 
-### Decisions
+Key rule: audit metadata must be safe and bounded. Do not store secrets, raw CSV bodies, or unbounded card payloads.
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+### Phase 15: Production Hardening
 
-- [Roadmap]: Stack is Next.js 16 (SSG) + Tailwind + Zustand + PapaParse + Scryfall API + Resend
-- [Roadmap]: Static site with build-time Scryfall enrichment (not runtime) to respect rate limits
-- [Roadmap]: Zero database -- card data generated at build time from CSV
-- [01-01]: Composite dedup key: setCode-collectorNumber-foil-condition for distinct card listings
-- [01-01]: String-coerce collectorNumber from PapaParse dynamicTyping to avoid numeric type mismatch
-- [01-02]: No name+set fallback needed: SLD high collector numbers resolve via standard Scryfall endpoint
-- [01-02]: Price fallback chain: usd -> usd_foil -> usd_etched -> null covers all printings
-- [01-03]: Chain generate before next build so cards.json is always fresh on deploy
-- [02-01]: Oracle text for DFC joined with ' // ' separator matching Scryfall convention
-- [02-03]: Scroll lock in card-grid.tsx via useEffect, keeping card-modal.tsx presentational
-- [02-03]: Mana symbols rendered as Scryfall SVG CDN icons parsed from {X} syntax
-- [03-01]: Zustand 5 curried create pattern for TypeScript; Set toggles use new Set() for reactivity
-- [03-01]: Color filter OR logic with colorless (C) as special case checking empty colorIdentity
-- [03-01]: Null prices sort to end in both price-desc and price-asc
-- [03-02]: Rarity dropdown uses MTG conventional order (mythic/rare/uncommon/common) not alphabetical
-- [03-02]: MultiSelect backdrop div pattern for outside-click close prevents two-open-at-once pitfall
-- [03-02]: Native select for SortDropdown with only 3 fixed options
-- [03-03]: Set picker as its own bottom sheet (z-50) with search and clear, not a dropdown in the main sheet
-- [03-03]: Rarity/sort use inline toggle pills on mobile (small option sets don't need dropdowns)
-- [03-03]: Selected sets sort to top of set picker list for quick filter management
-- [03-03]: Zustand selectors must not call getFilteredCards() (new array = SSR infinite loop); use useMemo with individual state subscriptions
-- [04-01]: Cart store uses Map<string, number> with custom replacer/reviver for localStorage JSON serialization
-- [04-01]: createJSONStorage wraps localStorage for SSG safety (no build failures without manual checks)
-- [04-01]: Tile cart controls use span[role=button] with stopPropagation to avoid nested <button> DOM violations
-- [04-01]: Plus button disables at stock cap (no message on tile; message is for cart page input per user decision)
-- [04-02]: Shared loadCardData utility in src/lib/load-cards.ts used by both / and /cart server components
-- [04-02]: Native window.confirm for clear-cart (simple, accessible, no custom dialog state per research)
-- [04-02]: Hydration guard via persist.hasHydrated + onFinishHydration prevents empty-cart flash
-- [Phase 05-01]: Sequential email sends: seller first (critical), buyer second (best-effort) per D-17
-- [Phase 05-01]: OrderData cleanly separated from delivery mechanism per D-14 for future thermal printer
-- [Phase 05-01]: Resend SDK v6 with onboarding@resend.dev sender for free-tier compatibility
-- [Phase 05-01]: Stock validation against build-time card data via loadCardData (zero-DB architecture)
-- [Phase 05-01]: HTML entity escaping for all user input in email templates to prevent XSS
-- [Phase 05]: Form renders first on mobile (D-05 action-first) with sticky submit bar (D-06) matching cart-summary-bar pattern
-- [Phase 05]: sessionStorage stash before clearCart prevents data loss; URL params carry essentials for refresh resilience
-- [Phase 05]: Confirmation page Suspense boundary required by Next.js 16 for useSearchParams
-- [Phase 10-01]: db.batch([delete, insert]) over db.transaction() -- neon-http throws on interactive transactions; batch is atomic via HTTP transaction endpoint
-- [Phase 10-01]: parseManaboxCsvContent NEW alongside existing parseAllCsvFiles; original silent-skip path preserved for Phase 6 seed backward compat
-- [Phase 10-01]: cardToRow imported from @/db/seed rather than extracted -- avoids refactor; seed.test.ts coverage remains authoritative
-- [Phase 10-01]: enrichCards onProgress fires on both success and skip paths (once per card, strict ascending) for accurate UI progress bar
-- [Phase 10-01]: CSV row numbers 1-indexed with header=row 1 (first data row=row 2) matching spreadsheet app convention
-- [Phase 10-02]: Client holds enriched Card[] between /preview and /commit -- serverless memory is not shared across invocations; token-based handoff would require a persistent store we don't need
-- [Phase 10-02]: NDJSON preview final message carries FULL cards[] (not just 20-card sample) so /commit receives the exact payload the admin approved
-- [Phase 10-02]: maxDuration=300 on preview only (Scryfall rate limit headroom); commit uses maxDuration=30 (DB-only path)
-- [Phase 10-02]: vi.hoisted() to pre-initialize mock fns used by vi.mock factories -- Vitest 4 hoists factories above top-level const declarations
-- [Phase 10-02]: Mock @/db/queries WITHOUT importActual -- @/db/client calls drizzle(DATABASE_URL) at module load and throws without env var
-- [Phase 10-03]: Confirm button label IS the safeguard (D-12) — admin reads the destructive action verbatim before clicking
-- [Phase 10-03]: Client buffers the FULL enriched cards[] from preview's NDJSON result and POSTs it back to /commit unmodified
-- [Phase 10-03]: sessionStorage 'admin-toast' is the cross-route handoff for post-import success toast (router.push doesn't preserve client state)
-- [Phase 10-03]: D-13 cart reconciliation is silent (no banner) — friend-store UX prefers quiet correctness over scolding
-- [Phase 10.1]: Multi-CSV import is still a full-replace operation — multiple files are merged together before preview, not merged incrementally into existing inventory
-- [Phase 10.1]: Duplicate card IDs across uploaded CSV files sum quantities via the existing composite ID dedupe rule
-- [Phase 10.1]: Parse skipped rows carry optional fileName so the admin can locate bad rows in multi-file uploads without changing single-file behavior
-- [Phase 10.1]: Delete inventory uses a dedicated deleteAllCards helper and DELETE /api/admin/cards so the UI can report deleted count; it does not overload replaceAllCards([])
-- [Phase 10.1 Auth]: Username/password admin login is local-only through Auth.js Credentials because Google OAuth can reject local automation contexts; production disables the provider via `NODE_ENV=production`, `ADMIN_EMAIL` remains the authorization identity, and `ADMIN_USERNAME`/`ADMIN_PASSWORD` are env-backed secrets.
+Goal: The store has production guardrails, diagnostics, and repeatable verification before wider sharing.
 
-### Post-Phase 10 Hotfixes (2026-04-25)
+Plans:
+- 15-01: Rate limits and structured operational logs
+- 15-02: Health page, production smoke script, runbook docs, and security review
 
-Real-user import on the deployed Vercel URL surfaced production-only issues. All shipped to main same day:
+Key rule: production smoke defaults to read-only/guard-focused checks unless a future command explicitly enables authenticated mutation.
 
-- **`7b3f517` cache(setCache):** Vercel's serverless FS is read-only outside `/tmp`. `setCache` wrote to a project-relative path, throwing EROFS. The catch in scryfall.ts treated that as a Scryfall miss for every card → admin import showed "No valid cards parsed." Fix: swallow setCache failures (caching is an optimization, not correctness).
-- **`cdba6fa` scryfall(retry):** `fetchCard` returned null on any non-OK response, conflating 429 / 5xx / network errors with genuine 404 misses. Roughly 4% of a 600-card import was mislabeled as "not found on Scryfall." Fix: 404 still returns null; 429/5xx/network errors retry up to 3 times with exponential backoff (or `Retry-After` when provided). Base rate bumped 100ms → 120ms.
-- **`3fdc83d` enrichment(foil):** `getPrice` ignored the listing's foil flag. Foil rows displayed the cheaper non-foil USD price for any card with both finishes in Scryfall's payload. Fix: foil rows pull `usd_foil → usd_etched → usd`; non-foil rows keep the existing chain.
+## Blockers/Concerns
 
-### Post-Phase 10 Storefront Polish (2026-04-25)
-
-Same-day UX fixes shipped to main while testing the live import:
-
-- **`81ecc14`** (pre-hotfix-wave) — storefront redesigned as "Wiko's Spellbook" (predates this batch).
-- **`0851844` admin/View store:** added "View store" link in admin header so the seller can browse the storefront without signing out.
-- **`1443789` filters/subset:** color filter switched from OR (`some()`) to subset semantics (`every()`). Selecting W+U now yields mono-W, mono-U, and W+U cards — matches Scryfall `c<=` and every other MTG search tool. Colorless toggle unchanged.
-- **`7df5c8a` + `4469584` catalog/tile-size:** `gridTemplateColumns` minmax bumped 150px → 220px → 250px. Roughly 4–5 tiles per row on desktop instead of 8+.
-- **`70d30da` mobile/header+drawer:** iPhone Pro Max-class screens were clipping the header title (right-side controls + 32px padding pushed "Spellbook" past `overflow:hidden`) and treating the 248px sticky filter rail as "filter open by default" (it covered ~58% of the viewport). Below 767px the rail is now a right-side drawer triggered by a "Filter" button; below 640px the header tightens padding, shrinks mascot+title, and hides the tagline + Satchel label.
-
-### Phase 10.1 Local Completion (2026-04-26)
-
-User chose the 10.1 insertion before Phase 11. Implemented locally on branch `phase-10.1-import-delete-inventory`:
-
-- Multi-CSV import: `/admin/import` accepts multiple `.csv` files; preview route parses repeated multipart `file` fields; parser merges duplicate composite IDs across files and preserves per-file skipped-row context.
-- Delete inventory: `/admin` action bar has a destructive `Delete inventory` button; confirmation is inline; DELETE `/api/admin/cards` is auth-gated and returns deleted row count.
-- Browser verification: authenticated admin session reached `/admin`; `/admin/import` accepted two CSV files; preview showed 3 unique imported cards after duplicate merge, 1 skipped row with filename, per-file parse counts, and correct destructive confirm label. Returned to `/admin`; empty-inventory state showed `Delete inventory` disabled. No console or failed network logs during final browser checks.
-- Verification: focused tests 41/41 pass; auth/proxy focused tests 24/24 pass; `npx tsc --noEmit` passes; full `npm test` 135/135 passes; touched-file eslint has no errors; `npm run build` passes after local auth/database env keys were collected securely.
-- Project-wide `npm run lint` still fails on pre-existing issues outside this change (React set-state-in-effect, JSX in try/catch, test `any` types). Touched files only have existing admin table warnings.
-- PR status: Phase 10.1 is pushed as PR #1; Vercel preview checks are green; preview verification caught and fixed a production-login regression so Google sign-in remains visible when local password login is disabled.
-
-### Phase 11 Plan 01 Completion (2026-04-26)
-
-Implemented transactional checkout persistence on branch `phase-11-checkout-order-history`:
-
-- `placeCheckoutOrder()` now performs one atomic database write that locks requested cards, rejects missing/short stock, decrements stock, inserts the order, and inserts denormalized item snapshots.
-- `POST /api/checkout` now returns HTTP 201 on persisted order success, HTTP 409 with `code: "stock_conflict"` for stale carts, and HTTP 503 when the DB write fails before notifications.
-- Notification emails are post-commit side effects; seller/buyer email failure no longer erases a persisted order.
-- Checkout UI preserves cart/form data on errors and formats stock conflicts with requested/available quantities.
-- Verification: `git diff --check`, `npm test` (149/149), `npm run build`, and a disposable remote Neon concurrent checkout proof all passed. The proof created one sentinel card with quantity 1, ran two concurrent checkout writes, observed one success and one `stock_conflict`, confirmed final quantity 0, and cleaned up sentinel card/order rows.
-
-### Phase 11 Completion (2026-04-26)
-
-Implemented Phase 11 across two local commits on branch `phase-11-checkout-order-history`:
-
-- Plan 01: `placeCheckoutOrder()` performs one atomic DB write for stock decrement + order/order_item snapshots; checkout route returns 201/409/503 appropriately; notification emails are post-commit side effects.
-- Plan 02: `/admin/orders` and `/admin/orders/[id]` show seller-facing order history/detail from snapshot rows; admin order APIs are auth-gated; admin nav exposes Orders.
-- Checkout page now reads DB card data, matching `/cart` and the checkout API source of truth.
-- Header cart badge waits for persisted cart hydration, removing the browser-observed localStorage hydration mismatch.
-- Verification: `git diff --check`, `npx tsc --noEmit`, `npm test` (163/163), `npm run build`, remote Neon concurrent checkout proof, and browser checkout → admin orders → detail → inventory decrement proof all passed. Disposable DB rows were cleaned up.
-
-### Phase 12 Planning (2026-04-26)
-
-User chose to leave Phase 11 PR #2 open and start Phase 12 planning. Created local stacked branch `phase-12-bulk-dashboard` from `phase-11-checkout-order-history` so PR #2 remains untouched.
-
-Planned Phase 12 as two execution plans:
-
-- `12-01-PLAN.md`: dashboard stats and inventory breakdowns on `/admin`, server-rendered above the inventory table.
-- `12-02-PLAN.md`: bulk row selection and selected-card delete workflow through a dedicated `POST /api/admin/cards/bulk-delete` route.
-
-Key planning decisions:
-
-- Keep `/admin` as the Inventory page and add dashboard stat cards above the table; no separate `/admin/dashboard` route.
-- Select-all means current visible page only, not all matching rows across pages.
-- Bulk delete gets a dedicated route so it cannot be confused with existing full-inventory delete.
-
-### Phase 12 Plan 01 (2026-04-26)
-
-Completed admin inventory dashboard stats on `/admin`:
-
-- Added `getAdminDashboardStats()` in `src/db/queries.ts` with totals and breakdowns by set, color identity, and rarity.
-- Added `DashboardSummary` above the existing inventory table.
-- Added `router.refresh()` after existing successful inline edit, single delete, and delete-all inventory mutations so server-rendered dashboard stats refresh.
-- Verified with unit tests, full tests/build, browser proof with three disposable sentinel rows, and cleanup back to zero sentinel rows.
-
-### Phase 12 Plan 02 (2026-04-26)
-
-Completed selected-row bulk delete on `/admin`:
-
-- Added `deleteCardsByIds()` in `src/db/queries.ts` using one delete statement with `RETURNING`.
-- Added authenticated `POST /api/admin/cards/bulk-delete` with validation, request cap, and explicit unchanged-inventory failure copy.
-- Added row checkboxes, select-all-current-page, selected count, selected delete confirmation, and success/error toasts.
-- Verified with helper/route tests, full tests/build, browser proof with two selected sentinel rows plus one unselected keep row, and cleanup back to zero sentinel rows.
-
-### Pending Todos
-
-- Decide whether to merge Phase 11 PR #2 before pushing/opening Phase 12 cleanly.
-- Keep Phase 11 PR #2 open until separately merged.
-
-### Blockers/Concerns
-
-- Resend free tier limits need verification at signup (Phase 5)
-- Branch hygiene: all 2026-04-25 hotfixes shipped directly to `main` because production was already broken. Future feature work should use feature branches → preview URLs → merge (production URL `wikos-spellbinder.vercel.app` is friends-facing).
+- Phase 13 requires a safe database schema update for order workflow changes, especially adding a `cancelled` status if the existing PostgreSQL enum remains in use.
+- Phase 14 should avoid noisy or fragile audit logging. Prefer centralized helper-level integration where practical.
+- Phase 15 rate limiting must be production-compatible with Vercel/serverless; in-memory counters are not sufficient for production correctness.
 
 ## Session Continuity
 
-Last session: 2026-04-26T23:59:00.000Z
-Stopped at: Phase 12 complete locally; next action is decide PR #2 merge / Phase 12 branch sequencing
-Resume file: .planning/phases/12-bulk-operations-dashboard/12-02-SUMMARY.md
+Working tree should remain on `main`. Planning-only changes are expected under `.planning/` until the user approves execution for Phase 13.
