@@ -13,7 +13,7 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
-import { getAdminOrders, getOrderById } from "../orders";
+import { getAdminOrders, getOrderById, updateOrderWorkflow } from "../orders";
 
 const orderRows = [
   {
@@ -44,6 +44,7 @@ const detailOrderRow = {
   totalItems: 3,
   totalPrice: 425,
   status: "pending",
+  adminNote: "Pull from blue binder.",
   createdAt: "2026-04-27T02:03:04.000Z",
 };
 
@@ -115,10 +116,35 @@ describe("getAdminOrders", () => {
     expect(result.totalPages).toBe(3);
   });
 
+  it("accepts search and status filters for centralized query handling", async () => {
+    mockExecute
+      .mockResolvedValueOnce({ rows: [orderRows[0]] })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] });
+
+    const result = await getAdminOrders({
+      page: 1,
+      limit: 25,
+      q: "viki@example.com",
+      status: "pending",
+    });
+
+    expect(result.orders).toHaveLength(1);
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+  });
+
   it("orders list SQL newest first", () => {
     const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
 
     expect(source).toContain("ORDER BY created_at DESC");
+  });
+
+  it("filters orders by search text and status in SQL", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
+
+    expect(source).toContain("ILIKE");
+    expect(source).toContain("status =");
+    expect(source).toContain("buyer_email");
+    expect(source).toContain("buyer_name");
   });
 });
 
@@ -139,6 +165,7 @@ describe("getOrderById", () => {
       buyerName: detailOrderRow.buyerName,
       buyerEmail: detailOrderRow.buyerEmail,
       message: detailOrderRow.message,
+      adminNote: detailOrderRow.adminNote,
       totalItems: 3,
       totalPrice: 4.25,
       status: "pending",
@@ -163,5 +190,39 @@ describe("getOrderById", () => {
 
     expect(source).toContain("FROM order_items");
     expect(source).not.toContain("getCardById");
+  });
+});
+
+describe("updateOrderWorkflow", () => {
+  beforeEach(() => {
+    mockExecute.mockReset();
+  });
+
+  it("updates provided status and admin note fields, then returns order detail", async () => {
+    mockExecute
+      .mockResolvedValueOnce({ rows: [{ id: detailOrderRow.id }] })
+      .mockResolvedValueOnce({
+        rows: [{ ...detailOrderRow, status: "confirmed", adminNote: "Ready for pickup." }],
+      })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await updateOrderWorkflow({
+      orderId: detailOrderRow.id,
+      status: "confirmed",
+      adminNote: "Ready for pickup.",
+    });
+
+    expect(result?.status).toBe("confirmed");
+    expect(result?.adminNote).toBe("Ready for pickup.");
+    expect(mockExecute).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns null when no order is updated", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    await expect(
+      updateOrderWorkflow({ orderId: "missing", status: "confirmed" }),
+    ).resolves.toBeNull();
+    expect(mockExecute).toHaveBeenCalledTimes(1);
   });
 });

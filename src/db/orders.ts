@@ -113,9 +113,17 @@ function parseSqlPayload(raw: unknown): CheckoutSqlPayload {
 
 export type OrderStatus = "pending" | "confirmed" | "completed";
 
+export const ORDER_STATUSES: readonly OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "completed",
+];
+
 export interface AdminOrdersParams {
   page?: number;
   limit?: number;
+  q?: string;
+  status?: OrderStatus | "all";
 }
 
 export interface AdminOrderSummary {
@@ -136,7 +144,16 @@ export interface AdminOrdersResult {
   totalPages: number;
 }
 
-export type AdminOrderDetail = OrderData & { status: OrderStatus };
+export type AdminOrderDetail = OrderData & {
+  status: OrderStatus;
+  adminNote?: string | null;
+};
+
+export interface UpdateOrderWorkflowInput {
+  orderId: string;
+  status?: OrderStatus;
+  adminNote?: string | null;
+}
 
 interface AdminOrderRow {
   [key: string]: unknown;
@@ -144,6 +161,7 @@ interface AdminOrderRow {
   buyerName: string;
   buyerEmail: string;
   message?: string | null;
+  adminNote?: string | null;
   totalItems: number;
   totalPrice: number;
   status: OrderStatus | string;
@@ -172,6 +190,64 @@ function numberFromDb(value: number | string | null | undefined): number {
 
 function normalizeStatus(value: string): OrderStatus {
   return value === "confirmed" || value === "completed" ? value : "pending";
+}
+
+function normalizeStatusFilter(
+  value: AdminOrdersParams["status"],
+): OrderStatus | undefined {
+  if (!value || value === "all") return undefined;
+  return ORDER_STATUSES.includes(value) ? value : undefined;
+}
+
+function normalizeSearch(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function buildOrderFilters(params: AdminOrdersParams) {
+  const filters = [];
+  const search = normalizeSearch(params.q);
+  const status = normalizeStatusFilter(params.status);
+
+  if (search) {
+    const pattern = `%${search}%`;
+    filters.push(sql`(
+      id ILIKE ${pattern}
+      OR buyer_name ILIKE ${pattern}
+      OR buyer_email ILIKE ${pattern}
+    )`);
+  }
+
+  if (status) {
+    filters.push(sql`status = ${status}::order_status`);
+  }
+
+  return filters.length > 0 ? sql`WHERE ${sql.join(filters, sql` AND `)}` : sql``;
+}
+
+function normalizeAdminNote(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function buildWorkflowSetClauses(input: UpdateOrderWorkflowInput) {
+  const clauses = [];
+
+  if (input.status !== undefined) {
+    clauses.push(sql`status = ${input.status}::order_status`);
+  }
+
+  if ("adminNote" in input) {
+    clauses.push(sql`admin_note = ${normalizeAdminNote(input.adminNote)}`);
+  }
+
+  if (clauses.length === 0) {
+    throw new Error("Order workflow update requires at least one field");
+  }
+
+  return sql.join(clauses, sql`, `);
 }
 
 function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
@@ -377,6 +453,7 @@ export async function getAdminOrders(
   const page = normalizePage(params.page);
   const limit = normalizeLimit(params.limit);
   const offset = (page - 1) * limit;
+  const whereClause = buildOrderFilters(params);
 
   const [ordersResult, countResult] = await Promise.all([
     db.execute<AdminOrderRow>(sql`
@@ -389,6 +466,7 @@ export async function getAdminOrders(
         status,
         created_at AS "createdAt"
       FROM orders
+      ${whereClause}
       ORDER BY created_at DESC, id DESC
       LIMIT ${limit}
       OFFSET ${offset}
@@ -396,6 +474,7 @@ export async function getAdminOrders(
     db.execute<{ total: number | string }>(sql`
       SELECT COUNT(*)::integer AS total
       FROM orders
+      ${whereClause}
     `),
   ]);
 
@@ -419,6 +498,7 @@ export async function getOrderById(
       buyer_name AS "buyerName",
       buyer_email AS "buyerEmail",
       message,
+      admin_note AS "adminNote",
       total_items AS "totalItems",
       total_price AS "totalPrice",
       status,
@@ -453,6 +533,7 @@ export async function getOrderById(
     buyerName: order.buyerName,
     buyerEmail: order.buyerEmail,
     message: order.message ?? undefined,
+    adminNote: order.adminNote ?? null,
     totalItems: order.totalItems,
     totalPrice: order.totalPrice / 100,
     status: normalizeStatus(order.status),
@@ -470,4 +551,21 @@ export async function getOrderById(
       imageUrl: item.imageUrl,
     })),
   };
+}
+
+export async function updateOrderWorkflow(
+  input: UpdateOrderWorkflowInput,
+): Promise<AdminOrderDetail | null> {
+  const setClauses = buildWorkflowSetClauses(input);
+
+  const result = await db.execute<{ id: string }>(sql`
+    UPDATE orders
+    SET ${setClauses}
+    WHERE id = ${input.orderId}
+    RETURNING id
+  `);
+
+  if (!result.rows[0]) return null;
+
+  return getOrderById(input.orderId);
 }

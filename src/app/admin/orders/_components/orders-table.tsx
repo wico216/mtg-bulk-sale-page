@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { AdminOrdersResult, AdminOrderSummary } from "@/db/orders";
+import type { AdminOrdersResult, AdminOrderSummary, OrderStatus } from "@/db/orders";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -34,13 +34,33 @@ function StatusBadge({ status }: { status: AdminOrderSummary["status"] }) {
   );
 }
 
+function buildOrdersHref({
+  page,
+  q,
+  status,
+}: {
+  page: number;
+  q?: string;
+  status?: OrderStatus | "all";
+}): string {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  if (q) params.set("q", q);
+  if (status && status !== "all") params.set("status", status);
+  return `/admin/orders?${params.toString()}`;
+}
+
 function PageLink({
   page,
   disabled,
+  q,
+  status,
   children,
 }: {
   page: number;
   disabled: boolean;
+  q?: string;
+  status?: OrderStatus | "all";
   children: React.ReactNode;
 }) {
   if (disabled) {
@@ -53,7 +73,7 @@ function PageLink({
 
   return (
     <Link
-      href={`/admin/orders?page=${page}`}
+      href={buildOrdersHref({ page, q, status })}
       className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
     >
       {children}
@@ -61,13 +81,23 @@ function PageLink({
   );
 }
 
-export function OrdersTable({ result }: { result: AdminOrdersResult }) {
+export function OrdersTable({
+  result,
+  q,
+  status,
+}: {
+  result: AdminOrdersResult;
+  q?: string;
+  status?: OrderStatus | "all";
+}) {
   if (result.orders.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-200 py-16 text-center dark:border-zinc-800">
-        <h2 className="text-lg font-semibold">No orders yet</h2>
+        <h2 className="text-lg font-semibold">No orders found</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Placed checkouts will appear here after checkout succeeds.
+          {q || (status && status !== "all")
+            ? "Try changing the search or status filter."
+            : "Placed checkouts will appear here after checkout succeeds."}
         </p>
       </div>
     );
@@ -145,7 +175,12 @@ export function OrdersTable({ result }: { result: AdminOrdersResult }) {
           {Math.min(result.page * result.limit, result.total)} of {result.total} orders
         </span>
         <div className="flex items-center gap-2">
-          <PageLink page={result.page - 1} disabled={result.page <= 1}>
+          <PageLink
+            page={result.page - 1}
+            disabled={result.page <= 1}
+            q={q}
+            status={status}
+          >
             Previous Page
           </PageLink>
           <span className="text-zinc-500 dark:text-zinc-400">
@@ -154,6 +189,8 @@ export function OrdersTable({ result }: { result: AdminOrdersResult }) {
           <PageLink
             page={result.page + 1}
             disabled={result.page >= result.totalPages}
+            q={q}
+            status={status}
           >
             Next Page
           </PageLink>
