@@ -4,7 +4,7 @@
 
 - v1.0 MVP - Phases 1-5 (shipped 2026-04-11)
 - v1.1 Admin Panel & Inventory Management - Phases 6-12 (shipped 2026-04-27)
-- v1.2 Store Operations & Hardening - Phases 13-15 (planned)
+- v1.2 Store Operations & Hardening - Phases 13-15 (in progress)
 
 ## Phases
 
@@ -121,11 +121,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Checkout Upgrade & Order History** - Transactional stock decrement and admin order tracking (completed 2026-04-26)
 - [x] **Phase 12: Bulk Operations & Dashboard** - Bulk select/delete, inventory stats, and breakdowns (completed 2026-04-27)
 
-### v1.2 Store Operations & Hardening (Planned)
+### v1.2 Store Operations & Hardening (In Progress)
 
 **Milestone Goal:** Help the seller operate the store after checkout, preserve a clear history of high-impact changes, and harden production before wider sharing.
 
-- [ ] **Phase 13: Admin Order Workflow** - Status changes, private notes, order search/filter, and cancellation with optional inventory restore
+- [x] **Phase 13: Admin Order Workflow** - Status changes, private notes, order search/filter, and cancellation with optional inventory restore (completed 2026-04-27 on feature branch)
 - [ ] **Phase 14: Inventory Audit Trail** - Audit logs, import history, and admin-visible mutation history
 - [ ] **Phase 15: Production Hardening** - Rate limits, structured logs, health checks, production smoke, docs, and security review
 
@@ -279,8 +279,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md -- Order search/filter, status updates, and internal notes
-- [ ] 13-02-PLAN.md -- Cancel order workflow with optional inventory restore
+- [x] 13-01-PLAN.md -- Order search/filter, status updates, and internal notes
+- [x] 13-02-PLAN.md -- Cancel order workflow with optional inventory restore
 
 **UI hint**: yes
 
@@ -340,6 +340,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12 -> 1
 | 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete | 2026-04-26 |
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
 | 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-27 |
-| 13. Admin Order Workflow | v1.2 | 0/2 | Planned | - |
+| 13. Admin Order Workflow | v1.2 | 2/2 | Complete | 2026-04-27 |
 | 14. Inventory Audit Trail | v1.2 | 0/2 | Planned | - |
 | 15. Production Hardening | v1.2 | 0/2 | Planned | - |

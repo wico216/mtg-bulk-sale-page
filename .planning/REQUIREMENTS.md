@@ -78,9 +78,9 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 - [x] **ORD-01**: Checkout stores order in database (buyer, items, totals, timestamp)
 - [x] **ORD-02**: Admin can view order history in a table (buyer, date, total)
 - [x] **ORD-03**: Admin can click into an order to see full line items and buyer info
-- [ ] **ORD-04**: Admin can update order status through the order detail workflow
-- [ ] **ORD-05**: Admin can search and filter order history by status, order ref, buyer name, and buyer email
-- [ ] **ORD-06**: Admin can cancel orders with an explicit optional inventory restore
+- [x] **ORD-04**: Admin can update order status through the order detail workflow
+- [x] **ORD-05**: Admin can search and filter order history by status, order ref, buyer name, and buyer email
+- [x] **ORD-06**: Admin can cancel orders with an explicit optional inventory restore
 
 ### Dashboard
 
@@ -159,9 +159,9 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | ORD-01 | Phase 11 | Complete |
 | ORD-02 | Phase 11 | Complete |
 | ORD-03 | Phase 11 | Complete |
-| ORD-04 | Phase 13 | Planned |
-| ORD-05 | Phase 13 | Planned |
-| ORD-06 | Phase 13 | Planned |
+| ORD-04 | Phase 13 | Complete |
+| ORD-05 | Phase 13 | Complete |
+| ORD-06 | Phase 13 | Complete |
 | DASH-01 | Phase 12 | Complete |
 | DASH-02 | Phase 12 | Complete |
 | AUD-01 | Phase 14 | Planned |

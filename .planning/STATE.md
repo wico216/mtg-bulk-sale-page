@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Store Operations & Hardening
-status: planning
-stopped_at: Phase 13-15 planning drafted; no implementation started
-last_updated: "2026-04-27T00:00:00.000Z"
+status: in_progress
+stopped_at: Phase 13 implementation complete on feature branch; next decision is push/open PR or start Phase 14 after merge
+last_updated: "2026-04-27T14:25:00.000Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 15
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 34
-  completed_plans: 28
-  percent: 80
+  completed_plans: 30
+  percent: 87
 ---
 
 # Project State
@@ -21,17 +21,24 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** Plan the next operational phases after Phase 12 shipped: order workflow, audit trail, and production hardening.
+**Current focus:** Phase 13 admin order workflow is implemented and verified on the feature branch; next is review/push/PR, then Phase 14 audit trail after merge.
 
 ## Current Position
 
-Phase: 13 (admin-order-workflow) — PLANNED
-Plan: 0 of 2 — NOT STARTED
-Status: Phase 13/14/15 planning artifacts are drafted. No implementation branch or code changes have started for these phases.
+Phase: 13 (admin-order-workflow) — COMPLETE ON FEATURE BRANCH
+Plan: 2 of 2 — COMPLETE
+Status: Phase 13 implementation is committed locally on `phase-13-admin-order-workflow`. It has not been pushed, opened as a PR, merged, or deployed yet.
 Last activity: 2026-04-27
 
 ## Recently Completed
 
+- Phase 13 was implemented and verified locally on `phase-13-admin-order-workflow`:
+  - order list search by order ref, buyer name, and buyer email
+  - order list filtering by pending/confirmed/completed/cancelled status
+  - order detail status updates and private internal notes
+  - cancel-order workflow with explicit optional inventory restore
+  - idempotent cancellation so inventory restore cannot run twice
+  - disposable browser/DB verification and cleanup
 - Phase 11 was merged into `main` and deployed: transactional checkout, stock-safe order persistence, admin order list/detail.
 - Phase 12 was merged into `main` and deployed: inventory dashboard stats, breakdowns, selected-row bulk delete.
 - Full local browser/DB system test passed after Phase 12 merge:
@@ -53,9 +60,9 @@ Last activity: 2026-04-27
 
 ### Phase 13: Admin Order Workflow
 
-Goal: The seller can process orders end-to-end after checkout.
+Status: Complete locally on `phase-13-admin-order-workflow`; awaiting push/PR/merge decision.
 
-Plans:
+Delivered:
 - 13-01: Order search/filter, status updates, and internal notes
 - 13-02: Cancel order workflow with optional inventory restore
 
@@ -83,10 +90,11 @@ Key rule: production smoke defaults to read-only/guard-focused checks unless a f
 
 ## Blockers/Concerns
 
-- Phase 13 requires a safe database schema update for order workflow changes, especially adding a `cancelled` status if the existing PostgreSQL enum remains in use.
+- Phase 13 touched database schema in the configured DB during verification: `orders.admin_note` nullable text and `order_status` enum value `cancelled` were applied after explicit approval. Production deployment needs the same additive schema state before the new code handles cancellation in production.
+- Phase 13 is local-only until the user approves pushing/opening a PR.
 - Phase 14 should avoid noisy or fragile audit logging. Prefer centralized helper-level integration where practical.
 - Phase 15 rate limiting must be production-compatible with Vercel/serverless; in-memory counters are not sufficient for production correctness.
 
 ## Session Continuity
 
-Working tree should remain on `main`. Planning-only changes are expected under `.planning/` until the user approves execution for Phase 13.
+Working tree is on `phase-13-admin-order-workflow`. Phase 13 code and tracker updates are committed locally except for the latest tracker-state update if not yet committed. Do not push/open PR without explicit user approval.
