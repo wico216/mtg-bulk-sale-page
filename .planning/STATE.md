@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Phase 11 complete; checkout persistence and admin order history verified end-to-end
-last_updated: "2026-04-26T23:15:00.000Z"
+stopped_at: Phase 12 planned locally; next action is execute 12-01 dashboard stats
+last_updated: "2026-04-26T23:35:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 11
+  total_plans: 13
   completed_plans: 11
   percent: 63
 ---
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 12 planning/execution — bulk operations and dashboard
+**Current focus:** Phase 12 Plan 01 — admin dashboard stats and inventory breakdowns
 
 ## Current Position
 
-Phase: 11 (checkout-upgrade-order-history) — COMPLETE
-Plan: 2 of 2 — DONE
-Status: Transactional checkout persistence and admin order history are implemented, verified, and cleaned up after disposable DB/browser proofs
+Phase: 12 (bulk-operations-dashboard) — PLANNED LOCALLY
+Plan: 0 of 2 — READY
+Status: Phase 12 context and two execution plans are drafted locally on stacked branch `phase-12-bulk-dashboard`; PR #2 remains open/green for Phase 11
 Last activity: 2026-04-26
 
-Progress: [██████░░░░] 63% phases (5 of 8 v1.1 phases shipped)
+Progress: [██████░░░░] 63% phases (5 of 8 v1.1 phases shipped, Phase 12 planned locally)
 
 ## Performance Metrics
 
@@ -173,10 +173,26 @@ Implemented Phase 11 across two local commits on branch `phase-11-checkout-order
 - Header cart badge waits for persisted cart hydration, removing the browser-observed localStorage hydration mismatch.
 - Verification: `git diff --check`, `npx tsc --noEmit`, `npm test` (163/163), `npm run build`, remote Neon concurrent checkout proof, and browser checkout → admin orders → detail → inventory decrement proof all passed. Disposable DB rows were cleaned up.
 
+### Phase 12 Planning (2026-04-26)
+
+User chose to leave Phase 11 PR #2 open and start Phase 12 planning. Created local stacked branch `phase-12-bulk-dashboard` from `phase-11-checkout-order-history` so PR #2 remains untouched.
+
+Planned Phase 12 as two execution plans:
+
+- `12-01-PLAN.md`: dashboard stats and inventory breakdowns on `/admin`, server-rendered above the inventory table.
+- `12-02-PLAN.md`: bulk row selection and selected-card delete workflow through a dedicated `POST /api/admin/cards/bulk-delete` route.
+
+Key planning decisions:
+
+- Keep `/admin` as the Inventory page and add dashboard stat cards above the table; no separate `/admin/dashboard` route.
+- Select-all means current visible page only, not all matching rows across pages.
+- Bulk delete gets a dedicated route so it cannot be confused with existing full-inventory delete.
+
 ### Pending Todos
 
-- Review/commit Phase 11 Plan 02.
-- Decide whether to push/open PR for Phase 11 or continue into Phase 12 planning.
+- Review/commit Phase 12 planning docs.
+- Execute Phase 12 Plan 01 when ready.
+- Keep Phase 11 PR #2 open until separately merged.
 
 ### Blockers/Concerns
 
@@ -185,6 +201,9 @@ Implemented Phase 11 across two local commits on branch `phase-11-checkout-order
 
 ## Session Continuity
 
-Last session: 2026-04-26T23:15:00.000Z
-Stopped at: Phase 11 complete and verified; next action is commit Phase 11 Plan 02 and decide PR/push vs Phase 12
-Resume file: .planning/phases/11-checkout-upgrade-order-history/11-02-SUMMARY.md
+Last session: 2026-04-26T23:35:00.000Z
+Stopped at: Phase 12 planned locally; next action is review/commit planning or execute 12-01
+Resume file: .planning/phases/12-bulk-operations-dashboard/12-01-PLAN.md
+Y.md
+AN.md
+Y.md
