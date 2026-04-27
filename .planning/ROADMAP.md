@@ -242,17 +242,17 @@ Plans:
 
 ### Phase 12: Bulk Operations & Dashboard
 **Goal**: The seller has efficient bulk tools and at-a-glance inventory insights
-**Depends on**: Phase 9 (inventory table for bulk ops), Phase 11 (orders for dashboard context)
+**Depends on**: Phase 9 (inventory table for bulk ops), Phase 11 (current admin branch/base sequencing)
 **Requirements**: INV-04, DASH-01, DASH-02
 **Success Criteria** (what must be TRUE):
   1. Admin can select multiple cards using checkboxes and delete them all in one action
   2. Admin dashboard shows inventory stats at a glance: total unique cards, total quantity, and total inventory value
   3. Admin dashboard shows inventory breakdowns by set, color identity, and rarity
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
+- [ ] 12-01-PLAN.md -- Admin dashboard stats and inventory breakdowns on /admin
+- [ ] 12-02-PLAN.md -- Bulk row selection and selected-card delete workflow
 
 **UI hint**: yes
 
@@ -275,4 +275,5 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
 | 10. CSV Import | v1.1 | 3/3 | Complete | 2026-04-20 |
 | 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete | 2026-04-26 |
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
-| 12. Bulk Operations & Dashboard | v1.1 | 0/2 | Not started | - |
+| 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-26 |
+|
