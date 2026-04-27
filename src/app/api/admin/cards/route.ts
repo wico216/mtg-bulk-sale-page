@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
-import { getAdminCards } from "@/db/queries";
+import { getAdminCards, deleteAllCards } from "@/db/queries";
 
 export async function GET(request: Request) {
   const result = await requireAdmin();
@@ -37,4 +37,20 @@ export async function GET(request: Request) {
     sortDir,
   });
   return Response.json(data);
+}
+
+export async function DELETE() {
+  const result = await requireAdmin();
+  if (result instanceof Response) return result;
+
+  try {
+    const { deleted } = await deleteAllCards();
+    return Response.json({ success: true, deleted });
+  } catch (err) {
+    console.error("[ADMIN CARDS] delete-all failed:", err);
+    return Response.json(
+      { error: "Delete inventory failed — inventory unchanged" },
+      { status: 500 },
+    );
+  }
 }

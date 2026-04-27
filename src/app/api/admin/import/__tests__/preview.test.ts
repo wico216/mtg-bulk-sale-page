@@ -7,10 +7,10 @@ vi.mock("server-only", () => ({}));
 // top of the file). Without it the mock factories would close over
 // uninitialized top-level consts -- see
 // https://vitest.dev/api/vi.html#vi-hoisted.
-const { requireAdminMock, parseManaboxCsvContentMock, enrichCardsMock } =
+const { requireAdminMock, parseManaboxCsvContentsMock, enrichCardsMock } =
   vi.hoisted(() => ({
     requireAdminMock: vi.fn(),
-    parseManaboxCsvContentMock: vi.fn(),
+    parseManaboxCsvContentsMock: vi.fn(),
     enrichCardsMock: vi.fn(),
   }));
 
@@ -23,7 +23,7 @@ vi.mock("@/lib/auth/admin-check", () => ({
 vi.mock("@/lib/csv-parser", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/csv-parser")>("@/lib/csv-parser");
-  return { ...actual, parseManaboxCsvContent: parseManaboxCsvContentMock };
+  return { ...actual, parseManaboxCsvContents: parseManaboxCsvContentsMock };
 });
 
 vi.mock("@/lib/enrichment", async () => {
@@ -94,7 +94,7 @@ function sampleCard(id = "lea-232-normal-near_mint"): Card {
 describe("POST /api/admin/import/preview", () => {
   beforeEach(() => {
     requireAdminMock.mockReset();
-    parseManaboxCsvContentMock.mockReset();
+    parseManaboxCsvContentsMock.mockReset();
     enrichCardsMock.mockReset();
   });
 
@@ -130,17 +130,18 @@ describe("POST /api/admin/import/preview", () => {
     );
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "File must be .csv" });
+    expect(await res.json()).toEqual({ error: "All uploaded files must be .csv" });
   });
 
   it("streams NDJSON with progress + result when .csv valid", async () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
-    parseManaboxCsvContentMock.mockReturnValueOnce({
+    parseManaboxCsvContentsMock.mockReturnValueOnce({
       cards: [
         sampleCard("lea-232-normal-near_mint"),
         sampleCard("mh2-45-foil-lightly_played"),
       ],
-      skippedRows: [{ rowNumber: 4, reason: "missing Name" }],
+      skippedRows: [{ rowNumber: 4, reason: "missing Name", fileName: "x.csv" }],
+      sourceFiles: [{ name: "x.csv", parsedCards: 2, skippedRows: 1 }],
     });
     enrichCardsMock.mockImplementationOnce(async (cards, opts) => {
       opts?.onProgress?.(1, cards.length);
@@ -158,6 +159,9 @@ describe("POST /api/admin/import/preview", () => {
     );
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(200);
+    expect(parseManaboxCsvContentsMock).toHaveBeenCalledWith([
+      { fileName: "x.csv", content: "name,set_code\nA,lea" },
+    ]);
     expect(res.headers.get("Content-Type")).toBe("application/x-ndjson");
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("X-Accel-Buffering")).toBe("no");
@@ -174,6 +178,9 @@ describe("POST /api/admin/import/preview", () => {
     expect(preview.scryfallSkipped).toBe(0);
     expect(preview.sample.length).toBe(2);
     expect(preview.cards.length).toBe(2);
+    expect(preview.sourceFiles).toEqual([
+      { name: "x.csv", parsedCards: 2, skippedRows: 1 },
+    ]);
     expect(preview.skippedRows).toEqual([
       expect.objectContaining({
         kind: "parse",
@@ -183,11 +190,41 @@ describe("POST /api/admin/import/preview", () => {
     ]);
   });
 
+  it("passes multiple CSV uploads to the parser in field order", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce({
+      cards: [sampleCard("a"), sampleCard("b")],
+      skippedRows: [],
+      sourceFiles: [
+        { name: "binder-a.csv", parsedCards: 1, skippedRows: 0 },
+        { name: "binder-b.csv", parsedCards: 1, skippedRows: 0 },
+      ],
+    });
+    enrichCardsMock.mockResolvedValueOnce({
+      cards: [sampleCard("a"), sampleCard("b")],
+      stats: { processed: 2, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    });
+
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["first"], "binder-a.csv"));
+    fd.append(IMPORT_FILE_FIELD, new File(["second"], "binder-b.csv"));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(200);
+    await readStream(res);
+    expect(parseManaboxCsvContentsMock).toHaveBeenCalledWith([
+      { fileName: "binder-a.csv", content: "first" },
+      { fileName: "binder-b.csv", content: "second" },
+    ]);
+  });
+
   it("emits error message when enrichCards throws", async () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
-    parseManaboxCsvContentMock.mockReturnValueOnce({
+    parseManaboxCsvContentsMock.mockReturnValueOnce({
       cards: [sampleCard()],
       skippedRows: [],
+      sourceFiles: [{ name: "x.csv", parsedCards: 1, skippedRows: 0 }],
     });
     enrichCardsMock.mockRejectedValueOnce(new Error("Scryfall unreachable"));
     const fd = new FormData();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseManaboxCsvContent } from "../csv-parser";
+import { parseManaboxCsvContent, parseManaboxCsvContents } from "../csv-parser";
 
 /**
  * Helper: build a CSV string with the canonical Manabox header + data rows.
@@ -206,5 +206,76 @@ describe("parseManaboxCsvContent", () => {
     expect(result.cards[0].collectorNumber).toBe("232a");
     expect(result.cards[0].id).toBe("lea-232a-normal-near_mint");
     expect(typeof result.cards[0].collectorNumber).toBe("string");
+  });
+});
+
+describe("parseManaboxCsvContents", () => {
+  it("merges duplicate cards across multiple uploaded CSV files and preserves per-file skip context", () => {
+    const first = makeCsv([
+      {
+        Name: "Lightning Bolt",
+        "Set code": "lea",
+        "Set name": "Alpha",
+        "Collector number": "232",
+        Condition: "near_mint",
+        Quantity: "1",
+        Foil: "normal",
+        Rarity: "common",
+      },
+      {
+        Name: "",
+        "Set code": "lea",
+        "Set name": "Alpha",
+        "Collector number": "233",
+        Condition: "near_mint",
+        Quantity: "1",
+        Foil: "normal",
+        Rarity: "common",
+      },
+    ]);
+    const second = makeCsv([
+      {
+        Name: "Lightning Bolt",
+        "Set code": "lea",
+        "Set name": "Alpha",
+        "Collector number": "232",
+        Condition: "near_mint",
+        Quantity: "2",
+        Foil: "normal",
+        Rarity: "common",
+      },
+      {
+        Name: "Counterspell",
+        "Set code": "mh2",
+        "Set name": "Modern Horizons 2",
+        "Collector number": "45",
+        Condition: "lightly_played",
+        Quantity: "1",
+        Foil: "foil",
+        Rarity: "uncommon",
+      },
+    ]);
+
+    const result = parseManaboxCsvContents([
+      { fileName: "red-binder.csv", content: first },
+      { fileName: "blue-binder.csv", content: second },
+    ]);
+
+    expect(result.cards).toHaveLength(2);
+    expect(
+      result.cards.find((card) => card.id === "lea-232-normal-near_mint")
+        ?.quantity,
+    ).toBe(3);
+    expect(result.skippedRows).toEqual([
+      expect.objectContaining({
+        fileName: "red-binder.csv",
+        rowNumber: 3,
+        reason: "missing Name",
+      }),
+    ]);
+    expect(result.sourceFiles).toEqual([
+      { name: "red-binder.csv", parsedCards: 1, skippedRows: 1 },
+      { name: "blue-binder.csv", parsedCards: 2, skippedRows: 0 },
+    ]);
   });
 });

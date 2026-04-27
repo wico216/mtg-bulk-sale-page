@@ -10,6 +10,13 @@ import type { SkippedCard } from "@/lib/enrichment";
 /** Multipart field name the client uses when uploading the CSV. */
 export const IMPORT_FILE_FIELD = "file";
 
+/** Metadata for one uploaded CSV in a multi-file import preview. */
+export interface ImportSourceFile {
+  name: string;
+  parsedCards: number;
+  skippedRows: number;
+}
+
 // ---- NDJSON stream messages (preview endpoint) -----------------------------
 
 /** Emitted one or more times while enrichment progresses. */
@@ -67,6 +74,7 @@ export interface PreviewPayload {
         name?: SkippedRow["name"];
         setCode?: SkippedRow["setCode"];
         collectorNumber?: SkippedRow["collectorNumber"];
+        fileName?: SkippedRow["fileName"];
       }
     | {
         kind: "enrich";
@@ -76,6 +84,8 @@ export interface PreviewPayload {
         reason: SkippedCard["reason"];
       }
   >;
+  /** Per-file parse totals shown when the admin imports multiple CSV files. */
+  sourceFiles: ImportSourceFile[];
   /** Full enriched card list -- posted back to /commit verbatim. */
   cards: Card[];
 }

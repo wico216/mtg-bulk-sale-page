@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Card } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
-import { conditionToAbbr } from "@/lib/condition-map";
 import { EditableCell } from "./editable-cell";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { Toast } from "./toast";
@@ -77,6 +76,9 @@ export function InventoryTable() {
   const [toastVariant, setToastVariant] = useState<"success" | "error">("error");
   const [availableSets, setAvailableSets] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -101,6 +103,9 @@ export function InventoryTable() {
       setCards(data.cards);
       setTotal(data.total);
       setTotalPages(data.totalPages);
+      if (!debouncedSearch && !setFilter && !conditionFilter) {
+        setInventoryTotal(data.total);
+      }
     } catch {
       setError(true);
     } finally {
@@ -137,6 +142,7 @@ export function InventoryTable() {
           ),
         ].sort();
         setAvailableSets(sets);
+        setInventoryTotal(data.total);
       } catch {
         // Non-critical, filters just won't have set options
       }
@@ -177,13 +183,51 @@ export function InventoryTable() {
       method: "DELETE",
     });
     if (!res.ok) {
+      setToastVariant("error");
       setToastMessage("Failed to delete card. Try again.");
       setDeletingId(null);
       return;
     }
     setCards((prev) => prev.filter((c) => c.id !== cardId));
     setTotal((prev) => prev - 1);
+    setInventoryTotal((prev) => Math.max(0, prev - 1));
     setDeletingId(null);
+  }
+
+  async function handleDeleteAll() {
+    setDeletingAll(true);
+    try {
+      const res = await fetch("/api/admin/cards", { method: "DELETE" });
+      if (!res.ok) {
+        let message = "Failed to delete inventory. Try again.";
+        try {
+          const body = await res.json();
+          if (body?.error) message = body.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const body = (await res.json()) as { success: true; deleted: number };
+      setCards([]);
+      setTotal(0);
+      setTotalPages(0);
+      setInventoryTotal(0);
+      setAvailableSets([]);
+      setSearch("");
+      setSetFilter("");
+      setConditionFilter("");
+      setPage(1);
+      setConfirmingDeleteAll(false);
+      setToastVariant("success");
+      setToastMessage(
+        body.deleted === 1 ? "Deleted 1 card." : `Deleted ${body.deleted} cards.`,
+      );
+    } catch (err) {
+      setToastVariant("error");
+      setToastMessage(err instanceof Error ? err.message : "Failed to delete inventory. Try again.");
+    } finally {
+      setDeletingAll(false);
+    }
   }
 
   async function handleExport() {
@@ -199,6 +243,7 @@ export function InventoryTable() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
+      setToastVariant("error");
       setToastMessage("Failed to export CSV. Try again.");
     } finally {
       setExporting(false);
@@ -222,6 +267,51 @@ export function InventoryTable() {
     if (sortBy !== field) return "none";
     return sortDir === "asc" ? "ascending" : "descending";
   }
+
+  const deleteAllConfirmation = confirmingDeleteAll ? (
+    <div
+      role="alert"
+      className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold">Delete all {inventoryTotal} cards from inventory?</p>
+          <p className="mt-1 text-red-600 dark:text-red-400">
+            This empties the storefront until you import a new CSV. Export first if you need a backup.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmingDeleteAll(false)}
+            disabled={deletingAll}
+            className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteAll}
+            disabled={deletingAll}
+            className="rounded-md bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deletingAll ? "Deleting..." : `Delete ${inventoryTotal} cards`}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const toastElement = toastMessage ? (
+    <Toast
+      message={toastMessage}
+      variant={toastVariant}
+      onDismiss={() => {
+        setToastMessage(null);
+        setToastVariant("error");
+      }}
+    />
+  ) : null;
 
   // Loading skeleton
   if (loading && cards.length === 0) {
@@ -262,7 +352,11 @@ export function InventoryTable() {
             availableSets={availableSets}
             exporting={exporting}
             onExport={handleExport}
+            deletingAll={deletingAll}
+            deleteDisabled={inventoryTotal === 0}
+            onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
           />
+          {deleteAllConfirmation}
           <div className="text-center py-12">
             <h2 className="text-lg font-semibold">No cards found</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
@@ -279,6 +373,7 @@ export function InventoryTable() {
               Clear filters
             </button>
           </div>
+          {toastElement}
         </>
       );
     }
@@ -294,13 +389,18 @@ export function InventoryTable() {
           availableSets={availableSets}
           exporting={exporting}
           onExport={handleExport}
+          deletingAll={deletingAll}
+          deleteDisabled={inventoryTotal === 0}
+          onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
         />
+        {deleteAllConfirmation}
         <div className="text-center py-12">
           <h2 className="text-lg font-semibold">No cards in inventory</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
             Import a CSV file to add cards to your store.
           </p>
         </div>
+        {toastElement}
       </>
     );
   }
@@ -317,7 +417,11 @@ export function InventoryTable() {
         availableSets={availableSets}
         exporting={exporting}
         onExport={handleExport}
+        deletingAll={deletingAll}
+        deleteDisabled={inventoryTotal === 0}
+        onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
       />
+      {deleteAllConfirmation}
 
       <div className="w-full overflow-x-auto">
         <table className="w-full text-sm">
@@ -426,7 +530,7 @@ export function InventoryTable() {
                       field="price"
                       cardName={card.name}
                       onSave={handleSave}
-                      onError={(msg) => setToastMessage(msg)}
+                      onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
                     />
                   </td>
                   <td className="px-4 py-2">
@@ -436,7 +540,7 @@ export function InventoryTable() {
                       field="condition"
                       cardName={card.name}
                       onSave={handleSave}
-                      onError={(msg) => setToastMessage(msg)}
+                      onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
                     />
                   </td>
                   <td className="px-4 py-2">
@@ -447,7 +551,7 @@ export function InventoryTable() {
                         field="quantity"
                         cardName={card.name}
                         onSave={handleSave}
-                        onError={(msg) => setToastMessage(msg)}
+                        onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
                       />
                       {isLowStock && (
                         <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -482,16 +586,7 @@ export function InventoryTable() {
         />
       )}
 
-      {toastMessage && (
-        <Toast
-          message={toastMessage}
-          variant={toastVariant}
-          onDismiss={() => {
-            setToastMessage(null);
-            setToastVariant("error");
-          }}
-        />
-      )}
+      {toastElement}
     </>
   );
 }

@@ -64,12 +64,14 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 - [ ] **INV-04**: Admin can select multiple cards and delete them in bulk
 - [ ] **INV-05**: Admin can search cards by name and filter by set/condition in admin table
 - [ ] **INV-06**: Cards with quantity 1 are visually highlighted as low stock
+- [x] **INV-07**: Admin can delete the full inventory with explicit confirmation
 
 ### CSV Operations
 
 - [x] **CSV-01**: Admin can import a Manabox CSV to replace full inventory
 - [x] **CSV-02**: Import shows a preview (cards to add, rows skipped) before committing
 - [ ] **CSV-03**: Admin can export current inventory as CSV
+- [x] **CSV-04**: Admin can import multiple Manabox CSV files in one full-replace batch
 
 ### Orders
 
@@ -131,9 +133,11 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | INV-04 | Phase 12 | Pending |
 | INV-05 | Phase 9 | Pending |
 | INV-06 | Phase 9 | Pending |
+| INV-07 | Phase 10.1 | Complete |
 | CSV-01 | Phase 10 | Complete |
 | CSV-02 | Phase 10 | Complete |
 | CSV-03 | Phase 9 | Pending |
+| CSV-04 | Phase 10.1 | Complete |
 | ORD-01 | Phase 11 | Pending |
 | ORD-02 | Phase 11 | Pending |
 | ORD-03 | Phase 11 | Pending |
@@ -141,8 +145,8 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | DASH-02 | Phase 12 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 21 total
-- Mapped to phases: 21
+- v1.1 requirements: 23 total
+- Mapped to phases: 23
 - Unmapped: 0
 
 ---

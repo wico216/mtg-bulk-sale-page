@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
-import { parseManaboxCsvContent } from "@/lib/csv-parser";
+import { parseManaboxCsvContents } from "@/lib/csv-parser";
 import { enrichCards } from "@/lib/enrichment";
 import {
   IMPORT_FILE_FIELD,
@@ -27,16 +27,26 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "Invalid multipart body" }, { status: 400 });
   }
 
-  const file = formData.get(IMPORT_FILE_FIELD);
-  if (!(file instanceof File)) {
+  const rawFiles = formData.getAll(IMPORT_FILE_FIELD);
+  const files = rawFiles.filter((item): item is File => item instanceof File);
+  if (files.length === 0) {
     return Response.json({ error: "No file uploaded" }, { status: 400 });
   }
-  if (!file.name.toLowerCase().endsWith(".csv")) {
-    return Response.json({ error: "File must be .csv" }, { status: 400 });
+  if (files.length !== rawFiles.length) {
+    return Response.json({ error: "Uploaded fields must be files" }, { status: 400 });
+  }
+  const invalidFile = files.find((file) => !file.name.toLowerCase().endsWith(".csv"));
+  if (invalidFile) {
+    return Response.json({ error: "All uploaded files must be .csv" }, { status: 400 });
   }
 
-  const content = await file.text();
-  const parsed = parseManaboxCsvContent(content);
+  const uploaded = await Promise.all(
+    files.map(async (file) => ({
+      fileName: file.name,
+      content: await file.text(),
+    })),
+  );
+  const parsed = parseManaboxCsvContents(uploaded);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -73,6 +83,7 @@ export async function POST(request: Request): Promise<Response> {
               name: r.name,
               setCode: r.setCode,
               collectorNumber: r.collectorNumber,
+              fileName: r.fileName,
             })),
             ...scryfallMisses.map((m) => ({
               kind: "enrich" as const,
@@ -82,6 +93,7 @@ export async function POST(request: Request): Promise<Response> {
               reason: m.reason,
             })),
           ],
+          sourceFiles: parsed.sourceFiles ?? [],
           cards: enriched,
         };
 
