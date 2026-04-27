@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Card } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
@@ -60,6 +60,38 @@ function TrashIcon() {
   );
 }
 
+function SelectAllCheckbox({
+  checked,
+  indeterminate,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label="Select all cards on this page"
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+}
+
 export function InventoryTable() {
   const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
@@ -81,6 +113,9 @@ export function InventoryTable() {
   const [inventoryTotal, setInventoryTotal] = useState(0);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  const [confirmingDeleteSelected, setConfirmingDeleteSelected] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -157,10 +192,18 @@ export function InventoryTable() {
     fetchCards();
   }, [fetchCards]);
 
-  // Reset page to 1 when filters change
+  // Reset page and selection when filters change
   useEffect(() => {
     setPage(1);
+    setSelectedCardIds([]);
+    setConfirmingDeleteSelected(false);
   }, [debouncedSearch, setFilter, conditionFilter]);
+
+  // Clear selection when the visible page or sort order changes
+  useEffect(() => {
+    setSelectedCardIds([]);
+    setConfirmingDeleteSelected(false);
+  }, [page, sortBy, sortDir]);
 
   async function handleSave(
     cardId: string,
@@ -273,6 +316,120 @@ export function InventoryTable() {
     return sortDir === "asc" ? "ascending" : "descending";
   }
 
+  const selectedCardIdSet = new Set(selectedCardIds);
+  const currentPageCardIds = cards.map((card) => card.id);
+  const selectedCurrentPageCount = currentPageCardIds.filter((id) =>
+    selectedCardIdSet.has(id),
+  ).length;
+  const allCurrentPageSelected =
+    currentPageCardIds.length > 0 && selectedCurrentPageCount === currentPageCardIds.length;
+  const someCurrentPageSelected =
+    selectedCurrentPageCount > 0 && !allCurrentPageSelected;
+
+  function toggleCardSelection(cardId: string, checked: boolean) {
+    setConfirmingDeleteSelected(false);
+    setSelectedCardIds((prev) => {
+      if (checked) {
+        return prev.includes(cardId) ? prev : [...prev, cardId];
+      }
+      return prev.filter((id) => id !== cardId);
+    });
+  }
+
+  function toggleCurrentPageSelection(checked: boolean) {
+    setConfirmingDeleteSelected(false);
+    setSelectedCardIds((prev) => {
+      if (checked) {
+        return [...new Set([...prev, ...currentPageCardIds])];
+      }
+      const currentPageIds = new Set(currentPageCardIds);
+      return prev.filter((id) => !currentPageIds.has(id));
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedCardIds.length === 0) return;
+
+    setDeletingSelected(true);
+    try {
+      const res = await fetch("/api/admin/cards/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedCardIds }),
+      });
+      if (!res.ok) {
+        let message = "Failed to delete selected cards. Try again.";
+        try {
+          const body = await res.json();
+          if (body?.error) message = body.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const body = (await res.json()) as {
+        success: true;
+        deleted: number;
+        ids: string[];
+      };
+      const deletedIds = new Set(body.ids);
+      setCards((prev) => prev.filter((card) => !deletedIds.has(card.id)));
+      setTotal((prev) => Math.max(0, prev - body.deleted));
+      setInventoryTotal((prev) => Math.max(0, prev - body.deleted));
+      setSelectedCardIds([]);
+      setConfirmingDeleteSelected(false);
+      setToastVariant("success");
+      setToastMessage(
+        body.deleted === 1
+          ? "Deleted 1 selected card."
+          : `Deleted ${body.deleted} selected cards.`,
+      );
+      router.refresh();
+    } catch (err) {
+      setToastVariant("error");
+      setToastMessage(
+        err instanceof Error ? err.message : "Failed to delete selected cards. Try again.",
+      );
+    } finally {
+      setDeletingSelected(false);
+    }
+  }
+
+  const deleteSelectedConfirmation = confirmingDeleteSelected ? (
+    <div
+      role="alert"
+      className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold">
+            Delete {selectedCardIds.length} selected {selectedCardIds.length === 1 ? "card" : "cards"}?
+          </p>
+          <p className="mt-1 text-red-600 dark:text-red-400">
+            This removes only the selected rows. Export first if you need a backup.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmingDeleteSelected(false)}
+            disabled={deletingSelected}
+            className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteSelected}
+            disabled={deletingSelected}
+            className="rounded-md bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deletingSelected ? "Deleting selected..." : `Delete ${selectedCardIds.length} selected`}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const deleteAllConfirmation = confirmingDeleteAll ? (
     <div
       role="alert"
@@ -360,7 +517,11 @@ export function InventoryTable() {
             deletingAll={deletingAll}
             deleteDisabled={inventoryTotal === 0}
             onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
+            selectedCount={selectedCardIds.length}
+            deletingSelected={deletingSelected}
+            onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
           />
+          {deleteSelectedConfirmation}
           {deleteAllConfirmation}
           <div className="text-center py-12">
             <h2 className="text-lg font-semibold">No cards found</h2>
@@ -397,7 +558,11 @@ export function InventoryTable() {
           deletingAll={deletingAll}
           deleteDisabled={inventoryTotal === 0}
           onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
+          selectedCount={selectedCardIds.length}
+          deletingSelected={deletingSelected}
+          onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
         />
+        {deleteSelectedConfirmation}
         {deleteAllConfirmation}
         <div className="text-center py-12">
           <h2 className="text-lg font-semibold">No cards in inventory</h2>
@@ -425,13 +590,25 @@ export function InventoryTable() {
         deletingAll={deletingAll}
         deleteDisabled={inventoryTotal === 0}
         onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
+        selectedCount={selectedCardIds.length}
+        deletingSelected={deletingSelected}
+        onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
       />
+      {deleteSelectedConfirmation}
       {deleteAllConfirmation}
 
       <div className="w-full overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-zinc-50 dark:bg-zinc-800 text-left">
+              <th className="w-10 px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                <SelectAllCheckbox
+                  checked={allCurrentPageSelected}
+                  indeterminate={someCurrentPageSelected}
+                  disabled={cards.length === 0}
+                  onChange={toggleCurrentPageSelection}
+                />
+              </th>
               <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-12">
                 Img
               </th>
@@ -490,7 +667,7 @@ export function InventoryTable() {
                     key={card.id}
                     className="bg-red-50 dark:bg-red-950/20 border-b border-zinc-100 dark:border-zinc-800"
                   >
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <DeleteConfirmation
                         cardName={card.name}
                         onConfirm={() => handleDelete(card.id)}
@@ -510,6 +687,15 @@ export function InventoryTable() {
                     isLowStock ? "border-l-2 border-amber-500" : ""
                   }`}
                 >
+                  <td className="px-4 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${card.name}`}
+                      checked={selectedCardIdSet.has(card.id)}
+                      onChange={(event) => toggleCardSelection(card.id, event.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent"
+                    />
+                  </td>
                   <td className="px-4 py-2">
                     {card.imageUrl ? (
                       <img

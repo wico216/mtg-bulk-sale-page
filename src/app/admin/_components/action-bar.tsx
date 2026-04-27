@@ -14,6 +14,9 @@ interface ActionBarProps {
   deletingAll: boolean;
   deleteDisabled: boolean;
   onRequestDeleteAll: () => void;
+  selectedCount: number;
+  deletingSelected: boolean;
+  onRequestDeleteSelected: () => void;
 }
 
 export function ActionBar({
@@ -29,9 +32,14 @@ export function ActionBar({
   deletingAll,
   deleteDisabled,
   onRequestDeleteAll,
+  selectedCount,
+  deletingSelected,
+  onRequestDeleteSelected,
 }: ActionBarProps) {
+  const bulkDeleteDisabled = selectedCount === 0 || deletingSelected;
+
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-6">
+    <div className="mb-6 flex flex-wrap items-center gap-3">
       {/* Search input (D-09, D-11) */}
       <div className="relative">
         <input
@@ -40,7 +48,7 @@ export function ActionBar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           aria-label="Search cards by name"
-          className="w-64 rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-64 rounded-md border border-zinc-300 bg-transparent px-3 py-1.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:border-zinc-700"
         />
         {search && (
           <button
@@ -49,7 +57,7 @@ export function ActionBar({
             className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
           >
             <svg
-              className="w-4 h-4"
+              className="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -70,7 +78,7 @@ export function ActionBar({
       <select
         value={setFilter}
         onChange={(e) => onSetFilterChange(e.target.value)}
-        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        className="rounded-md border border-zinc-300 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:border-zinc-700"
       >
         <option value="">All sets</option>
         {availableSets.map((s) => (
@@ -84,7 +92,7 @@ export function ActionBar({
       <select
         value={conditionFilter}
         onChange={(e) => onConditionFilterChange(e.target.value)}
-        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        className="rounded-md border border-zinc-300 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:border-zinc-700"
       >
         <option value="">All conditions</option>
         <option value="near_mint">NM</option>
@@ -95,12 +103,27 @@ export function ActionBar({
       </select>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          {selectedCount} selected
+        </span>
+
+        <button
+          type="button"
+          onClick={onRequestDeleteSelected}
+          disabled={bulkDeleteDisabled}
+          className={`rounded-md border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20 ${
+            bulkDeleteDisabled ? "cursor-not-allowed opacity-50" : ""
+          }`}
+        >
+          {deletingSelected ? "Deleting selected..." : "Delete selected"}
+        </button>
+
         <button
           type="button"
           onClick={onRequestDeleteAll}
           disabled={deleteDisabled || deletingAll}
-          className={`px-4 py-1.5 text-sm font-semibold rounded-md border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors ${
-            deleteDisabled || deletingAll ? "opacity-50 cursor-not-allowed" : ""
+          className={`rounded-md border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20 ${
+            deleteDisabled || deletingAll ? "cursor-not-allowed opacity-50" : ""
           }`}
         >
           {deletingAll ? "Deleting..." : "Delete inventory"}
@@ -109,7 +132,7 @@ export function ActionBar({
         {/* D-02: Import CSV link (navigates — not a mutation — so it's a Link, not a button) */}
         <Link
           href="/admin/import"
-          className="px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+          className="rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
         >
           Import CSV
         </Link>
@@ -119,8 +142,8 @@ export function ActionBar({
           type="button"
           onClick={onExport}
           disabled={exporting}
-          className={`px-4 py-1.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors ${
-            exporting ? "opacity-70 cursor-not-allowed" : ""
+          className={`rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover ${
+            exporting ? "cursor-not-allowed opacity-70" : ""
           }`}
         >
           {exporting ? "Exporting..." : "Export CSV"}

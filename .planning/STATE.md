@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Admin Panel & Inventory Management
 status: executing
-stopped_at: Phase 12 planned locally; next action is execute 12-01 dashboard stats
-last_updated: "2026-04-26T23:35:00.000Z"
+stopped_at: Phase 12 complete locally; next action is review/commit/push sequencing after PR #2 decision
+last_updated: "2026-04-26T23:59:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 13
-  completed_plans: 11
-  percent: 63
+  completed_plans: 13
+  percent: 75
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 12 Plan 02 — bulk row selection and selected-card delete workflow
+**Current focus:** Phase 12 complete locally — await PR #2 / Phase 12 branch sequencing decision
 
 ## Current Position
 
-Phase: 12 (bulk-operations-dashboard) — PLANNED LOCALLY
-Plan: 0 of 2 — READY
-Status: Phase 12 context and two execution plans are drafted locally on stacked branch `phase-12-bulk-dashboard`; PR #2 remains open/green for Phase 11
+Phase: 12 (bulk-operations-dashboard) — COMPLETE LOCALLY
+Plan: 2 of 2 — DONE
+Status: Admin dashboard stats and bulk selected-row delete are implemented, verified, and cleaned up after disposable DB/browser proofs
 Last activity: 2026-04-26
 
-Progress: [██████░░░░] 63% phases (5 of 8 v1.1 phases shipped, Phase 12 planned locally)
+Progress: [███████░░░] 75% phases (6 of 8 v1.1 phases shipped locally; Phase 11 PR #2 still awaits merge)
 
 ## Performance Metrics
 
@@ -197,9 +197,18 @@ Completed admin inventory dashboard stats on `/admin`:
 - Added `router.refresh()` after existing successful inline edit, single delete, and delete-all inventory mutations so server-rendered dashboard stats refresh.
 - Verified with unit tests, full tests/build, browser proof with three disposable sentinel rows, and cleanup back to zero sentinel rows.
 
+### Phase 12 Plan 02 (2026-04-26)
+
+Completed selected-row bulk delete on `/admin`:
+
+- Added `deleteCardsByIds()` in `src/db/queries.ts` using one delete statement with `RETURNING`.
+- Added authenticated `POST /api/admin/cards/bulk-delete` with validation, request cap, and explicit unchanged-inventory failure copy.
+- Added row checkboxes, select-all-current-page, selected count, selected delete confirmation, and success/error toasts.
+- Verified with helper/route tests, full tests/build, browser proof with two selected sentinel rows plus one unselected keep row, and cleanup back to zero sentinel rows.
+
 ### Pending Todos
 
-- Execute Phase 12 Plan 02 bulk row selection and selected-card delete workflow.
+- Decide whether to merge Phase 11 PR #2 before pushing/opening Phase 12 cleanly.
 - Keep Phase 11 PR #2 open until separately merged.
 
 ### Blockers/Concerns
@@ -209,9 +218,6 @@ Completed admin inventory dashboard stats on `/admin`:
 
 ## Session Continuity
 
-Last session: 2026-04-26T23:50:00.000Z
-Stopped at: Phase 12 Plan 01 complete; next action is execute 12-02 bulk delete
-Resume file: .planning/phases/12-bulk-operations-dashboard/12-02-PLAN.md
-Y.md
-AN.md
-Y.md
+Last session: 2026-04-26T23:59:00.000Z
+Stopped at: Phase 12 complete locally; next action is decide PR #2 merge / Phase 12 branch sequencing
+Resume file: .planning/phases/12-bulk-operations-dashboard/12-02-SUMMARY.md

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, count, max, asc, desc, ilike, and, type SQL } from "drizzle-orm";
+import { eq, count, max, asc, desc, ilike, and, inArray, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { cards } from "@/db/schema";
 import { cardToRow } from "@/db/seed";
@@ -314,6 +314,26 @@ export async function deleteCard(id: string): Promise<boolean> {
     .where(eq(cards.id, id))
     .returning({ id: cards.id });
   return result.length > 0;
+}
+
+/** Delete selected cards by ID. Returns actual deleted row IDs. */
+export async function deleteCardsByIds(
+  ids: string[],
+): Promise<{ deleted: number; ids: string[] }> {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    return { deleted: 0, ids: [] };
+  }
+
+  const deletedRows = await db
+    .delete(cards)
+    .where(inArray(cards.id, uniqueIds))
+    .returning({ id: cards.id });
+
+  return {
+    deleted: deletedRows.length,
+    ids: deletedRows.map((row) => row.id),
+  };
 }
 
 /** Fetch all cards (unpaginated) for CSV export. Returns raw DB rows (not converted). */
