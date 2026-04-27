@@ -104,6 +104,134 @@ export interface AdminCardsResult {
   totalPages: number;
 }
 
+export interface AdminDashboardBreakdown {
+  quantity: number;
+  uniqueCards: number;
+  value: number;
+}
+
+export interface AdminDashboardStats {
+  inventory: {
+    uniqueCards: number;
+    totalQuantity: number;
+    totalValue: number;
+    lowStockCount: number;
+    missingPriceCount: number;
+  };
+  breakdowns: {
+    bySet: Array<AdminDashboardBreakdown & { setCode: string }>;
+    byColor: Array<AdminDashboardBreakdown & { color: string }>;
+    byRarity: Array<AdminDashboardBreakdown & { rarity: string }>;
+  };
+}
+
+interface DashboardBreakdownAccumulator {
+  quantity: number;
+  uniqueCards: number;
+  valueCents: number;
+}
+
+const COLOR_SORT_ORDER = ["W", "U", "B", "R", "G"];
+
+function toDollars(cents: number): number {
+  return cents / 100;
+}
+
+function normalizeColorIdentity(colorIdentity: string[]): string {
+  if (colorIdentity.length === 0) return "C";
+
+  return [...colorIdentity]
+    .sort((a, b) => {
+      const aIndex = COLOR_SORT_ORDER.indexOf(a);
+      const bIndex = COLOR_SORT_ORDER.indexOf(b);
+      const normalizedAIndex = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const normalizedBIndex = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+      return normalizedAIndex - normalizedBIndex || a.localeCompare(b);
+    })
+    .join("");
+}
+
+function addBreakdownEntry(
+  map: Map<string, DashboardBreakdownAccumulator>,
+  key: string,
+  quantity: number,
+  valueCents: number,
+) {
+  const current = map.get(key) ?? { quantity: 0, uniqueCards: 0, valueCents: 0 };
+  current.quantity += quantity;
+  current.uniqueCards += 1;
+  current.valueCents += valueCents;
+  map.set(key, current);
+}
+
+function mapBreakdown<TKey extends string>(
+  map: Map<string, DashboardBreakdownAccumulator>,
+  keyName: TKey,
+): Array<AdminDashboardBreakdown & Record<TKey, string>> {
+  return [...map.entries()]
+    .map(([key, value]) => ({
+      [keyName]: key,
+      quantity: value.quantity,
+      uniqueCards: value.uniqueCards,
+      value: toDollars(value.valueCents),
+    }) as AdminDashboardBreakdown & Record<TKey, string>)
+    .sort((a, b) => b.quantity - a.quantity || a[keyName].localeCompare(b[keyName]));
+}
+
+export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
+  const rows = await db
+    .select({
+      id: cards.id,
+      setCode: cards.setCode,
+      price: cards.price,
+      quantity: cards.quantity,
+      colorIdentity: cards.colorIdentity,
+      rarity: cards.rarity,
+    })
+    .from(cards);
+
+  const bySet = new Map<string, DashboardBreakdownAccumulator>();
+  const byColor = new Map<string, DashboardBreakdownAccumulator>();
+  const byRarity = new Map<string, DashboardBreakdownAccumulator>();
+
+  let totalQuantity = 0;
+  let totalValueCents = 0;
+  let lowStockCount = 0;
+  let missingPriceCount = 0;
+
+  for (const row of rows) {
+    const valueCents = (row.price ?? 0) * row.quantity;
+    totalQuantity += row.quantity;
+    totalValueCents += valueCents;
+    if (row.quantity === 1) lowStockCount += 1;
+    if (row.price === null) missingPriceCount += 1;
+
+    addBreakdownEntry(bySet, row.setCode, row.quantity, valueCents);
+    addBreakdownEntry(
+      byColor,
+      normalizeColorIdentity(row.colorIdentity),
+      row.quantity,
+      valueCents,
+    );
+    addBreakdownEntry(byRarity, row.rarity, row.quantity, valueCents);
+  }
+
+  return {
+    inventory: {
+      uniqueCards: rows.length,
+      totalQuantity,
+      totalValue: toDollars(totalValueCents),
+      lowStockCount,
+      missingPriceCount,
+    },
+    breakdowns: {
+      bySet: mapBreakdown(bySet, "setCode"),
+      byColor: mapBreakdown(byColor, "color"),
+      byRarity: mapBreakdown(byRarity, "rarity"),
+    },
+  };
+}
+
 /** Fetch paginated, filtered, sorted cards for admin table */
 export async function getAdminCards(
   params: AdminCardsParams = {},

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { Card } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
 import { EditableCell } from "./editable-cell";
@@ -60,6 +61,7 @@ function TrashIcon() {
 }
 
 export function InventoryTable() {
+  const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -174,6 +176,7 @@ export function InventoryTable() {
     const data = await res.json();
     if (data.card) {
       setCards((prev) => prev.map((c) => (c.id === cardId ? data.card : c)));
+      router.refresh();
     }
     return true;
   }
@@ -192,6 +195,7 @@ export function InventoryTable() {
     setTotal((prev) => prev - 1);
     setInventoryTotal((prev) => Math.max(0, prev - 1));
     setDeletingId(null);
+    router.refresh();
   }
 
   async function handleDeleteAll() {
@@ -222,6 +226,7 @@ export function InventoryTable() {
       setToastMessage(
         body.deleted === 1 ? "Deleted 1 card." : `Deleted ${body.deleted} cards.`,
       );
+      router.refresh();
     } catch (err) {
       setToastVariant("error");
       setToastMessage(err instanceof Error ? err.message : "Failed to delete inventory. Try again.");

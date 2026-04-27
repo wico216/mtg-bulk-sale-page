@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Friends can easily find and order cards from your bulk collection without friction
-**Current focus:** Phase 12 Plan 01 — admin dashboard stats and inventory breakdowns
+**Current focus:** Phase 12 Plan 02 — bulk row selection and selected-card delete workflow
 
 ## Current Position
 
@@ -188,10 +188,18 @@ Key planning decisions:
 - Select-all means current visible page only, not all matching rows across pages.
 - Bulk delete gets a dedicated route so it cannot be confused with existing full-inventory delete.
 
+### Phase 12 Plan 01 (2026-04-26)
+
+Completed admin inventory dashboard stats on `/admin`:
+
+- Added `getAdminDashboardStats()` in `src/db/queries.ts` with totals and breakdowns by set, color identity, and rarity.
+- Added `DashboardSummary` above the existing inventory table.
+- Added `router.refresh()` after existing successful inline edit, single delete, and delete-all inventory mutations so server-rendered dashboard stats refresh.
+- Verified with unit tests, full tests/build, browser proof with three disposable sentinel rows, and cleanup back to zero sentinel rows.
+
 ### Pending Todos
 
-- Review/commit Phase 12 planning docs.
-- Execute Phase 12 Plan 01 when ready.
+- Execute Phase 12 Plan 02 bulk row selection and selected-card delete workflow.
 - Keep Phase 11 PR #2 open until separately merged.
 
 ### Blockers/Concerns
@@ -201,9 +209,9 @@ Key planning decisions:
 
 ## Session Continuity
 
-Last session: 2026-04-26T23:35:00.000Z
-Stopped at: Phase 12 planned locally; next action is review/commit planning or execute 12-01
-Resume file: .planning/phases/12-bulk-operations-dashboard/12-01-PLAN.md
+Last session: 2026-04-26T23:50:00.000Z
+Stopped at: Phase 12 Plan 01 complete; next action is execute 12-02 bulk delete
+Resume file: .planning/phases/12-bulk-operations-dashboard/12-02-PLAN.md
 Y.md
 AN.md
 Y.md

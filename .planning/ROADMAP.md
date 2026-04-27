@@ -275,4 +275,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12
 | 10. CSV Import | v1.1 | 3/3 | Complete | 2026-04-20 |
 | 10.1. Multi-CSV Import & Delete Inventory | v1.1 | 1/1 | Complete | 2026-04-26 |
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
-| 12. Bulk Operations & Dashboard | v1.1 | 0/2 | Planned locally | - |
+| 12. Bulk Operations & Dashboard | v1.1 | 1/2 | In progress locally | - |
