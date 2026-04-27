@@ -15,6 +15,7 @@ const ORDER_STATUSES: readonly OrderStatus[] = [
   "pending",
   "confirmed",
   "completed",
+  "cancelled",
 ];
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -103,6 +104,7 @@ export default async function AdminOrdersPage({
               <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
 
             <button

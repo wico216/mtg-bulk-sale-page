@@ -5,11 +5,13 @@ const {
   mockGetAdminOrders,
   mockGetOrderById,
   mockUpdateOrderWorkflow,
+  mockCancelOrder,
 } = vi.hoisted(() => ({
   mockRequireAdmin: vi.fn(),
   mockGetAdminOrders: vi.fn(),
   mockGetOrderById: vi.fn(),
   mockUpdateOrderWorkflow: vi.fn(),
+  mockCancelOrder: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,10 +22,12 @@ vi.mock("@/db/orders", () => ({
   getAdminOrders: mockGetAdminOrders,
   getOrderById: mockGetOrderById,
   updateOrderWorkflow: mockUpdateOrderWorkflow,
+  cancelOrder: mockCancelOrder,
 }));
 
 import { GET as GET_LIST } from "../route";
 import { GET as GET_DETAIL, PATCH as PATCH_DETAIL } from "../[id]/route";
+import { POST as POST_CANCEL } from "../[id]/cancel/route";
 
 const adminSession = {
   user: { email: "admin@example.com", name: "Admin User" },
@@ -44,6 +48,19 @@ function makeDetailRequest(body?: unknown): Request {
       ? undefined
       : {
           method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+  );
+}
+
+function makeCancelRequest(body?: unknown): Request {
+  return new Request(
+    "http://localhost:3000/api/admin/orders/ORD-20260427-020304-ABC123/cancel",
+    body === undefined
+      ? { method: "POST" }
+      : {
+          method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(body),
         },
@@ -367,5 +384,125 @@ describe("PATCH /api/admin/orders/[id]", () => {
 
     expect(response.status).toBe(403);
     expect(mockUpdateOrderWorkflow).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/admin/orders/[id]/cancel", () => {
+  beforeEach(() => {
+    mockRequireAdmin.mockReset();
+    mockCancelOrder.mockReset();
+    mockRequireAdmin.mockResolvedValue(adminSession);
+  });
+
+  it("cancels an order with explicit inventory restore", async () => {
+    const result = {
+      ok: true,
+      alreadyCancelled: false,
+      restoredQuantity: 3,
+      restoredRows: 1,
+      skippedItems: [],
+      order: {
+        orderRef: "ORD-20260427-020304-ABC123",
+        buyerName: "Viki",
+        buyerEmail: "viki@example.com",
+        totalItems: 3,
+        totalPrice: 4.25,
+        status: "cancelled",
+        createdAt: "2026-04-27T02:03:04.000Z",
+        items: [],
+      },
+    };
+    mockCancelOrder.mockResolvedValue(result);
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: true }),
+      makeDetailContext(result.order.orderRef),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, result });
+    expect(mockCancelOrder).toHaveBeenCalledWith({
+      orderId: result.order.orderRef,
+      restoreInventory: true,
+    });
+  });
+
+  it("returns 409 when the helper rejects a completed order", async () => {
+    mockCancelOrder.mockResolvedValue({
+      ok: false,
+      code: "completed_order",
+      message: "Completed orders cannot be cancelled",
+    });
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("completed-order"),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Completed orders cannot be cancelled",
+      code: "completed_order",
+    });
+  });
+
+  it("returns 404 when the order does not exist", async () => {
+    mockCancelOrder.mockResolvedValue({
+      ok: false,
+      code: "not_found",
+      message: "Order not found",
+    });
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("missing-order"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: "Order not found",
+      code: "not_found",
+    });
+  });
+
+  it("requires restoreInventory to be a boolean", async () => {
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: "yes" }),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "restoreInventory must be a boolean",
+    });
+    expect(mockCancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid JSON bodies", async () => {
+    const response = await POST_CANCEL(
+      new Request("http://localhost:3000/api/admin/orders/order-1/cancel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{",
+      }),
+      makeDetailContext("order-1"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid JSON body" });
+  });
+
+  it("returns 401 when requireAdmin returns a 401 Response", async () => {
+    mockRequireAdmin.mockResolvedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("order-1"),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockCancelOrder).not.toHaveBeenCalled();
   });
 });

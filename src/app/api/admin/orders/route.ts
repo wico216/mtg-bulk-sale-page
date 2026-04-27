@@ -1,7 +1,7 @@
 import { getAdminOrders } from "@/db/orders";
 import { requireAdmin } from "@/lib/auth/admin-check";
 
-const ORDER_STATUSES = ["pending", "confirmed", "completed"] as const;
+const ORDER_STATUSES = ["pending", "confirmed", "completed", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 function parseIntegerParam(value: string | null, fallback: number): number {

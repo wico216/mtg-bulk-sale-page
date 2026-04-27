@@ -93,7 +93,12 @@ describe("orderItems table schema", () => {
 });
 
 describe("orderStatusEnum", () => {
-  it("has pending, confirmed, completed values (D-05)", () => {
-    expect(orderStatusEnum.enumValues).toEqual(["pending", "confirmed", "completed"]);
+  it("has pending, confirmed, completed, cancelled values (D-05)", () => {
+    expect(orderStatusEnum.enumValues).toEqual([
+      "pending",
+      "confirmed",
+      "completed",
+      "cancelled",
+    ]);
   });
 });

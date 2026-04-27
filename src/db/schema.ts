@@ -14,6 +14,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "confirmed",
   "completed",
+  "cancelled",
 ]);
 
 // Cards table

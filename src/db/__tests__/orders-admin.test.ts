@@ -13,7 +13,7 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
-import { getAdminOrders, getOrderById, updateOrderWorkflow } from "../orders";
+import { cancelOrder, getAdminOrders, getOrderById, updateOrderWorkflow } from "../orders";
 
 const orderRows = [
   {
@@ -193,36 +193,182 @@ describe("getOrderById", () => {
   });
 });
 
-describe("updateOrderWorkflow", () => {
+describe("cancelOrder", () => {
   beforeEach(() => {
     mockExecute.mockReset();
   });
 
-  it("updates provided status and admin note fields, then returns order detail", async () => {
+  it("cancels an order without restoring inventory", async () => {
     mockExecute
-      .mockResolvedValueOnce({ rows: [{ id: detailOrderRow.id }] })
       .mockResolvedValueOnce({
-        rows: [{ ...detailOrderRow, status: "confirmed", adminNote: "Ready for pickup." }],
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: false,
+              restoredQuantity: 0,
+              restoredRows: 0,
+              skippedItems: [],
+            },
+          },
+        ],
       })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
       .mockResolvedValueOnce({ rows: detailItemRows });
 
-    const result = await updateOrderWorkflow({
+    const result = await cancelOrder({
       orderId: detailOrderRow.id,
-      status: "confirmed",
-      adminNote: "Ready for pickup.",
+      restoreInventory: false,
     });
 
-    expect(result?.status).toBe("confirmed");
-    expect(result?.adminNote).toBe("Ready for pickup.");
+    expect(result).toMatchObject({
+      ok: true,
+      alreadyCancelled: false,
+      restoredQuantity: 0,
+      restoredRows: 0,
+      skippedItems: [],
+      order: { orderRef: detailOrderRow.id, status: "cancelled" },
+    });
     expect(mockExecute).toHaveBeenCalledTimes(3);
   });
 
-  it("returns null when no order is updated", async () => {
-    mockExecute.mockResolvedValueOnce({ rows: [] });
+  it("restores existing inventory rows and reports skipped missing rows", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: false,
+              restoredQuantity: 3,
+              restoredRows: 1,
+              skippedItems: [
+                {
+                  cardId: "missing-card",
+                  name: "Missing Snapshot",
+                  quantity: 2,
+                },
+              ],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
 
-    await expect(
-      updateOrderWorkflow({ orderId: "missing", status: "confirmed" }),
-    ).resolves.toBeNull();
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      restoredQuantity: 3,
+      restoredRows: 1,
+      skippedItems: [
+        { cardId: "missing-card", name: "Missing Snapshot", quantity: 2 },
+      ],
+    });
+  });
+
+  it("rejects completed orders without returning order detail", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        {
+          result: {
+            found: true,
+            completed: true,
+            alreadyCancelled: false,
+            restoredQuantity: 0,
+            restoredRows: 0,
+            skippedItems: [],
+          },
+        },
+      ],
+    });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "completed_order",
+      message: "Completed orders cannot be cancelled",
+    });
     expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns not_found when the order does not exist", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        {
+          result: {
+            found: false,
+            completed: false,
+            alreadyCancelled: false,
+            restoredQuantity: 0,
+            restoredRows: 0,
+            skippedItems: [],
+          },
+        },
+      ],
+    });
+
+    const result = await cancelOrder({
+      orderId: "missing-order",
+      restoreInventory: false,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "not_found",
+      message: "Order not found",
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats already-cancelled orders as idempotent and does not restore twice", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: true,
+              restoredQuantity: 0,
+              restoredRows: 0,
+              skippedItems: [],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      alreadyCancelled: true,
+      restoredQuantity: 0,
+      restoredRows: 0,
+      order: { status: "cancelled" },
+    });
+  });
+
+  it("guards restore work behind the first successful cancellation update", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
+
+    expect(source).toContain("FOR UPDATE");
+    expect(source).toContain("status IN ('pending'::order_status, 'confirmed'::order_status)");
+    expect(source).toContain("EXISTS (SELECT 1 FROM updated_order)");
   });
 });
