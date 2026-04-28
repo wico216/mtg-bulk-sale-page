@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   if (ids instanceof Response) return ids;
 
   try {
-    const deleted = await deleteCardsByIds(ids);
+    const deleted = await deleteCardsByIds(ids, { actorEmail: result.user.email });
     return Response.json({ success: true, ...deleted });
   } catch (err) {
     console.error("[ADMIN CARDS] bulk-delete failed:", err);

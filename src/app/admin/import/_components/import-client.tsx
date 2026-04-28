@@ -154,7 +154,16 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
       res = await fetch("/api/admin/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cards: payload.cards }),
+        body: JSON.stringify({
+          cards: payload.cards,
+          summary: {
+            sourceFiles: payload.sourceFiles,
+            toImport: payload.toImport,
+            parseSkipped: payload.parseSkipped,
+            scryfallSkipped: payload.scryfallSkipped,
+            missingPrices: payload.missingPrices,
+          },
+        }),
       });
     } catch (err) {
       setStage({

@@ -92,9 +92,18 @@ export interface PreviewPayload {
 
 // ---- Commit endpoint --------------------------------------------------------
 
+export interface CommitSummary {
+  sourceFiles?: ImportSourceFile[];
+  toImport?: number;
+  parseSkipped?: number;
+  scryfallSkipped?: number;
+  missingPrices?: number;
+}
+
 /** Shape of POST body accepted by /api/admin/import/commit. */
 export interface CommitRequest {
   cards: Card[];
+  summary?: CommitSummary;
 }
 
 /** Success response returned by /api/admin/import/commit. */

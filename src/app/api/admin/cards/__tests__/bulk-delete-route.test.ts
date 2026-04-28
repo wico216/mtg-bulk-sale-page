@@ -66,7 +66,7 @@ describe("POST /api/admin/cards/bulk-delete", () => {
     expect(mockDeleteCardsByIds).toHaveBeenCalledWith([
       "lea-232-normal-near_mint",
       "mh2-45-normal-lightly_played",
-    ]);
+    ], { actorEmail: "admin@example.com" });
     expect(mockDeleteAllCards).not.toHaveBeenCalled();
   });
 
@@ -84,7 +84,7 @@ describe("POST /api/admin/cards/bulk-delete", () => {
 
     expect(mockDeleteCardsByIds).toHaveBeenCalledWith([
       "lea-232-normal-near_mint",
-    ]);
+    ], { actorEmail: "admin@example.com" });
   });
 
   it.each([

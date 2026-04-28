@@ -44,7 +44,7 @@ export async function DELETE() {
   if (result instanceof Response) return result;
 
   try {
-    const { deleted } = await deleteAllCards();
+    const { deleted } = await deleteAllCards({ actorEmail: result.user.email });
     return Response.json({ success: true, deleted });
   } catch (err) {
     console.error("[ADMIN CARDS] delete-all failed:", err);

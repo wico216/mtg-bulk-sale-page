@@ -91,15 +91,38 @@ describe("POST /api/admin/import/commit", () => {
     expect(await res.json()).toEqual({ error: "Missing cards array" });
   });
 
-  it("returns 200 and calls replaceAllCards exactly once with body.cards", async () => {
+  it("returns 200 and calls replaceAllCards with audit-safe import metadata", async () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
     const cards = [sampleCard("a"), sampleCard("b"), sampleCard("c")];
     replaceAllCardsMock.mockResolvedValueOnce({ inserted: 3 });
-    const res = await POST(makeJsonRequest({ cards }));
+    const res = await POST(makeJsonRequest({
+      cards,
+      summary: {
+        sourceFiles: [
+          { name: "binder-a.csv", parsedCards: 2, skippedRows: 1 },
+          { name: "binder-b.csv", parsedCards: 1, skippedRows: 0 },
+        ],
+        parseSkipped: 1,
+        scryfallSkipped: 2,
+        missingPrices: 1,
+      },
+    }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, inserted: 3 });
     expect(replaceAllCardsMock).toHaveBeenCalledTimes(1);
-    expect(replaceAllCardsMock).toHaveBeenCalledWith(cards);
+    expect(replaceAllCardsMock).toHaveBeenCalledWith(cards, {
+      actorEmail: "admin@example.com",
+      metadata: {
+        fileNames: ["binder-a.csv", "binder-b.csv"],
+        fileCount: 2,
+        parsedRows: 3,
+        skippedRows: 3,
+        parseSkipped: 1,
+        scryfallSkipped: 2,
+        missingPrices: 1,
+        insertedCards: 3,
+      },
+    });
   });
 
   it("returns 500 when replaceAllCards rejects", async () => {

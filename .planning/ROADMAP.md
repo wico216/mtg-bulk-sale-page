@@ -297,7 +297,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md -- Audit schema/helper and mutation coverage
+- [x] 14-01-PLAN.md -- Audit schema/helper and mutation coverage
 - [ ] 14-02-PLAN.md -- Import history and admin audit/history page
 
 **UI hint**: yes
@@ -341,5 +341,5 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12 -> 1
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
 | 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-27 |
 | 13. Admin Order Workflow | v1.2 | 2/2 | Complete | 2026-04-27 |
-| 14. Inventory Audit Trail | v1.2 | 0/2 | Planned | - |
+| 14. Inventory Audit Trail | v1.2 | 1/2 | In progress | - |
 | 15. Production Hardening | v1.2 | 0/2 | Planned | - |

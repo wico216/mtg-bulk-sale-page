@@ -5,6 +5,7 @@ import {
   text,
   integer,
   boolean,
+  jsonb,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -55,6 +56,30 @@ export const cards = pgTable(
     // D-08: Indexes for search performance
     index("cards_name_idx").on(table.name),
     index("cards_set_code_idx").on(table.setCode),
+  ],
+);
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    action: text("action").notNull(),
+    actorEmail: text("actor_email"),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id"),
+    targetCount: integer("target_count"),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("admin_audit_log_created_at_idx").on(table.createdAt),
+    index("admin_audit_log_action_idx").on(table.action),
+    index("admin_audit_log_target_type_idx").on(table.targetType),
   ],
 );
 

@@ -89,7 +89,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ### Audit & Import Safety
 
-- [ ] **AUD-01**: High-impact admin mutations create durable audit log entries
+- [x] **AUD-01**: High-impact admin mutations create durable audit log entries
 - [ ] **AUD-02**: Import commits create durable import history with safe file and row-count metadata
 - [ ] **AUD-03**: Admin can view audit and import history from the admin panel
 - [ ] **AUD-04**: Destructive inventory actions preserve clear backup/export guidance and leave an explainable history
@@ -164,7 +164,7 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | ORD-06 | Phase 13 | Complete |
 | DASH-01 | Phase 12 | Complete |
 | DASH-02 | Phase 12 | Complete |
-| AUD-01 | Phase 14 | Planned |
+| AUD-01 | Phase 14 | Complete |
 | AUD-02 | Phase 14 | Planned |
 | AUD-03 | Phase 14 | Planned |
 | AUD-04 | Phase 14 | Planned |
