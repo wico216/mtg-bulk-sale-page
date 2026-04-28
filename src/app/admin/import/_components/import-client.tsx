@@ -154,7 +154,16 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
       res = await fetch("/api/admin/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cards: payload.cards }),
+        body: JSON.stringify({
+          cards: payload.cards,
+          summary: {
+            sourceFiles: payload.sourceFiles,
+            toImport: payload.toImport,
+            parseSkipped: payload.parseSkipped,
+            scryfallSkipped: payload.scryfallSkipped,
+            missingPrices: payload.missingPrices,
+          },
+        }),
       });
     } catch (err) {
       setStage({
@@ -275,6 +284,13 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
         )}
 
         <PreviewPanel preview={payload} currentTotal={currentTotal} />
+
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+          <p className="font-semibold">Backup reminder</p>
+          <p className="mt-1">
+            This replaces the full inventory. Export the current CSV first if you need a rollback reference; successful imports are recorded in Audit.
+          </p>
+        </div>
 
         <div className="flex items-center justify-end gap-3 mt-6">
           <button

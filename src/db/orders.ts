@@ -2,6 +2,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { createAdminAuditEntry, type AdminMutationAuditContext } from "@/db/queries";
 import type { OrderData, OrderItem } from "@/lib/types";
 
 export interface CheckoutLineInput {
@@ -184,11 +185,13 @@ export interface UpdateOrderWorkflowInput {
   orderId: string;
   status?: OrderWorkflowStatus;
   adminNote?: string | null;
+  audit?: AdminMutationAuditContext;
 }
 
 export interface CancelOrderInput {
   orderId: string;
   restoreInventory: boolean;
+  audit?: AdminMutationAuditContext;
 }
 
 export interface CancelSkippedItem {
@@ -649,6 +652,25 @@ export async function updateOrderWorkflow(
 
   if (!result.rows[0]) return null;
 
+  if (input.audit) {
+    await createAdminAuditEntry({
+      action: "order.status_update",
+      actorEmail: input.audit.actorEmail ?? null,
+      targetType: "order",
+      targetId: input.orderId,
+      targetCount: 1,
+      metadata: {
+        ...(input.audit.metadata ?? {}),
+        changedFields: [
+          ...(input.status !== undefined ? ["status"] : []),
+          ...("adminNote" in input ? ["adminNote"] : []),
+        ],
+        status: input.status,
+        adminNoteChanged: "adminNote" in input,
+      },
+    });
+  }
+
   return getOrderById(input.orderId);
 }
 
@@ -746,6 +768,39 @@ export async function cancelOrder(
   const order = await getOrderById(input.orderId);
   if (!order) {
     return { ok: false, code: "not_found", message: "Order not found" };
+  }
+
+  if (input.audit && !payload.alreadyCancelled) {
+    await createAdminAuditEntry({
+      action: "order.cancel",
+      actorEmail: input.audit.actorEmail ?? null,
+      targetType: "order",
+      targetId: input.orderId,
+      targetCount: 1,
+      metadata: {
+        ...(input.audit.metadata ?? {}),
+        restoreRequested: input.restoreInventory,
+        restoredQuantity: payload.restoredQuantity,
+        restoredRows: payload.restoredRows,
+        skippedItems: payload.skippedItems,
+      },
+    });
+
+    if (input.restoreInventory) {
+      await createAdminAuditEntry({
+        action: "order.restore_inventory",
+        actorEmail: input.audit.actorEmail ?? null,
+        targetType: "order",
+        targetId: input.orderId,
+        targetCount: payload.restoredRows,
+        metadata: {
+          ...(input.audit.metadata ?? {}),
+          restoredQuantity: payload.restoredQuantity,
+          restoredRows: payload.restoredRows,
+          skippedItems: payload.skippedItems,
+        },
+      });
+    }
   }
 
   return {

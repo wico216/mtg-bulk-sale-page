@@ -281,6 +281,7 @@ describe("PATCH /api/admin/orders/[id]", () => {
       orderId: order.orderRef,
       status: "confirmed",
       adminNote: "Ready for pickup.",
+      audit: { actorEmail: "admin@example.com" },
     });
   });
 
@@ -306,6 +307,7 @@ describe("PATCH /api/admin/orders/[id]", () => {
     expect(mockUpdateOrderWorkflow).toHaveBeenCalledWith({
       orderId: "ORD-20260427-020304-ABC123",
       adminNote: null,
+      audit: { actorEmail: "admin@example.com" },
     });
   });
 
@@ -424,6 +426,7 @@ describe("POST /api/admin/orders/[id]/cancel", () => {
     expect(mockCancelOrder).toHaveBeenCalledWith({
       orderId: result.order.orderRef,
       restoreInventory: true,
+      audit: { actorEmail: "admin@example.com" },
     });
   });
 

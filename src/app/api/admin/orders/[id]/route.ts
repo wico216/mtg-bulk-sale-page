@@ -86,7 +86,10 @@ export async function PATCH(
     return Response.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const order = await updateOrderWorkflow(updates);
+  const order = await updateOrderWorkflow({
+    ...updates,
+    audit: { actorEmail: result.user.email },
+  });
   if (!order) {
     return Response.json({ error: "Order not found" }, { status: 404 });
   }

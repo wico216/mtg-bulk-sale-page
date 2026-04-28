@@ -89,10 +89,10 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ### Audit & Import Safety
 
-- [ ] **AUD-01**: High-impact admin mutations create durable audit log entries
-- [ ] **AUD-02**: Import commits create durable import history with safe file and row-count metadata
-- [ ] **AUD-03**: Admin can view audit and import history from the admin panel
-- [ ] **AUD-04**: Destructive inventory actions preserve clear backup/export guidance and leave an explainable history
+- [x] **AUD-01**: High-impact admin mutations create durable audit log entries
+- [x] **AUD-02**: Import commits create durable import history with safe file and row-count metadata
+- [x] **AUD-03**: Admin can view audit and import history from the admin panel
+- [x] **AUD-04**: Destructive inventory actions preserve clear backup/export guidance and leave an explainable history
 
 ### Operations & Hardening
 
@@ -164,10 +164,10 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 | ORD-06 | Phase 13 | Complete |
 | DASH-01 | Phase 12 | Complete |
 | DASH-02 | Phase 12 | Complete |
-| AUD-01 | Phase 14 | Planned |
-| AUD-02 | Phase 14 | Planned |
-| AUD-03 | Phase 14 | Planned |
-| AUD-04 | Phase 14 | Planned |
+| AUD-01 | Phase 14 | Complete |
+| AUD-02 | Phase 14 | Complete |
+| AUD-03 | Phase 14 | Complete |
+| AUD-04 | Phase 14 | Complete |
 | OPS-01 | Phase 15 | Planned |
 | OPS-02 | Phase 15 | Planned |
 | OPS-03 | Phase 15 | Planned |
@@ -181,4 +181,4 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ---
 *Requirements defined: 2026-04-02 (v1.0)*
-*Last updated: 2026-04-11 after v1.1 roadmap creation*
+*Last updated: 2026-04-28 after Phase 14 local completion*

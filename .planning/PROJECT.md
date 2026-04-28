@@ -8,19 +8,17 @@ A simple online store for selling Magic: The Gathering bulk cards to friends. Fr
 
 Friends can easily find and order cards from your bulk collection without friction — browse, pick, checkout, done.
 
-## Current Milestone: v1.1 Admin Panel & Inventory Management
+## Current Milestone: v1.2 Store Operations & Hardening
 
-**Goal:** Replace the static CSV rebuild workflow with a live admin panel for managing inventory, backed by a real database.
+**Goal:** Help the seller operate the live store after checkout, preserve a clear history of high-impact changes, and harden production before wider sharing.
 
 **Target features:**
-- Admin panel protected by Google OAuth
-- Vercel Postgres database (migrate from static JSON)
-- Auto-decrement stock on checkout
-- Manually remove/edit cards (price, condition, quantity)
-- CSV import (full replace) and CSV export
-- Bulk select & delete cards
-- Order history
-- Inventory stats dashboard
+- Admin order workflow with status updates, search/filter, notes, and cancellation
+- Audit log for high-impact admin mutations
+- Import history for full-replace CSV commits
+- Admin-visible audit/history page
+- Production-compatible rate limits and operational logs
+- Health checks, repeatable production smoke, runbook docs, and security review
 
 ## Requirements
 
@@ -40,19 +38,15 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Admin can view order history and order details — Validated in Phase 11 Plan 02 browser proof
 - [x] Admin can import one or more Manabox CSV files as a full inventory replacement — Validated locally in Phase 10/10.1
 - [x] Admin can delete the full inventory with explicit confirmation — Validated locally in Phase 10.1
+- [x] Admin can update order status, private notes, and cancellation state — Validated in Phase 13
+- [x] High-impact admin mutations create durable audit log entries — Validated locally in Phase 14
+- [x] Import commits create durable import history — Validated locally in Phase 14
+- [x] Admin can view audit and import history from `/admin/audit` — Validated locally in Phase 14
 
 ### Active
 
 - [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
-- [ ] Vercel Postgres database for live inventory
-- [x] Auto-decrement stock on checkout — Validated in Phase 11 Plan 01
-- [ ] Edit individual card details (price, condition, quantity)
-- [ ] Remove cards from inventory manually
-- [x] CSV import (full replace) into database — Validated locally in Phase 10/10.1
-- [ ] CSV export of current inventory
-- [ ] Bulk select and delete cards
-- [ ] Order history dashboard
-- [ ] Inventory stats (total cards, value, breakdowns)
+- [ ] Production hardening: rate limits, structured logs, health checks, repeatable smoke, runbook, and security review
 
 ### Out of Scope
 
@@ -70,7 +64,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 - No payment gateway needed — all transactions settled in person
 - Public storefront (no password) — admin panel is Google OAuth protected
 - v1.0 shipped: browse, search, filter, cart, email checkout — all static/build-time
-- v1.1 shifts from static JSON to Vercel Postgres for live inventory management
+- v1.1 shipped: live database-backed storefront/admin inventory, multi-CSV import, bulk operations, dashboard, transactional checkout, and admin order history
+- v1.2 in progress: order workflow and audit trail are complete locally; production hardening remains
 
 ## Constraints
 
@@ -95,6 +90,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 | CSV import replaces inventory | Simple mental model — Manabox export is source of truth | ✓ Good |
 | Multi-CSV import still full-replaces inventory | Multiple Manabox exports are merged into one preview batch before replacing DB rows; no incremental merge semantics | ✓ Good |
 | Checkout database commit is source of truth | Phase 11 treats the atomic stock decrement + order insert as the placed order; notification emails are post-commit side effects so email failure does not erase persisted inventory/order state | ✓ Good |
+| Audit metadata is safe and bounded | Phase 14 records operational context without secrets, raw CSV bodies, or unbounded payloads | ✓ Good |
+| Import history is first-class | Full-replace CSV commits create dedicated import-history rows in addition to audit entries | ✓ Good |
 
 ## Evolution
 
@@ -114,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 after Phase 10.1 local completion and admin credentials fallback*
+*Last updated: 2026-04-28 after Phase 14 local completion*

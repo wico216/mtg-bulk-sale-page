@@ -157,7 +157,7 @@ describe("DELETE /api/admin/cards", () => {
     const data = await response.json();
 
     expect(data).toEqual({ success: true, deleted: 42 });
-    expect(mockDeleteAllCards).toHaveBeenCalledTimes(1);
+    expect(mockDeleteAllCards).toHaveBeenCalledWith({ actorEmail: "admin@example.com" });
   });
 
   it("returns 401 when requireAdmin returns 401 Response", async () => {
@@ -202,7 +202,7 @@ describe("PATCH /api/admin/cards/[id]", () => {
 
     expect(data.success).toBe(true);
     expect(data.card).toEqual(updatedCard);
-    expect(mockUpdateCard).toHaveBeenCalledWith("card-1", { price: 5.99 });
+    expect(mockUpdateCard).toHaveBeenCalledWith("card-1", { price: 5.99 }, { actorEmail: "admin@example.com" });
   });
 
   it("updates quantity to 0", async () => {
@@ -213,7 +213,7 @@ describe("PATCH /api/admin/cards/[id]", () => {
     const data = await response.json();
 
     expect(data.success).toBe(true);
-    expect(mockUpdateCard).toHaveBeenCalledWith("card-1", { quantity: 0 });
+    expect(mockUpdateCard).toHaveBeenCalledWith("card-1", { quantity: 0 }, { actorEmail: "admin@example.com" });
   });
 
   it('converts condition abbreviation NM to near_mint', async () => {
@@ -226,7 +226,7 @@ describe("PATCH /api/admin/cards/[id]", () => {
     expect(data.success).toBe(true);
     expect(mockUpdateCard).toHaveBeenCalledWith("card-1", {
       condition: "near_mint",
-    });
+    }, { actorEmail: "admin@example.com" });
   });
 
   it("returns 400 for negative price", async () => {

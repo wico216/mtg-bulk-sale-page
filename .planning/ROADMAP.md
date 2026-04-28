@@ -126,7 +126,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Milestone Goal:** Help the seller operate the store after checkout, preserve a clear history of high-impact changes, and harden production before wider sharing.
 
 - [x] **Phase 13: Admin Order Workflow** - Status changes, private notes, order search/filter, and cancellation with optional inventory restore (completed 2026-04-27 on feature branch)
-- [ ] **Phase 14: Inventory Audit Trail** - Audit logs, import history, and admin-visible mutation history
+- [x] **Phase 14: Inventory Audit Trail** - Audit logs, import history, and admin-visible mutation history (completed locally 2026-04-28)
 - [ ] **Phase 15: Production Hardening** - Rate limits, structured logs, health checks, production smoke, docs, and security review
 
 ## Phase Details
@@ -297,8 +297,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md -- Audit schema/helper and mutation coverage
-- [ ] 14-02-PLAN.md -- Import history and admin audit/history page
+- [x] 14-01-PLAN.md -- Audit schema/helper and mutation coverage
+- [x] 14-02-PLAN.md -- Import history and admin audit/history page
 
 **UI hint**: yes
 
@@ -341,5 +341,5 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12 -> 1
 | 11. Checkout Upgrade & Order History | v1.1 | 2/2 | Complete | 2026-04-26 |
 | 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-27 |
 | 13. Admin Order Workflow | v1.2 | 2/2 | Complete | 2026-04-27 |
-| 14. Inventory Audit Trail | v1.2 | 0/2 | Planned | - |
+| 14. Inventory Audit Trail | v1.2 | 2/2 | Complete | 2026-04-28 |
 | 15. Production Hardening | v1.2 | 0/2 | Planned | - |

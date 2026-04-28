@@ -51,7 +51,7 @@ export async function PATCH(
     );
   }
 
-  const updated = await updateCard(id, updates);
+  const updated = await updateCard(id, updates, { actorEmail: result.user.email });
   if (!updated) {
     return Response.json({ error: "Card not found" }, { status: 404 });
   }
@@ -67,7 +67,7 @@ export async function DELETE(
   if (result instanceof Response) return result;
 
   const { id } = await params;
-  const deleted = await deleteCard(id);
+  const deleted = await deleteCard(id, { actorEmail: result.user.email });
 
   if (!deleted) {
     return Response.json({ error: "Card not found" }, { status: 404 });

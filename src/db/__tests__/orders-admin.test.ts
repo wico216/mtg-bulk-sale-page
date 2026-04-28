@@ -2,14 +2,23 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockExecute } = vi.hoisted(() => ({
-  mockExecute: vi.fn(),
-}));
+const { mockExecute, mockInsert, insertBuilder } = vi.hoisted(() => {
+  const insertBuilder = {
+    values: vi.fn().mockReturnThis(),
+    returning: vi.fn(),
+  };
+  return {
+    mockExecute: vi.fn(),
+    mockInsert: vi.fn(() => insertBuilder),
+    insertBuilder,
+  };
+});
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/db/client", () => ({
   db: {
     execute: mockExecute,
+    insert: mockInsert,
   },
 }));
 
@@ -74,6 +83,24 @@ const detailItemRows = [
     imageUrl: null,
   },
 ];
+
+function resetAuditMocks() {
+  mockInsert.mockClear();
+  insertBuilder.values.mockClear();
+  insertBuilder.returning.mockReset();
+  insertBuilder.returning.mockResolvedValue([
+    {
+      id: 99,
+      action: "order.status_update",
+      actorEmail: "admin@example.com",
+      targetType: "order",
+      targetId: detailOrderRow.id,
+      targetCount: 1,
+      metadata: {},
+      createdAt: "2026-04-28T06:00:00.000Z",
+    },
+  ]);
+}
 
 describe("getAdminOrders", () => {
   beforeEach(() => {
@@ -193,9 +220,70 @@ describe("getOrderById", () => {
   });
 });
 
+describe("updateOrderWorkflow", () => {
+  beforeEach(() => {
+    mockExecute.mockReset();
+    resetAuditMocks();
+  });
+
+  it("writes an order.status_update audit entry without storing internal note content", async () => {
+    mockExecute
+      .mockResolvedValueOnce({ rows: [{ id: detailOrderRow.id }] })
+      .mockResolvedValueOnce({
+        rows: [{ ...detailOrderRow, status: "confirmed", adminNote: "Private note" }],
+      })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await updateOrderWorkflow({
+      orderId: detailOrderRow.id,
+      status: "confirmed",
+      adminNote: "Private note",
+      audit: { actorEmail: "admin@example.com" },
+    });
+
+    expect(result?.status).toBe("confirmed");
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const stored = insertBuilder.values.mock.calls[0][0] as {
+      action: string;
+      actorEmail: string;
+      targetType: string;
+      targetId: string;
+      targetCount: number;
+      metadata: Record<string, unknown>;
+    };
+    expect(stored).toMatchObject({
+      action: "order.status_update",
+      actorEmail: "admin@example.com",
+      targetType: "order",
+      targetId: detailOrderRow.id,
+      targetCount: 1,
+    });
+    expect(stored.metadata).toMatchObject({
+      changedFields: ["status", "adminNote"],
+      status: "confirmed",
+      adminNoteChanged: true,
+    });
+    expect(JSON.stringify(stored.metadata)).not.toContain("Private note");
+  });
+
+  it("does not write an audit entry when the order is missing", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const result = await updateOrderWorkflow({
+      orderId: "missing-order",
+      status: "confirmed",
+      audit: { actorEmail: "admin@example.com" },
+    });
+
+    expect(result).toBeNull();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("cancelOrder", () => {
   beforeEach(() => {
     mockExecute.mockReset();
+    resetAuditMocks();
   });
 
   it("cancels an order without restoring inventory", async () => {
@@ -270,6 +358,67 @@ describe("cancelOrder", () => {
       skippedItems: [
         { cardId: "missing-card", name: "Missing Snapshot", quantity: 2 },
       ],
+    });
+  });
+
+  it("writes cancel and restore audit entries when cancellation restores inventory", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              found: true,
+              completed: false,
+              alreadyCancelled: false,
+              restoredQuantity: 3,
+              restoredRows: 1,
+              skippedItems: [
+                {
+                  cardId: "missing-card",
+                  name: "Missing Snapshot",
+                  quantity: 2,
+                },
+              ],
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...detailOrderRow, status: "cancelled" }] })
+      .mockResolvedValueOnce({ rows: detailItemRows });
+
+    const result = await cancelOrder({
+      orderId: detailOrderRow.id,
+      restoreInventory: true,
+      audit: { actorEmail: "admin@example.com" },
+    });
+
+    expect(result).toMatchObject({ ok: true, restoredQuantity: 3, restoredRows: 1 });
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+    const [cancelAudit, restoreAudit] = insertBuilder.values.mock.calls.map(
+      (call) => call[0] as { action: string; metadata: Record<string, unknown>; targetCount: number },
+    );
+    expect(cancelAudit).toMatchObject({
+      action: "order.cancel",
+      targetCount: 1,
+      metadata: {
+        restoreRequested: true,
+        restoredQuantity: 3,
+        restoredRows: 1,
+        skippedItems: [
+          { cardId: "missing-card", name: "Missing Snapshot", quantity: 2 },
+        ],
+      },
+    });
+    expect(restoreAudit).toMatchObject({
+      action: "order.restore_inventory",
+      targetCount: 1,
+      metadata: {
+        restoredQuantity: 3,
+        restoredRows: 1,
+        skippedItems: [
+          { cardId: "missing-card", name: "Missing Snapshot", quantity: 2 },
+        ],
+      },
     });
   });
 

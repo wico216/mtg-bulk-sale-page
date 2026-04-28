@@ -5,6 +5,7 @@ import {
   text,
   integer,
   boolean,
+  jsonb,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -55,6 +56,57 @@ export const cards = pgTable(
     // D-08: Indexes for search performance
     index("cards_name_idx").on(table.name),
     index("cards_set_code_idx").on(table.setCode),
+  ],
+);
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    action: text("action").notNull(),
+    actorEmail: text("actor_email"),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id"),
+    targetCount: integer("target_count"),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("admin_audit_log_created_at_idx").on(table.createdAt),
+    index("admin_audit_log_action_idx").on(table.action),
+    index("admin_audit_log_target_type_idx").on(table.targetType),
+  ],
+);
+
+export const importHistory = pgTable(
+  "import_history",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    actorEmail: text("actor_email"),
+    fileNames: text("file_names")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    fileCount: integer("file_count").notNull().default(0),
+    parsedRows: integer("parsed_rows").notNull().default(0),
+    skippedRows: integer("skipped_rows").notNull().default(0),
+    insertedCards: integer("inserted_cards").notNull().default(0),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    committedAt: timestamp("committed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("import_history_committed_at_idx").on(table.committedAt),
+    index("import_history_actor_email_idx").on(table.actorEmail),
   ],
 );
 

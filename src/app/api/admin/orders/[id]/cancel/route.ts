@@ -35,7 +35,11 @@ export async function POST(
   );
   if (restoreInventory instanceof Response) return restoreInventory;
 
-  const cancellation = await cancelOrder({ orderId: id, restoreInventory });
+  const cancellation = await cancelOrder({
+    orderId: id,
+    restoreInventory,
+    audit: { actorEmail: result.user.email },
+  });
 
   if (!cancellation.ok) {
     return Response.json(
