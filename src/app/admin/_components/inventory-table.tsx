@@ -405,7 +405,7 @@ export function InventoryTable() {
             Delete {selectedCardIds.length} selected {selectedCardIds.length === 1 ? "card" : "cards"}?
           </p>
           <p className="mt-1 text-red-600 dark:text-red-400">
-            This removes only the selected rows. Export first if you need a backup.
+            This removes only the selected rows. Export first if you need a backup; successful deletion is recorded in Audit.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -439,7 +439,7 @@ export function InventoryTable() {
         <div>
           <p className="font-semibold">Delete all {inventoryTotal} cards from inventory?</p>
           <p className="mt-1 text-red-600 dark:text-red-400">
-            This empties the storefront until you import a new CSV. Export first if you need a backup.
+            This empties the storefront until you import a new CSV. Export first if you need a backup; successful deletion is recorded in Audit.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

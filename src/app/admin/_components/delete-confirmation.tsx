@@ -25,9 +25,14 @@ export function DeleteConfirmation({
       aria-label={`Confirm deletion of ${cardName}`}
       className="flex items-center justify-between px-4 py-2"
     >
-      <span className="text-sm">
-        Delete {cardName}?
-      </span>
+      <div>
+        <span className="text-sm font-semibold">
+          Delete {cardName}?
+        </span>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Export first if you need a backup. A successful delete is recorded in Audit.
+        </p>
+      </div>
       <div className="flex items-center gap-2">
         <button
           onClick={handleDelete}

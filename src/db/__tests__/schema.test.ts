@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getTableColumns } from "drizzle-orm";
-import { cards, orders, orderItems, orderStatusEnum, adminAuditLog } from "../schema";
+import { cards, orders, orderItems, orderStatusEnum, adminAuditLog, importHistory } from "../schema";
 
 describe("cards table schema", () => {
   const columns = getTableColumns(cards);
@@ -113,6 +113,34 @@ describe("adminAuditLog table schema", () => {
   });
 
   it("stores metadata as non-null JSON", () => {
+    expect(columns.metadata.dataType).toBe("json");
+    expect(columns.metadata.notNull).toBe(true);
+  });
+});
+
+describe("importHistory table schema", () => {
+  const columns = getTableColumns(importHistory);
+
+  it("has durable import history fields", () => {
+    const requiredColumns = [
+      "id",
+      "actorEmail",
+      "fileNames",
+      "fileCount",
+      "parsedRows",
+      "skippedRows",
+      "insertedCards",
+      "metadata",
+      "committedAt",
+    ];
+    const colRecord = columns as Record<string, unknown>;
+    for (const col of requiredColumns) {
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
+    }
+  });
+
+  it("stores file names as an array and metadata as non-null JSON", () => {
+    expect(columns.fileNames.dataType).toBe("array");
     expect(columns.metadata.dataType).toBe("json");
     expect(columns.metadata.notNull).toBe(true);
   });

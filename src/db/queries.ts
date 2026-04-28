@@ -2,7 +2,7 @@ import "server-only";
 
 import { eq, count, max, asc, desc, ilike, and, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
-import { adminAuditLog, cards } from "@/db/schema";
+import { adminAuditLog, cards, importHistory } from "@/db/schema";
 import { cardToRow } from "@/db/seed";
 import type { Card, CardData } from "@/lib/types";
 
@@ -151,9 +151,45 @@ export interface AdminAuditEntriesResult {
   totalPages: number;
 }
 
+export interface ImportHistoryEntry {
+  id: number;
+  actorEmail: string | null;
+  fileNames: string[];
+  fileCount: number;
+  parsedRows: number;
+  skippedRows: number;
+  insertedCards: number;
+  metadata: Record<string, unknown>;
+  committedAt: string;
+}
+
+export interface CreateImportHistoryEntryInput {
+  actorEmail?: string | null;
+  fileNames: string[];
+  fileCount: number;
+  parsedRows: number;
+  skippedRows: number;
+  insertedCards: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ImportHistoryParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ImportHistoryResult {
+  entries: ImportHistoryEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface AdminMutationAuditContext {
   actorEmail?: string | null;
   metadata?: Record<string, unknown>;
+  importHistory?: CreateImportHistoryEntryInput;
 }
 
 interface AdminAuditRow {
@@ -168,6 +204,19 @@ interface AdminAuditRow {
   createdAt: string | Date;
 }
 
+interface ImportHistoryRow {
+  [key: string]: unknown;
+  id: number;
+  actorEmail?: string | null;
+  fileNames?: string[] | null;
+  fileCount: number;
+  parsedRows: number;
+  skippedRows: number;
+  insertedCards: number;
+  metadata?: Record<string, unknown> | null;
+  committedAt: string | Date;
+}
+
 const MAX_AUDIT_STRING_LENGTH = 320;
 const MAX_AUDIT_ARRAY_LENGTH = 50;
 const MAX_AUDIT_OBJECT_KEYS = 40;
@@ -177,7 +226,7 @@ const REDACTED_AUDIT_VALUE = "[redacted]";
 const SENSITIVE_AUDIT_KEY_PATTERN =
   /(password|secret|token|api[_-]?key|authorization|cookie|session|credential)/i;
 const RAW_CONTENT_AUDIT_KEY_PATTERN =
-  /(raw.*csv|csv.*raw|file.*content|content.*csv|csv.*content|request.*body|response.*body)/i;
+  /(raw.*csv|csv.*raw|file.*content|content.*csv|csv.*content|request.*body|response.*body|^cards$|card.*payload|payload.*cards)/i;
 
 function normalizeAuditPage(value: number | undefined): number {
   if (!Number.isFinite(value) || value === undefined) return 1;
@@ -287,6 +336,98 @@ function buildAdminAuditInsertValues(input: CreateAdminAuditEntryInput) {
     targetId: input.targetId ?? null,
     targetCount: input.targetCount ?? null,
     metadata: sanitizeAdminAuditMetadata(input.metadata),
+  };
+}
+
+function normalizeImportHistoryEntry(row: ImportHistoryRow): ImportHistoryEntry {
+  return {
+    id: row.id,
+    actorEmail: row.actorEmail ?? null,
+    fileNames: row.fileNames ?? [],
+    fileCount: row.fileCount,
+    parsedRows: row.parsedRows,
+    skippedRows: row.skippedRows,
+    insertedCards: row.insertedCards,
+    metadata: row.metadata ?? {},
+    committedAt:
+      row.committedAt instanceof Date
+        ? row.committedAt.toISOString()
+        : row.committedAt,
+  };
+}
+
+function normalizeImportHistoryCount(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.trunc(value));
+}
+
+function buildImportHistoryInsertValues(input: CreateImportHistoryEntryInput) {
+  return {
+    actorEmail: input.actorEmail ?? null,
+    fileNames: input.fileNames
+      .filter((fileName) => typeof fileName === "string" && fileName.trim().length > 0)
+      .slice(0, MAX_AUDIT_ARRAY_LENGTH)
+      .map((fileName) => truncateAuditString(fileName.trim())),
+    fileCount: normalizeImportHistoryCount(input.fileCount),
+    parsedRows: normalizeImportHistoryCount(input.parsedRows),
+    skippedRows: normalizeImportHistoryCount(input.skippedRows),
+    insertedCards: normalizeImportHistoryCount(input.insertedCards),
+    metadata: sanitizeAdminAuditMetadata(input.metadata),
+  };
+}
+
+export async function createImportHistoryEntry(
+  input: CreateImportHistoryEntryInput,
+): Promise<ImportHistoryEntry> {
+  const [row] = await db
+    .insert(importHistory)
+    .values(buildImportHistoryInsertValues(input))
+    .returning();
+
+  if (!row) throw new Error("Import history insert returned no row");
+  return normalizeImportHistoryEntry(row);
+}
+
+export async function getImportHistory(
+  params: ImportHistoryParams = {},
+): Promise<ImportHistoryResult> {
+  const page = normalizeAuditPage(params.page);
+  const limit = normalizeAuditLimit(params.limit);
+  const offset = (page - 1) * limit;
+
+  const [entriesResult, countResult] = await Promise.all([
+    db.execute<ImportHistoryRow>(sql`
+      SELECT
+        id,
+        actor_email AS "actorEmail",
+        file_names AS "fileNames",
+        file_count AS "fileCount",
+        parsed_rows AS "parsedRows",
+        skipped_rows AS "skippedRows",
+        inserted_cards AS "insertedCards",
+        metadata,
+        committed_at AS "committedAt"
+      FROM import_history
+      ORDER BY committed_at DESC, id DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `),
+    db.execute<{ total: number | string }>(sql`
+      SELECT COUNT(*)::integer AS total
+      FROM import_history
+    `),
+  ]);
+
+  const total = typeof countResult.rows[0]?.total === "string"
+    ? Number.parseInt(countResult.rows[0].total, 10)
+    : (countResult.rows[0]?.total ?? 0);
+
+  return {
+    entries: entriesResult.rows.map(normalizeImportHistoryEntry),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
   };
 }
 
@@ -685,22 +826,34 @@ export async function replaceAllCards(
         }),
       )
     : null;
+  const importHistoryInsert = audit?.importHistory
+    ? db.insert(importHistory).values(
+        buildImportHistoryInsertValues({
+          ...audit.importHistory,
+          actorEmail: audit.importHistory.actorEmail ?? audit.actorEmail ?? null,
+          insertedCards: rows.length,
+        }),
+      )
+    : null;
 
   if (newCards.length === 0) {
-    if (auditInsert) {
-      await db.batch([db.delete(cards), auditInsert] as unknown as Parameters<typeof db.batch>[0]);
+    if (auditInsert || importHistoryInsert) {
+      await db.batch(
+        [db.delete(cards), auditInsert, importHistoryInsert].filter(Boolean) as unknown as Parameters<typeof db.batch>[0],
+      );
     } else {
       await db.batch([db.delete(cards)]);
     }
     return { inserted: 0 };
   }
 
-  if (auditInsert) {
+  if (auditInsert || importHistoryInsert) {
     await db.batch([
       db.delete(cards),
       db.insert(cards).values(rows),
       auditInsert,
-    ] as unknown as Parameters<typeof db.batch>[0]);
+      importHistoryInsert,
+    ].filter(Boolean) as unknown as Parameters<typeof db.batch>[0]);
   } else {
     await db.batch([db.delete(cards), db.insert(cards).values(rows)]);
   }

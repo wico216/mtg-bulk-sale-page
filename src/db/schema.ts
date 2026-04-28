@@ -83,6 +83,33 @@ export const adminAuditLog = pgTable(
   ],
 );
 
+export const importHistory = pgTable(
+  "import_history",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    actorEmail: text("actor_email"),
+    fileNames: text("file_names")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    fileCount: integer("file_count").notNull().default(0),
+    parsedRows: integer("parsed_rows").notNull().default(0),
+    skippedRows: integer("skipped_rows").notNull().default(0),
+    insertedCards: integer("inserted_cards").notNull().default(0),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    committedAt: timestamp("committed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("import_history_committed_at_idx").on(table.committedAt),
+    index("import_history_actor_email_idx").on(table.actorEmail),
+  ],
+);
+
 // Orders table
 export const orders = pgTable(
   "orders",

@@ -28,8 +28,10 @@ vi.mock("@/db/client", () => ({
 import { db } from "@/db/client";
 import {
   createAdminAuditEntry,
+  createImportHistoryEntry,
   deleteCardsByIds,
   getAdminAuditEntries,
+  getImportHistory,
 } from "../queries";
 
 beforeEach(() => {
@@ -165,6 +167,124 @@ describe("getAdminAuditEntries", () => {
     const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
 
     expect(source).toContain("ORDER BY created_at DESC, id DESC");
+  });
+});
+
+describe("import history", () => {
+  it("stores safe file and row-count metadata for an import commit", async () => {
+    insertBuilder.returning.mockResolvedValueOnce([
+      {
+        id: 5,
+        actorEmail: "admin@example.com",
+        fileNames: ["binder-a.csv", "binder-b.csv"],
+        fileCount: 2,
+        parsedRows: 12,
+        skippedRows: 3,
+        insertedCards: 9,
+        metadata: { missingPrices: 1 },
+        committedAt: new Date("2026-04-28T06:00:00.000Z"),
+      },
+    ]);
+
+    const entry = await createImportHistoryEntry({
+      actorEmail: "admin@example.com",
+      fileNames: ["binder-a.csv", "binder-b.csv"],
+      fileCount: 2,
+      parsedRows: 12,
+      skippedRows: 3,
+      insertedCards: 9,
+      metadata: {
+        missingPrices: 1,
+        rawCsv: "Name,Set,Collector Number\nLightning Bolt,LEA,232",
+        cards: [{ id: "full-card-payload-should-not-store" }],
+        apiToken: "secret-token",
+      },
+    });
+
+    const stored = insertBuilder.values.mock.calls[0][0] as {
+      actorEmail: string;
+      fileNames: string[];
+      fileCount: number;
+      parsedRows: number;
+      skippedRows: number;
+      insertedCards: number;
+      metadata: Record<string, unknown>;
+    };
+
+    expect(stored).toMatchObject({
+      actorEmail: "admin@example.com",
+      fileNames: ["binder-a.csv", "binder-b.csv"],
+      fileCount: 2,
+      parsedRows: 12,
+      skippedRows: 3,
+      insertedCards: 9,
+    });
+    expect(stored.metadata.missingPrices).toBe(1);
+    expect(stored.metadata.rawCsv).toBe("[redacted]");
+    expect(stored.metadata.cards).toBe("[redacted]");
+    expect(stored.metadata.apiToken).toBe("[redacted]");
+
+    expect(entry).toEqual({
+      id: 5,
+      actorEmail: "admin@example.com",
+      fileNames: ["binder-a.csv", "binder-b.csv"],
+      fileCount: 2,
+      parsedRows: 12,
+      skippedRows: 3,
+      insertedCards: 9,
+      metadata: { missingPrices: 1 },
+      committedAt: "2026-04-28T06:00:00.000Z",
+    });
+  });
+
+  it("returns newest-first paginated import history", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 6,
+            actorEmail: "admin@example.com",
+            fileNames: ["single-binder.csv"],
+            fileCount: 1,
+            parsedRows: 7,
+            skippedRows: 0,
+            insertedCards: 7,
+            metadata: { missingPrices: 0 },
+            committedAt: "2026-04-28T07:00:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ total: 14 }] });
+
+    const result = await getImportHistory({ page: 2, limit: 5 });
+
+    expect(result).toEqual({
+      entries: [
+        {
+          id: 6,
+          actorEmail: "admin@example.com",
+          fileNames: ["single-binder.csv"],
+          fileCount: 1,
+          parsedRows: 7,
+          skippedRows: 0,
+          insertedCards: 7,
+          metadata: { missingPrices: 0 },
+          committedAt: "2026-04-28T07:00:00.000Z",
+        },
+      ],
+      total: 14,
+      page: 2,
+      limit: 5,
+      totalPages: 3,
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+  });
+
+  it("orders import history newest first in SQL", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
+
+    expect(source).toContain("FROM import_history");
+    expect(source).toContain("ORDER BY committed_at DESC, id DESC");
   });
 });
 

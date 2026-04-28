@@ -7,17 +7,25 @@ export const runtime = "nodejs";
 // generous headroom for Neon cold starts; the work itself takes well under a second.
 export const maxDuration = 30;
 
+function toNonNegativeInteger(value: unknown): number {
+  return Number.isFinite(value)
+    ? Math.max(0, Math.trunc(value as number))
+    : 0;
+}
+
 function buildImportAuditMetadata(
   summary: CommitSummary | undefined,
   inserted: number,
 ): Record<string, unknown> {
-  const sourceFiles = Array.isArray(summary?.sourceFiles) ? summary.sourceFiles : [];
-  const parseSkipped = Number.isFinite(summary?.parseSkipped)
-    ? Math.max(0, Math.trunc(summary!.parseSkipped!))
-    : 0;
-  const scryfallSkipped = Number.isFinite(summary?.scryfallSkipped)
-    ? Math.max(0, Math.trunc(summary!.scryfallSkipped!))
-    : 0;
+  const sourceFiles = Array.isArray(summary?.sourceFiles)
+    ? (summary.sourceFiles as Array<Partial<{ name: unknown; parsedCards: unknown }>>)
+        .map((file) => ({
+          name: typeof file.name === "string" ? file.name : "unknown.csv",
+          parsedCards: toNonNegativeInteger(file.parsedCards),
+        }))
+    : [];
+  const parseSkipped = toNonNegativeInteger(summary?.parseSkipped);
+  const scryfallSkipped = toNonNegativeInteger(summary?.scryfallSkipped);
 
   return {
     fileNames: sourceFiles.map((file) => file.name),
@@ -26,9 +34,7 @@ function buildImportAuditMetadata(
     skippedRows: parseSkipped + scryfallSkipped,
     parseSkipped,
     scryfallSkipped,
-    missingPrices: Number.isFinite(summary?.missingPrices)
-      ? Math.max(0, Math.trunc(summary!.missingPrices!))
-      : 0,
+    missingPrices: toNonNegativeInteger(summary?.missingPrices),
     insertedCards: inserted,
   };
 }
@@ -49,9 +55,23 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const importMetadata = buildImportAuditMetadata(body.summary, body.cards.length);
     const { inserted } = await replaceAllCards(body.cards, {
       actorEmail: auth.user.email,
-      metadata: buildImportAuditMetadata(body.summary, body.cards.length),
+      metadata: importMetadata,
+      importHistory: {
+        actorEmail: auth.user.email,
+        fileNames: importMetadata.fileNames as string[],
+        fileCount: importMetadata.fileCount as number,
+        parsedRows: importMetadata.parsedRows as number,
+        skippedRows: importMetadata.skippedRows as number,
+        insertedCards: body.cards.length,
+        metadata: {
+          parseSkipped: importMetadata.parseSkipped,
+          scryfallSkipped: importMetadata.scryfallSkipped,
+          missingPrices: importMetadata.missingPrices,
+        },
+      },
     });
     const response: CommitResponse = { success: true, inserted };
     return Response.json(response);

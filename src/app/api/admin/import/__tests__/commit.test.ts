@@ -122,6 +122,19 @@ describe("POST /api/admin/import/commit", () => {
         missingPrices: 1,
         insertedCards: 3,
       },
+      importHistory: {
+        actorEmail: "admin@example.com",
+        fileNames: ["binder-a.csv", "binder-b.csv"],
+        fileCount: 2,
+        parsedRows: 3,
+        skippedRows: 3,
+        insertedCards: 3,
+        metadata: {
+          parseSkipped: 1,
+          scryfallSkipped: 2,
+          missingPrices: 1,
+        },
+      },
     });
   });
 
