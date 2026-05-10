@@ -1,0 +1,340 @@
+/**
+ * Phase 15-01: Rate-limit primitives.
+ *
+ * Design (D-04, P15 plan 15-01):
+ * - Sliding-window counter: each successful "check" inserts a hit row; a check
+ *   is allowed iff the count of hits within `windowMs` is strictly below `limit`.
+ * - The default production store is Postgres-backed because the app already
+ *   uses Neon/Postgres (zero new vendor). On serverless cold starts every
+ *   request still hits the same shared row store, so the counter is correct
+ *   across instances. See `createPostgresRateLimitStore`.
+ * - Tests inject `createMemoryRateLimitStore` to get deterministic behavior
+ *   without a database. The runtime route handler also falls back to the
+ *   in-memory store when DATABASE_URL is not set (tests, local dev without DB).
+ * - `checkRateLimit` never mutates state when blocked, so abusive callers cannot
+ *   extend their own window by retrying — the original first hit ages out at
+ *   `firstHit + windowMs` regardless of further attempts (#15-01 plan rule
+ *   "Rate limit responses are explicit and do not mutate state").
+ *
+ * Public surface:
+ *   - `checkRateLimit({ store, key, config, now? })` → { allowed, remaining, retryAfterSeconds }
+ *   - `createMemoryRateLimitStore()` for tests/dev
+ *   - `createPostgresRateLimitStore()` for production
+ *   - `getDefaultRateLimitStore()` chooses one based on env (memoised)
+ *   - `clientKeyFromRequest(req, extra?)` builds a stable per-IP key with optional
+ *     identity suffix (e.g. admin email) — uses `x-forwarded-for` when present.
+ */
+
+import "server-only";
+
+export type RateLimitConfig = {
+  /** Bucket name distinguishes surfaces (e.g. "checkout", "admin-mutation"). */
+  bucket: string;
+  /** Maximum number of allowed hits per (bucket, key) within the window. */
+  limit: number;
+  /** Sliding window length in milliseconds. */
+  windowMs: number;
+};
+
+export type RateLimitDecision = {
+  /** True when the caller is permitted to proceed; false when blocked. */
+  allowed: boolean;
+  /** Remaining hits before a block (0 once blocked). */
+  remaining: number;
+  /** Seconds the caller should wait before retrying (0 when allowed). */
+  retryAfterSeconds: number;
+};
+
+export interface RateLimitStore {
+  /**
+   * Returns how many hits have been recorded for the (bucket, key) pair within
+   * `[now - windowMs, now]` (inclusive). Must not mutate state.
+   */
+  countHits(args: {
+    bucket: string;
+    key: string;
+    windowMs: number;
+    now: number;
+  }): Promise<number>;
+
+  /**
+   * Returns the earliest hit timestamp in the window for (bucket, key).
+   * Returns null if no hit exists.
+   */
+  earliestHit(args: {
+    bucket: string;
+    key: string;
+    windowMs: number;
+    now: number;
+  }): Promise<number | null>;
+
+  /** Records a hit for (bucket, key) at `now`. */
+  recordHit(args: {
+    bucket: string;
+    key: string;
+    now: number;
+  }): Promise<void>;
+}
+
+export type CheckRateLimitArgs = {
+  store: RateLimitStore;
+  key: string;
+  config: RateLimitConfig;
+  /** Override the current time (defaults to Date.now()). */
+  now?: number;
+};
+
+export async function checkRateLimit({
+  store,
+  key,
+  config,
+  now = Date.now(),
+}: CheckRateLimitArgs): Promise<RateLimitDecision> {
+  const { bucket, limit, windowMs } = config;
+
+  if (limit <= 0) {
+    return { allowed: false, remaining: 0, retryAfterSeconds: 0 };
+  }
+
+  const count = await store.countHits({ bucket, key, windowMs, now });
+
+  if (count >= limit) {
+    const earliest = await store.earliestHit({ bucket, key, windowMs, now });
+    const retryAfterMs = earliest === null ? windowMs : Math.max(0, earliest + windowMs - now);
+    const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+    // Blocked: do NOT record a new hit -- preserves "blocked attempts do not
+    // extend the window" guarantee.
+    return { allowed: false, remaining: 0, retryAfterSeconds };
+  }
+
+  await store.recordHit({ bucket, key, now });
+  return {
+    allowed: true,
+    remaining: Math.max(0, limit - count - 1),
+    retryAfterSeconds: 0,
+  };
+}
+
+// --- In-memory store (tests, dev fallback) ---
+
+export function createMemoryRateLimitStore(): RateLimitStore {
+  // Map<`${bucket}|${key}`, number[]> -- sorted ascending hit timestamps.
+  const hits = new Map<string, number[]>();
+
+  function bucketKey(bucket: string, key: string): string {
+    return `${bucket}|${key}`;
+  }
+
+  function pruneAndGet(
+    bucket: string,
+    key: string,
+    windowMs: number,
+    now: number,
+  ): number[] {
+    const stored = hits.get(bucketKey(bucket, key));
+    if (!stored) return [];
+    const threshold = now - windowMs;
+    // Remove hits that have aged out.
+    let firstFresh = 0;
+    while (firstFresh < stored.length && stored[firstFresh] <= threshold) {
+      firstFresh += 1;
+    }
+    if (firstFresh > 0) stored.splice(0, firstFresh);
+    return stored;
+  }
+
+  return {
+    async countHits({ bucket, key, windowMs, now }) {
+      return pruneAndGet(bucket, key, windowMs, now).length;
+    },
+    async earliestHit({ bucket, key, windowMs, now }) {
+      const fresh = pruneAndGet(bucket, key, windowMs, now);
+      return fresh.length > 0 ? fresh[0] : null;
+    },
+    async recordHit({ bucket, key, now }) {
+      const k = bucketKey(bucket, key);
+      const list = hits.get(k);
+      if (list) {
+        list.push(now);
+      } else {
+        hits.set(k, [now]);
+      }
+    },
+  };
+}
+
+// --- Postgres-backed store (production) ---
+//
+// Lazy-loaded so test files that mock `@/db/client` do not pay the import cost.
+
+let postgresStoreSingleton: RateLimitStore | null = null;
+
+export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
+  if (postgresStoreSingleton) return postgresStoreSingleton;
+
+  const { db } = await import("@/db/client");
+  const { sql } = await import("drizzle-orm");
+
+  let tableEnsured = false;
+  async function ensureTable(): Promise<void> {
+    if (tableEnsured) return;
+    // Idempotent. Cheap on subsequent calls.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS rate_limit_hits (
+        id BIGSERIAL PRIMARY KEY,
+        bucket TEXT NOT NULL,
+        key TEXT NOT NULL,
+        hit_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS rate_limit_hits_bucket_key_hit_at_idx
+        ON rate_limit_hits (bucket, key, hit_at DESC)
+    `);
+    tableEnsured = true;
+  }
+
+  postgresStoreSingleton = {
+    async countHits({ bucket, key, windowMs, now }) {
+      await ensureTable();
+      const threshold = new Date(now - windowMs);
+      const result = await db.execute<{ total: number | string }>(sql`
+        SELECT COUNT(*)::integer AS total
+        FROM rate_limit_hits
+        WHERE bucket = ${bucket}
+          AND key = ${key}
+          AND hit_at > ${threshold}
+      `);
+      const raw = result.rows[0]?.total ?? 0;
+      return typeof raw === "string" ? Number.parseInt(raw, 10) : raw;
+    },
+    async earliestHit({ bucket, key, windowMs, now }) {
+      await ensureTable();
+      const threshold = new Date(now - windowMs);
+      const result = await db.execute<{ hit_at: Date }>(sql`
+        SELECT hit_at
+        FROM rate_limit_hits
+        WHERE bucket = ${bucket}
+          AND key = ${key}
+          AND hit_at > ${threshold}
+        ORDER BY hit_at ASC
+        LIMIT 1
+      `);
+      const row = result.rows[0];
+      if (!row) return null;
+      return new Date(row.hit_at).getTime();
+    },
+    async recordHit({ bucket, key, now }) {
+      await ensureTable();
+      const at = new Date(now);
+      await db.execute(sql`
+        INSERT INTO rate_limit_hits (bucket, key, hit_at)
+        VALUES (${bucket}, ${key}, ${at})
+      `);
+    },
+  };
+
+  return postgresStoreSingleton;
+}
+
+/**
+ * Returns the runtime default store. Falls back to an in-memory store when
+ * DATABASE_URL is unset (tests, local dev without a DB). The in-memory fallback
+ * is deliberately permissive in dev so it never blocks the test suite, but it
+ * is NOT correct across serverless instances -- production MUST have
+ * DATABASE_URL configured.
+ */
+let defaultStorePromise: Promise<RateLimitStore> | null = null;
+
+export function getDefaultRateLimitStore(): Promise<RateLimitStore> {
+  if (defaultStorePromise) return defaultStorePromise;
+  if (process.env.DATABASE_URL) {
+    defaultStorePromise = createPostgresRateLimitStore();
+  } else {
+    defaultStorePromise = Promise.resolve(createMemoryRateLimitStore());
+  }
+  return defaultStorePromise;
+}
+
+/**
+ * Reset the memoised default store. Exposed for tests; not for runtime.
+ */
+export function __resetDefaultRateLimitStoreForTests(): void {
+  defaultStorePromise = null;
+  postgresStoreSingleton = null;
+}
+
+// --- Helpers ---
+
+/**
+ * Build a stable rate-limit key from a request. Prefers `x-forwarded-for`
+ * (Vercel/proxy header), falling back to a literal `unknown` so missing IPs
+ * collapse into one bucket rather than being unbounded (defense-in-depth).
+ *
+ * `extra` lets the caller add an identity suffix (admin email) so two admins
+ * on the same NAT don't share a bucket. Pass `null`/`undefined` to skip.
+ */
+export function clientKeyFromRequest(
+  request: Request,
+  extra?: string | null,
+): string {
+  const xff = request.headers.get("x-forwarded-for") ?? "";
+  const realIp = request.headers.get("x-real-ip") ?? "";
+  const candidate = xff.split(",")[0]?.trim() || realIp.trim() || "unknown";
+  return extra ? `${candidate}|${extra}` : candidate;
+}
+
+// --- Default bucket configs (centralized for visibility) ---
+
+export const RATE_LIMIT_BUCKETS = {
+  /** Public checkout: conservative; abusive repeat submission protection. */
+  CHECKOUT: {
+    bucket: "checkout",
+    limit: 10,
+    windowMs: 60_000,
+  } satisfies RateLimitConfig,
+  /** Authenticated admin mutations: higher because they run after auth. */
+  ADMIN_MUTATION: {
+    bucket: "admin-mutation",
+    limit: 60,
+    windowMs: 60_000,
+  } satisfies RateLimitConfig,
+  /** Bulk/import endpoints: lower because each call is expensive. */
+  ADMIN_BULK: {
+    bucket: "admin-bulk",
+    limit: 20,
+    windowMs: 60_000,
+  } satisfies RateLimitConfig,
+} as const;
+
+/**
+ * Convenience wrapper around `checkRateLimit` that builds a JSON 429 Response
+ * with retry-after metadata when blocked. Returns null when allowed so callers
+ * can keep their early-return shape consistent with `requireAdmin()`.
+ */
+export async function enforceRateLimit(args: {
+  store?: RateLimitStore;
+  key: string;
+  config: RateLimitConfig;
+  now?: number;
+}): Promise<Response | null> {
+  const store = args.store ?? (await getDefaultRateLimitStore());
+  const decision = await checkRateLimit({
+    store,
+    key: args.key,
+    config: args.config,
+    now: args.now,
+  });
+  if (decision.allowed) return null;
+  return Response.json(
+    {
+      error: "Too many requests. Please try again shortly.",
+      code: "rate_limited",
+      retryAfterSeconds: decision.retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(decision.retryAfterSeconds) },
+    },
+  );
+}

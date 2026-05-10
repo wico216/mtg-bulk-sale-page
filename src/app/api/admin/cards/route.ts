@@ -1,5 +1,13 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
 import { getAdminCards, deleteAllCards } from "@/db/queries";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
+
+const ROUTE = "/api/admin/cards";
 
 export async function GET(request: Request) {
   const result = await requireAdmin();
@@ -39,15 +47,43 @@ export async function GET(request: Request) {
   return Response.json(data);
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
 
+  // Delete-all is the most destructive admin op. Apply the bulk bucket AFTER
+  // auth so an auth bug never gets masked by a 429.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
+  });
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.delete_all.rate_limited",
+      route: ROUTE,
+      actor: result.user.email,
+    });
+    return rateLimited;
+  }
+
   try {
     const { deleted } = await deleteAllCards({ actorEmail: result.user.email });
+    logEvent({
+      level: "info",
+      event: "admin.delete_all.succeeded",
+      route: ROUTE,
+      actor: result.user.email,
+      metadata: { deleted },
+    });
     return Response.json({ success: true, deleted });
   } catch (err) {
-    console.error("[ADMIN CARDS] delete-all failed:", err);
+    logError({
+      event: "admin.delete_all.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+    });
     return Response.json(
       { error: "Delete inventory failed — inventory unchanged" },
       { status: 500 },

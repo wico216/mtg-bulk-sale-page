@@ -4,10 +4,12 @@ const {
   mockGetCards,
   mockPlaceCheckoutOrder,
   mockNotifyOrder,
+  mockEnforceRateLimit,
 } = vi.hoisted(() => ({
   mockGetCards: vi.fn(),
   mockPlaceCheckoutOrder: vi.fn(),
   mockNotifyOrder: vi.fn(),
+  mockEnforceRateLimit: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +22,13 @@ vi.mock("@/db/orders", () => ({
 vi.mock("@/lib/notifications", () => ({
   notifyOrder: mockNotifyOrder,
 }));
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: mockEnforceRateLimit,
+  };
+});
 
 import { POST } from "../route";
 
@@ -72,11 +81,14 @@ describe("POST /api/checkout", () => {
     mockGetCards.mockReset();
     mockPlaceCheckoutOrder.mockReset();
     mockNotifyOrder.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockGetCards.mockRejectedValue(new Error("legacy getCards should not be called"));
     mockNotifyOrder.mockResolvedValue({
       sellerEmailSent: true,
       buyerEmailSent: true,
     });
+    // Default: rate limit allows the request (returns null).
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("places an order through the transactional helper and returns 201", async () => {
@@ -120,6 +132,65 @@ describe("POST /api/checkout", () => {
       sellerEmailSent: false,
       buyerEmailSent: false,
     });
+  });
+
+  it("emits a structured warn log when post-commit notifications partially fail", async () => {
+    mockPlaceCheckoutOrder.mockResolvedValueOnce({ ok: true, order: sampleOrder });
+    mockNotifyOrder.mockResolvedValueOnce({
+      sellerEmailSent: true,
+      buyerEmailSent: false,
+    });
+    // Capture console.warn lines (the logger emits one JSON line per call).
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Capture console.log as well -- order_committed lives there.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      const response = await POST(makeCheckoutRequest(validBody()));
+      expect(response.status).toBe(201);
+
+      // Collect every JSON-line that parsed cleanly.
+      const allLines: Array<Record<string, unknown>> = [];
+      for (const spy of [warnSpy, logSpy]) {
+        for (const call of spy.mock.calls) {
+          const raw = call[0];
+          if (typeof raw !== "string") continue;
+          try {
+            allLines.push(JSON.parse(raw));
+          } catch {
+            // not a JSON log line (legacy console.log) -- skip
+          }
+        }
+      }
+
+      const partial = allLines.find(
+        (line) => line.event === "checkout.notification_partial",
+      );
+      expect(partial).toBeDefined();
+      expect(partial!.level).toBe("warn");
+      expect(partial!.route).toBe("/api/checkout");
+      expect(partial!.metadata).toEqual({
+        orderRef: sampleOrder.orderRef,
+        sellerEmailSent: true,
+        buyerEmailSent: false,
+      });
+      // Critically: the log must NOT contain the buyer email, secrets, or full
+      // order payload.
+      const rendered = JSON.stringify(partial);
+      expect(rendered).not.toContain("viki@example.com");
+      expect(rendered).not.toContain(process.env.RESEND_API_KEY ?? "test-resend");
+
+      // And `checkout.order_committed` should have been emitted as info BEFORE
+      // the partial warn (the commit succeeded before the email layer ran).
+      const committed = allLines.find(
+        (line) => line.event === "checkout.order_committed",
+      );
+      expect(committed).toBeDefined();
+      expect(committed!.level).toBe("info");
+    } finally {
+      warnSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 
   it("returns 409 with structured conflicts and does not send email", async () => {
@@ -176,5 +247,46 @@ describe("POST /api/checkout", () => {
       error: "Unable to process order right now, please try again",
     });
     expect(mockNotifyOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 and does not call placeCheckoutOrder when rate-limited", async () => {
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "Too many requests. Please try again shortly.", code: "rate_limited", retryAfterSeconds: 30 },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+
+    const response = await POST(makeCheckoutRequest(validBody()));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    const body = await response.json();
+    expect(body.code).toBe("rate_limited");
+    expect(body.retryAfterSeconds).toBe(30);
+    expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
+    expect(mockNotifyOrder).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits checkout BEFORE parsing or validating the body", async () => {
+    // A blocked request must not even touch the request body -- otherwise
+    // a flood of malformed bodies could starve real users via JSON-parse cost.
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "rate_limited", code: "rate_limited", retryAfterSeconds: 60 },
+        { status: 429 },
+      ),
+    );
+    // Request body deliberately not-JSON to prove we never parse it.
+    const req = new Request("http://localhost:3000/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not-json{",
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(429);
+    expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,13 @@
 import { getOrderById, updateOrderWorkflow } from "@/db/orders";
 import { requireAdmin } from "@/lib/auth/admin-check";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
 
+const ROUTE = "/api/admin/orders/[id]";
 const ORDER_STATUSES = ["pending", "confirmed", "completed"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 const MAX_INTERNAL_NOTE_LENGTH = 1000;
@@ -49,6 +56,20 @@ export async function PATCH(
   const result = await requireAdmin();
   if (result instanceof Response) return result;
 
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
+  });
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.order_workflow.rate_limited",
+      route: ROUTE,
+      actor: result.user.email,
+    });
+    return rateLimited;
+  }
+
   const { id } = await params;
   let body: unknown;
   try {
@@ -86,13 +107,36 @@ export async function PATCH(
     return Response.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const order = await updateOrderWorkflow({
-    ...updates,
-    audit: { actorEmail: result.user.email },
-  });
-  if (!order) {
-    return Response.json({ error: "Order not found" }, { status: 404 });
-  }
+  try {
+    const order = await updateOrderWorkflow({
+      ...updates,
+      audit: { actorEmail: result.user.email },
+    });
+    if (!order) {
+      return Response.json({ error: "Order not found" }, { status: 404 });
+    }
 
-  return Response.json({ success: true, order });
+    logEvent({
+      level: "info",
+      event: "admin.order_workflow.updated",
+      route: ROUTE,
+      actor: result.user.email,
+      metadata: {
+        orderId: id,
+        statusChanged: updates.status !== undefined,
+        noteChanged: "adminNote" in updates,
+      },
+    });
+
+    return Response.json({ success: true, order });
+  } catch (err) {
+    logError({
+      event: "admin.order_workflow.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { orderId: id },
+    });
+    throw err;
+  }
 }

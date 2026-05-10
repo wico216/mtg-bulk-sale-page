@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Store Operations & Hardening
-status: in_progress
-stopped_at: Phase 14 plan 14-02 complete locally; next is Phase 14 PR/deploy after approval or Phase 15 production hardening
-last_updated: "2026-04-28T03:05:00.000Z"
-last_activity: 2026-04-28
+status: executing
+last_updated: "2026-05-10T22:06:55.029Z"
+last_activity: 2026-05-10 -- Phase 15 execution started
 progress:
-  total_phases: 15
-  completed_phases: 14
-  total_plans: 34
-  completed_plans: 32
+  total_phases: 11
+  completed_phases: 8
+  total_plans: 18
+  completed_plans: 17
   percent: 94
 ---
 
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** Phase 14 inventory audit trail is complete locally on `phase-14-inventory-audit-trail`. The branch has not been pushed, opened as a PR, merged, or deployed.
+**Current focus:** Phase 15 — production-hardening
 
 ## Current Position
 
-Phase: 14 (inventory-audit-trail) — COMPLETE LOCALLY
-Plan: 2 of 2 — COMPLETE
-Status: Phase 14 is implemented and verified locally on branch `phase-14-inventory-audit-trail`. It has not been pushed, opened as a PR, merged, or deployed.
-Last activity: 2026-04-28
+Phase: 15 (production-hardening) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 15
+Last activity: 2026-05-10 -- Phase 15 execution started
 
 ## Recently Completed
 
@@ -58,10 +57,12 @@ Last activity: 2026-04-28
 Status: Complete locally on `phase-14-inventory-audit-trail`.
 
 Delivered:
+
 - 14-01: Audit schema/helper and mutation coverage
 - 14-02: Import history and admin audit/history page
 
 Remaining external work:
+
 - Push branch only after explicit approval.
 - Open PR only after explicit approval.
 - Before deployment, ensure the production target database has both `admin_audit_log` and `import_history` tables/indexes.
@@ -71,6 +72,7 @@ Remaining external work:
 Goal: The store has production guardrails, diagnostics, and repeatable verification before wider sharing.
 
 Plans:
+
 - 15-01: Rate limits and structured operational logs
 - 15-02: Health page, production smoke script, runbook docs, and security review
 
