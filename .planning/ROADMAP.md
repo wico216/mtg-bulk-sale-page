@@ -315,7 +315,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md -- Rate limits and structured operational logs
+- [x] 15-01-PLAN.md -- Rate limits and structured operational logs
 - [ ] 15-02-PLAN.md -- Health page, production smoke script, runbook docs, and security review
 
 **UI hint**: yes
@@ -342,4 +342,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10 -> 10.1 -> 11 -> 12 -> 1
 | 12. Bulk Operations & Dashboard | v1.1 | 2/2 | Complete | 2026-04-27 |
 | 13. Admin Order Workflow | v1.2 | 2/2 | Complete | 2026-04-27 |
 | 14. Inventory Audit Trail | v1.2 | 2/2 | Complete | 2026-04-28 |
-| 15. Production Hardening | v1.2 | 0/2 | Planned | - |
+| 15. Production Hardening | v1.2 | 1/2 | In Progress|  |
