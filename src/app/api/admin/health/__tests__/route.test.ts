@@ -1,0 +1,262 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockRequireAdmin, mockGetAdminHealthSnapshot } = vi.hoisted(() => ({
+  mockRequireAdmin: vi.fn(),
+  mockGetAdminHealthSnapshot: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/auth/admin-check", () => ({
+  requireAdmin: mockRequireAdmin,
+}));
+vi.mock("@/db/admin-health", () => ({
+  getAdminHealthSnapshot: mockGetAdminHealthSnapshot,
+}));
+
+import { GET } from "../route";
+
+const adminSession = {
+  user: { email: "admin@example.com", name: "Admin User" },
+};
+
+function makeRequest(): Request {
+  return new Request("http://localhost:3000/api/admin/health");
+}
+
+const ORIGINAL_ENV: Record<string, string | undefined> = {};
+const TRACKED_KEYS = [
+  "AUTH_SECRET",
+  "AUTH_GOOGLE_ID",
+  "AUTH_GOOGLE_SECRET",
+  "RESEND_API_KEY",
+  "SELLER_EMAIL",
+  "ADMIN_EMAIL",
+];
+
+beforeEach(() => {
+  for (const key of TRACKED_KEYS) {
+    ORIGINAL_ENV[key] = process.env[key];
+  }
+  mockRequireAdmin.mockReset();
+  mockGetAdminHealthSnapshot.mockReset();
+});
+
+afterEach(() => {
+  for (const key of TRACKED_KEYS) {
+    if (ORIGINAL_ENV[key] === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = ORIGINAL_ENV[key];
+    }
+  }
+});
+
+function setEnv(values: Record<string, string | undefined>) {
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function happySnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    database: "ok",
+    lastOrderAt: "2026-04-29T12:34:56.000Z",
+    lastImportAt: "2026-04-28T11:00:00.000Z",
+    lastAuditAt: "2026-04-29T13:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("GET /api/admin/health", () => {
+  it("returns 401 when requireAdmin returns a 401 Response", async () => {
+    mockRequireAdmin.mockResolvedValueOnce(
+      Response.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(401);
+    expect(mockGetAdminHealthSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when requireAdmin returns a 403 Response", async () => {
+    mockRequireAdmin.mockResolvedValueOnce(
+      Response.json({ error: "Forbidden" }, { status: 403 }),
+    );
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(403);
+    expect(mockGetAdminHealthSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("returns ok=true and all checks configured when all env vars and DB are healthy", async () => {
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.ok).toBe(true);
+    expect(body.checks).toEqual({
+      database: "ok",
+      authSecret: "configured",
+      googleOAuth: "configured",
+      email: "configured",
+    });
+    expect(body.recent).toMatchObject({
+      lastOrderAt: "2026-04-29T12:34:56.000Z",
+      lastImportAt: "2026-04-28T11:00:00.000Z",
+      lastAuditAt: "2026-04-29T13:00:00.000Z",
+    });
+    expect("notificationFailuresLast24h" in body.recent).toBe(true);
+  });
+
+  it("reports AUTH_SECRET missing without exposing any env value", async () => {
+    setEnv({
+      AUTH_SECRET: undefined,
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.ok).toBe(false);
+    expect(body.checks.authSecret).toBe("missing");
+    expect(body.checks.googleOAuth).toBe("configured");
+    expect(body.checks.email).toBe("configured");
+
+    // No env values leak.
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("client-id");
+    expect(serialized).not.toContain("client-secret");
+    expect(serialized).not.toContain("re_xxx");
+    expect(serialized).not.toContain("seller@example.com");
+  });
+
+  it("reports googleOAuth missing when either AUTH_GOOGLE_ID or AUTH_GOOGLE_SECRET is unset", async () => {
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: undefined,
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    expect(body.checks.googleOAuth).toBe("missing");
+    expect(body.ok).toBe(false);
+  });
+
+  it("reports email missing when RESEND_API_KEY or SELLER_EMAIL is unset", async () => {
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: undefined,
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    expect(body.checks.email).toBe("missing");
+    expect(body.ok).toBe(false);
+  });
+
+  it("returns ok=false when the database is unreachable", async () => {
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(
+      happySnapshot({
+        database: "error",
+        lastOrderAt: null,
+        lastImportAt: null,
+        lastAuditAt: null,
+      }),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.checks.database).toBe("error");
+    expect(body.ok).toBe(false);
+  });
+
+  it("never includes secret values in the response, even when env values are set to obvious markers", async () => {
+    setEnv({
+      AUTH_SECRET: "SECRET_AUTH_VALUE",
+      AUTH_GOOGLE_ID: "GOOGLE_ID_VALUE",
+      AUTH_GOOGLE_SECRET: "GOOGLE_SECRET_VALUE",
+      RESEND_API_KEY: "RESEND_VALUE",
+      SELLER_EMAIL: "seller-marker@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    const serialized = JSON.stringify(body);
+
+    for (const marker of [
+      "SECRET_AUTH_VALUE",
+      "GOOGLE_ID_VALUE",
+      "GOOGLE_SECRET_VALUE",
+      "RESEND_VALUE",
+      "seller-marker@example.com",
+    ]) {
+      expect(serialized).not.toContain(marker);
+    }
+  });
+
+  it("propagates recent timestamps from the snapshot helper", async () => {
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: "seller@example.com",
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce({
+      database: "ok",
+      lastOrderAt: null,
+      lastImportAt: "2026-04-30T08:00:00.000Z",
+      lastAuditAt: null,
+    });
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.recent.lastOrderAt).toBeNull();
+    expect(body.recent.lastImportAt).toBe("2026-04-30T08:00:00.000Z");
+    expect(body.recent.lastAuditAt).toBeNull();
+  });
+});
