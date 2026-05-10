@@ -48,6 +48,12 @@ export default async function AdminLayout({
               Audit
             </Link>
             <Link
+              href="/admin/health"
+              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
+            >
+              Health
+            </Link>
+            <Link
               href="/"
               className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             >
