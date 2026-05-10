@@ -7,8 +7,10 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
 import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
 
+const ROUTE = "/api/checkout";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validateCheckoutRequest(body: CheckoutRequest): string | null {
@@ -43,7 +45,12 @@ async function notifyOrderAfterCommit(order: CheckoutResponse["order"]): Promise
   try {
     return await notifyOrder(order);
   } catch (error) {
-    console.error("[CHECKOUT] Notification failed after order commit:", error);
+    logError({
+      event: "checkout.notification_failed",
+      route: ROUTE,
+      error,
+      metadata: { orderRef: order.orderRef, totalItems: order.totalItems },
+    });
     return { sellerEmailSent: false, buyerEmailSent: false };
   }
 }
@@ -55,12 +62,25 @@ export async function POST(request: NextRequest) {
     key: clientKeyFromRequest(request),
     config: RATE_LIMIT_BUCKETS.CHECKOUT,
   });
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "checkout.rate_limited",
+      route: ROUTE,
+    });
+    return rateLimited;
+  }
 
   try {
     const body = (await request.json()) as CheckoutRequest;
     const validationError = validateCheckoutRequest(body);
     if (validationError) {
+      logEvent({
+        level: "warn",
+        event: "checkout.validation_failed",
+        route: ROUTE,
+        metadata: { reason: validationError, itemCount: Array.isArray(body?.items) ? body.items.length : 0 },
+      });
       return Response.json(
         { success: false, error: validationError },
         { status: 400 },
@@ -80,7 +100,12 @@ export async function POST(request: NextRequest) {
         })),
       });
     } catch (dbError) {
-      console.error("[CHECKOUT] Database error:", dbError);
+      logError({
+        event: "checkout.db_failed",
+        route: ROUTE,
+        error: dbError,
+        metadata: { itemCount: body.items.length },
+      });
       return Response.json(
         { success: false, error: "Unable to process order right now, please try again" },
         { status: 503 },
@@ -88,6 +113,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!checkoutResult.ok) {
+      logEvent({
+        level: "warn",
+        event: "checkout.stock_conflict",
+        route: ROUTE,
+        metadata: { conflictCount: checkoutResult.conflicts.length },
+      });
       return Response.json(
         {
           success: false,
@@ -99,7 +130,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logEvent({
+      level: "info",
+      event: "checkout.order_committed",
+      route: ROUTE,
+      metadata: {
+        orderRef: checkoutResult.order.orderRef,
+        totalItems: checkoutResult.order.totalItems,
+        totalPrice: checkoutResult.order.totalPrice,
+      },
+    });
+
     const notification = await notifyOrderAfterCommit(checkoutResult.order);
+
+    if (!notification.sellerEmailSent || !notification.buyerEmailSent) {
+      logEvent({
+        level: "warn",
+        event: "checkout.notification_partial",
+        route: ROUTE,
+        metadata: {
+          orderRef: checkoutResult.order.orderRef,
+          sellerEmailSent: notification.sellerEmailSent,
+          buyerEmailSent: notification.buyerEmailSent,
+        },
+      });
+    }
 
     const response: CheckoutResponse = {
       success: true,
@@ -109,7 +164,11 @@ export async function POST(request: NextRequest) {
     };
     return Response.json(response, { status: 201 });
   } catch (error) {
-    console.error("[CHECKOUT] Unexpected error:", error);
+    logError({
+      event: "checkout.unexpected_error",
+      route: ROUTE,
+      error,
+    });
     return Response.json(
       { success: false, error: "Something went wrong. Your order was not placed." },
       { status: 500 },

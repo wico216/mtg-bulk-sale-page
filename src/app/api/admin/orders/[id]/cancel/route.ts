@@ -5,6 +5,9 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
+
+const ROUTE = "/api/admin/orders/[id]/cancel";
 
 function parseRestoreInventory(value: unknown): boolean | Response {
   if (typeof value !== "boolean") {
@@ -29,7 +32,15 @@ export async function POST(
     key: clientKeyFromRequest(request, result.user.email),
     config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
   });
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.order_cancel.rate_limited",
+      route: ROUTE,
+      actor: result.user.email,
+    });
+    return rateLimited;
+  }
 
   const { id } = await params;
   let body: unknown;
@@ -48,18 +59,50 @@ export async function POST(
   );
   if (restoreInventory instanceof Response) return restoreInventory;
 
-  const cancellation = await cancelOrder({
-    orderId: id,
-    restoreInventory,
-    audit: { actorEmail: result.user.email },
-  });
+  try {
+    const cancellation = await cancelOrder({
+      orderId: id,
+      restoreInventory,
+      audit: { actorEmail: result.user.email },
+    });
 
-  if (!cancellation.ok) {
-    return Response.json(
-      { error: cancellation.message, code: cancellation.code },
-      { status: cancellation.code === "not_found" ? 404 : 409 },
-    );
+    if (!cancellation.ok) {
+      logEvent({
+        level: "warn",
+        event: "admin.order_cancel.rejected",
+        route: ROUTE,
+        actor: result.user.email,
+        metadata: { orderId: id, code: cancellation.code },
+      });
+      return Response.json(
+        { error: cancellation.message, code: cancellation.code },
+        { status: cancellation.code === "not_found" ? 404 : 409 },
+      );
+    }
+
+    logEvent({
+      level: "info",
+      event: "admin.order_cancel.succeeded",
+      route: ROUTE,
+      actor: result.user.email,
+      metadata: {
+        orderId: id,
+        restoreInventory,
+        alreadyCancelled: cancellation.alreadyCancelled,
+        restoredQuantity: cancellation.restoredQuantity,
+        restoredRows: cancellation.restoredRows,
+      },
+    });
+
+    return Response.json({ success: true, result: cancellation });
+  } catch (err) {
+    logError({
+      event: "admin.order_cancel.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { orderId: id, restoreInventory },
+    });
+    throw err;
   }
-
-  return Response.json({ success: true, result: cancellation });
 }

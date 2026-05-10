@@ -5,7 +5,9 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
 
+const ROUTE = "/api/admin/cards/bulk-delete";
 const MAX_BULK_DELETE_IDS = 500;
 
 function validateIds(value: unknown): string[] | Response {
@@ -40,7 +42,15 @@ export async function POST(request: Request) {
     key: clientKeyFromRequest(request, result.user.email),
     config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
   });
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.bulk_delete.rate_limited",
+      route: ROUTE,
+      actor: result.user.email,
+    });
+    return rateLimited;
+  }
 
   let body: unknown;
   try {
@@ -54,9 +64,22 @@ export async function POST(request: Request) {
 
   try {
     const deleted = await deleteCardsByIds(ids, { actorEmail: result.user.email });
+    logEvent({
+      level: "info",
+      event: "admin.bulk_delete.succeeded",
+      route: ROUTE,
+      actor: result.user.email,
+      metadata: { requested: ids.length, deleted: deleted.deleted },
+    });
     return Response.json({ success: true, ...deleted });
   } catch (err) {
-    console.error("[ADMIN CARDS] bulk-delete failed:", err);
+    logError({
+      event: "admin.bulk_delete.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { requested: ids.length },
+    });
     return Response.json(
       { error: "Bulk delete failed — inventory unchanged" },
       { status: 500 },

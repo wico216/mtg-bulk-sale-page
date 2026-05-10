@@ -5,7 +5,10 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
 import type { CommitRequest, CommitResponse, CommitSummary } from "@/lib/import-contract";
+
+const ROUTE = "/api/admin/import/commit";
 
 export const runtime = "nodejs";
 // Commit is fast -- only DB round trips (one batched delete+insert). 30s is
@@ -53,7 +56,15 @@ export async function POST(request: Request): Promise<Response> {
     key: clientKeyFromRequest(request, auth.user.email),
     config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
   });
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.import_commit.rate_limited",
+      route: ROUTE,
+      actor: auth.user.email,
+    });
+    return rateLimited;
+  }
 
   let body: Partial<CommitRequest>;
   try {
@@ -85,10 +96,28 @@ export async function POST(request: Request): Promise<Response> {
         },
       },
     });
+    logEvent({
+      level: "info",
+      event: "admin.import_commit.succeeded",
+      route: ROUTE,
+      actor: auth.user.email,
+      metadata: {
+        fileCount: importMetadata.fileCount,
+        parsedRows: importMetadata.parsedRows,
+        skippedRows: importMetadata.skippedRows,
+        insertedCards: inserted,
+      },
+    });
     const response: CommitResponse = { success: true, inserted };
     return Response.json(response);
   } catch (err) {
-    console.error("[IMPORT COMMIT] atomic replace failed:", err);
+    logError({
+      event: "admin.import_commit.failed",
+      route: ROUTE,
+      actor: auth.user.email,
+      error: err,
+      metadata: { cardCount: body.cards.length },
+    });
     return Response.json(
       { error: "Import failed — inventory unchanged" },
       { status: 500 },

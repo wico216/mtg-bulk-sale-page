@@ -134,6 +134,65 @@ describe("POST /api/checkout", () => {
     });
   });
 
+  it("emits a structured warn log when post-commit notifications partially fail", async () => {
+    mockPlaceCheckoutOrder.mockResolvedValueOnce({ ok: true, order: sampleOrder });
+    mockNotifyOrder.mockResolvedValueOnce({
+      sellerEmailSent: true,
+      buyerEmailSent: false,
+    });
+    // Capture console.warn lines (the logger emits one JSON line per call).
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Capture console.log as well -- order_committed lives there.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      const response = await POST(makeCheckoutRequest(validBody()));
+      expect(response.status).toBe(201);
+
+      // Collect every JSON-line that parsed cleanly.
+      const allLines: Array<Record<string, unknown>> = [];
+      for (const spy of [warnSpy, logSpy]) {
+        for (const call of spy.mock.calls) {
+          const raw = call[0];
+          if (typeof raw !== "string") continue;
+          try {
+            allLines.push(JSON.parse(raw));
+          } catch {
+            // not a JSON log line (legacy console.log) -- skip
+          }
+        }
+      }
+
+      const partial = allLines.find(
+        (line) => line.event === "checkout.notification_partial",
+      );
+      expect(partial).toBeDefined();
+      expect(partial!.level).toBe("warn");
+      expect(partial!.route).toBe("/api/checkout");
+      expect(partial!.metadata).toEqual({
+        orderRef: sampleOrder.orderRef,
+        sellerEmailSent: true,
+        buyerEmailSent: false,
+      });
+      // Critically: the log must NOT contain the buyer email, secrets, or full
+      // order payload.
+      const rendered = JSON.stringify(partial);
+      expect(rendered).not.toContain("viki@example.com");
+      expect(rendered).not.toContain(process.env.RESEND_API_KEY ?? "test-resend");
+
+      // And `checkout.order_committed` should have been emitted as info BEFORE
+      // the partial warn (the commit succeeded before the email layer ran).
+      const committed = allLines.find(
+        (line) => line.event === "checkout.order_committed",
+      );
+      expect(committed).toBeDefined();
+      expect(committed!.level).toBe("info");
+    } finally {
+      warnSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
   it("returns 409 with structured conflicts and does not send email", async () => {
     const conflicts = [
       {

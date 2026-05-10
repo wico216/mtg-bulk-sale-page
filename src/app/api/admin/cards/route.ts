@@ -5,6 +5,9 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logEvent, logError } from "@/lib/logger";
+
+const ROUTE = "/api/admin/cards";
 
 export async function GET(request: Request) {
   const result = await requireAdmin();
@@ -54,13 +57,33 @@ export async function DELETE(request: Request) {
     key: clientKeyFromRequest(request, result.user.email),
     config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
   });
-  if (rateLimited) return rateLimited;
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.delete_all.rate_limited",
+      route: ROUTE,
+      actor: result.user.email,
+    });
+    return rateLimited;
+  }
 
   try {
     const { deleted } = await deleteAllCards({ actorEmail: result.user.email });
+    logEvent({
+      level: "info",
+      event: "admin.delete_all.succeeded",
+      route: ROUTE,
+      actor: result.user.email,
+      metadata: { deleted },
+    });
     return Response.json({ success: true, deleted });
   } catch (err) {
-    console.error("[ADMIN CARDS] delete-all failed:", err);
+    logError({
+      event: "admin.delete_all.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+    });
     return Response.json(
       { error: "Delete inventory failed — inventory unchanged" },
       { status: 500 },

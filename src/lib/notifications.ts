@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import type { OrderData } from "@/lib/types";
 import { buildSellerEmailHtml } from "@/lib/email/seller-email";
 import { buildBuyerEmailHtml } from "@/lib/email/buyer-email";
+import { logEvent, logError } from "@/lib/logger";
 
 export interface NotifyResult {
   sellerEmailSent: boolean;
@@ -31,10 +32,21 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
   });
 
   if (sellerError) {
-    console.error("[ORDER] Seller email failed:", sellerError);
+    logError({
+      event: "notification.seller_email_failed",
+      route: "lib/notifications",
+      error: sellerError,
+      metadata: { orderRef: order.orderRef, totalItems: order.totalItems },
+    });
     return result; // Both false -- seller is critical
   }
   result.sellerEmailSent = true;
+  logEvent({
+    level: "info",
+    event: "notification.seller_email_sent",
+    route: "lib/notifications",
+    metadata: { orderRef: order.orderRef, totalItems: order.totalItems },
+  });
 
   // Send buyer email SECOND (best-effort per D-17)
   try {
@@ -46,12 +58,28 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
       html: buildBuyerEmailHtml(order),
     });
     if (buyerError) {
-      console.error("[ORDER] Buyer email failed (non-critical):", buyerError);
+      logError({
+        event: "notification.buyer_email_failed",
+        route: "lib/notifications",
+        error: buyerError,
+        metadata: { orderRef: order.orderRef },
+      });
     } else {
       result.buyerEmailSent = true;
+      logEvent({
+        level: "info",
+        event: "notification.buyer_email_sent",
+        route: "lib/notifications",
+        metadata: { orderRef: order.orderRef },
+      });
     }
   } catch (e) {
-    console.error("[ORDER] Buyer email exception (non-critical):", e);
+    logError({
+      event: "notification.buyer_email_failed",
+      route: "lib/notifications",
+      error: e,
+      metadata: { orderRef: order.orderRef },
+    });
   }
 
   return result;
