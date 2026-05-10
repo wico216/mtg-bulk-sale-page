@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
 import { logEvent, logError } from "@/lib/logger";
 
 type LogCall = { stream: "log" | "warn" | "error"; payload: Record<string, unknown> };

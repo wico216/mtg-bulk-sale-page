@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
 import {
   checkRateLimit,
   createMemoryRateLimitStore,
