@@ -1,5 +1,10 @@
 import { cancelOrder } from "@/db/orders";
 import { requireAdmin } from "@/lib/auth/admin-check";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 
 function parseRestoreInventory(value: unknown): boolean | Response {
   if (typeof value !== "boolean") {
@@ -17,6 +22,14 @@ export async function POST(
 ) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  // Cancellation can restore inventory, so it's a state-changing mutation.
+  // Apply the admin-mutation bucket AFTER auth.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
+  });
+  if (rateLimited) return rateLimited;
 
   const { id } = await params;
   let body: unknown;

@@ -1,6 +1,11 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
 import { updateCard, deleteCard } from "@/db/queries";
 import { abbrToCondition, CONDITION_OPTIONS } from "@/lib/condition-map";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 
 export async function PATCH(
   request: Request,
@@ -8,6 +13,14 @@ export async function PATCH(
 ) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  // Rate-limit per admin identity (post-auth) so two admins on the same NAT
+  // do not share a bucket.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
+  });
+  if (rateLimited) return rateLimited;
 
   const { id } = await params;
   const body = await request.json();
@@ -65,6 +78,12 @@ export async function DELETE(
 ) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
+  });
+  if (rateLimited) return rateLimited;
 
   const { id } = await params;
   const deleted = await deleteCard(id, { actorEmail: result.user.email });

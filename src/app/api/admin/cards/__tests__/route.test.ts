@@ -1,14 +1,21 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Use vi.hoisted() pattern for mock variables (established in Phase 8)
-const { mockRequireAdmin, mockGetAdminCards, mockUpdateCard, mockDeleteCard, mockDeleteAllCards } =
-  vi.hoisted(() => ({
-    mockRequireAdmin: vi.fn(),
-    mockGetAdminCards: vi.fn(),
-    mockUpdateCard: vi.fn(),
-    mockDeleteCard: vi.fn(),
-    mockDeleteAllCards: vi.fn(),
-  }));
+const {
+  mockRequireAdmin,
+  mockGetAdminCards,
+  mockUpdateCard,
+  mockDeleteCard,
+  mockDeleteAllCards,
+  mockEnforceRateLimit,
+} = vi.hoisted(() => ({
+  mockRequireAdmin: vi.fn(),
+  mockGetAdminCards: vi.fn(),
+  mockUpdateCard: vi.fn(),
+  mockDeleteCard: vi.fn(),
+  mockDeleteAllCards: vi.fn(),
+  mockEnforceRateLimit: vi.fn(),
+}));
 
 // Mock server-only
 vi.mock("server-only", () => ({}));
@@ -25,6 +32,14 @@ vi.mock("@/db/queries", () => ({
   deleteCard: mockDeleteCard,
   deleteAllCards: mockDeleteAllCards,
 }));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: mockEnforceRateLimit,
+  };
+});
 
 import { GET, DELETE as DELETE_ALL } from "../route";
 import { PATCH, DELETE } from "../[id]/route";
@@ -64,6 +79,12 @@ function makeDeleteRequest(
   ];
 }
 
+function makeDeleteAllRequest(): Request {
+  return new Request("http://localhost:3000/api/admin/cards", {
+    method: "DELETE",
+  });
+}
+
 // Admin session fixture
 const adminSession = {
   user: { email: "admin@example.com", name: "Admin User" },
@@ -73,7 +94,9 @@ describe("GET /api/admin/cards", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockGetAdminCards.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("returns paginated response shape", async () => {
@@ -147,13 +170,15 @@ describe("DELETE /api/admin/cards", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockDeleteAllCards.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("deletes all cards and returns the deleted count", async () => {
     mockDeleteAllCards.mockResolvedValue({ deleted: 42 });
 
-    const response = await DELETE_ALL();
+    const response = await DELETE_ALL(makeDeleteAllRequest());
     const data = await response.json();
 
     expect(data).toEqual({ success: true, deleted: 42 });
@@ -165,7 +190,7 @@ describe("DELETE /api/admin/cards", () => {
       Response.json({ error: "Unauthorized" }, { status: 401 }),
     );
 
-    const response = await DELETE_ALL();
+    const response = await DELETE_ALL(makeDeleteAllRequest());
     expect(response.status).toBe(401);
     expect(mockDeleteAllCards).not.toHaveBeenCalled();
   });
@@ -173,11 +198,23 @@ describe("DELETE /api/admin/cards", () => {
   it("returns 500 when deleteAllCards rejects", async () => {
     mockDeleteAllCards.mockRejectedValue(new Error("DB is down"));
 
-    const response = await DELETE_ALL();
+    const response = await DELETE_ALL(makeDeleteAllRequest());
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       error: "Delete inventory failed — inventory unchanged",
     });
+  });
+
+  it("returns 429 when delete-all is rate-limited and does not touch the database", async () => {
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "rate_limited", code: "rate_limited", retryAfterSeconds: 30 },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+    const response = await DELETE_ALL(makeDeleteAllRequest());
+    expect(response.status).toBe(429);
+    expect(mockDeleteAllCards).not.toHaveBeenCalled();
   });
 });
 
@@ -185,7 +222,9 @@ describe("PATCH /api/admin/cards/[id]", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockUpdateCard.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("updates price (converts dollars to cents via updateCard)", async () => {
@@ -286,7 +325,9 @@ describe("DELETE /api/admin/cards/[id]", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockDeleteCard.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("returns success for existing card", async () => {

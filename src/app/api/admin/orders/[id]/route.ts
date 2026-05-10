@@ -1,5 +1,10 @@
 import { getOrderById, updateOrderWorkflow } from "@/db/orders";
 import { requireAdmin } from "@/lib/auth/admin-check";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 
 const ORDER_STATUSES = ["pending", "confirmed", "completed"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -48,6 +53,12 @@ export async function PATCH(
 ) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_MUTATION,
+  });
+  if (rateLimited) return rateLimited;
 
   const { id } = await params;
   let body: unknown;

@@ -4,9 +4,10 @@ vi.mock("server-only", () => ({}));
 
 // `vi.hoisted` runs before vi.mock factories (which Vitest 4 hoists to the
 // top of the file). See https://vitest.dev/api/vi.html#vi-hoisted.
-const { requireAdminMock, replaceAllCardsMock } = vi.hoisted(() => ({
+const { requireAdminMock, replaceAllCardsMock, enforceRateLimitMock } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
   replaceAllCardsMock: vi.fn(),
+  enforceRateLimitMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin-check", () => ({
@@ -20,6 +21,14 @@ vi.mock("@/lib/auth/admin-check", () => ({
 vi.mock("@/db/queries", () => ({
   replaceAllCards: replaceAllCardsMock,
 }));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: enforceRateLimitMock,
+  };
+});
 
 import { POST } from "../commit/route";
 import type { Card } from "@/lib/types";
@@ -61,6 +70,8 @@ describe("POST /api/admin/import/commit", () => {
   beforeEach(() => {
     requireAdminMock.mockReset();
     replaceAllCardsMock.mockReset();
+    enforceRateLimitMock.mockReset();
+    enforceRateLimitMock.mockResolvedValue(null);
   });
 
   it("returns 401 when requireAdmin returns 401 Response", async () => {

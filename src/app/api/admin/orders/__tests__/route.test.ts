@@ -6,12 +6,14 @@ const {
   mockGetOrderById,
   mockUpdateOrderWorkflow,
   mockCancelOrder,
+  mockEnforceRateLimit,
 } = vi.hoisted(() => ({
   mockRequireAdmin: vi.fn(),
   mockGetAdminOrders: vi.fn(),
   mockGetOrderById: vi.fn(),
   mockUpdateOrderWorkflow: vi.fn(),
   mockCancelOrder: vi.fn(),
+  mockEnforceRateLimit: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +26,13 @@ vi.mock("@/db/orders", () => ({
   updateOrderWorkflow: mockUpdateOrderWorkflow,
   cancelOrder: mockCancelOrder,
 }));
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: mockEnforceRateLimit,
+  };
+});
 
 import { GET as GET_LIST } from "../route";
 import { GET as GET_DETAIL, PATCH as PATCH_DETAIL } from "../[id]/route";
@@ -253,7 +262,9 @@ describe("PATCH /api/admin/orders/[id]", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockUpdateOrderWorkflow.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("updates status and internal note", async () => {
@@ -393,7 +404,9 @@ describe("POST /api/admin/orders/[id]/cancel", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockCancelOrder.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("cancels an order with explicit inventory restore", async () => {
@@ -506,6 +519,39 @@ describe("POST /api/admin/orders/[id]/cancel", () => {
     );
 
     expect(response.status).toBe(401);
+    expect(mockCancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 and does not call cancelOrder when rate-limited", async () => {
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "rate_limited", code: "rate_limited", retryAfterSeconds: 30 },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(mockCancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("rate-limit runs AFTER auth so an unauthenticated caller still sees 401, not 429", async () => {
+    mockRequireAdmin.mockResolvedValueOnce(
+      Response.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockEnforceRateLimit).not.toHaveBeenCalled();
     expect(mockCancelOrder).not.toHaveBeenCalled();
   });
 });

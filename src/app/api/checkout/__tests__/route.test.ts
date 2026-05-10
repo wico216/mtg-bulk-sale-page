@@ -4,10 +4,12 @@ const {
   mockGetCards,
   mockPlaceCheckoutOrder,
   mockNotifyOrder,
+  mockEnforceRateLimit,
 } = vi.hoisted(() => ({
   mockGetCards: vi.fn(),
   mockPlaceCheckoutOrder: vi.fn(),
   mockNotifyOrder: vi.fn(),
+  mockEnforceRateLimit: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +22,13 @@ vi.mock("@/db/orders", () => ({
 vi.mock("@/lib/notifications", () => ({
   notifyOrder: mockNotifyOrder,
 }));
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: mockEnforceRateLimit,
+  };
+});
 
 import { POST } from "../route";
 
@@ -72,11 +81,14 @@ describe("POST /api/checkout", () => {
     mockGetCards.mockReset();
     mockPlaceCheckoutOrder.mockReset();
     mockNotifyOrder.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockGetCards.mockRejectedValue(new Error("legacy getCards should not be called"));
     mockNotifyOrder.mockResolvedValue({
       sellerEmailSent: true,
       buyerEmailSent: true,
     });
+    // Default: rate limit allows the request (returns null).
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("places an order through the transactional helper and returns 201", async () => {
@@ -176,5 +188,46 @@ describe("POST /api/checkout", () => {
       error: "Unable to process order right now, please try again",
     });
     expect(mockNotifyOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 and does not call placeCheckoutOrder when rate-limited", async () => {
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "Too many requests. Please try again shortly.", code: "rate_limited", retryAfterSeconds: 30 },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+
+    const response = await POST(makeCheckoutRequest(validBody()));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    const body = await response.json();
+    expect(body.code).toBe("rate_limited");
+    expect(body.retryAfterSeconds).toBe(30);
+    expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
+    expect(mockNotifyOrder).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits checkout BEFORE parsing or validating the body", async () => {
+    // A blocked request must not even touch the request body -- otherwise
+    // a flood of malformed bodies could starve real users via JSON-parse cost.
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "rate_limited", code: "rate_limited", retryAfterSeconds: 60 },
+        { status: 429 },
+      ),
+    );
+    // Request body deliberately not-JSON to prove we never parse it.
+    const req = new Request("http://localhost:3000/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not-json{",
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(429);
+    expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
   });
 });

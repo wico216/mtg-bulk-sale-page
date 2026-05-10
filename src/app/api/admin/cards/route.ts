@@ -1,5 +1,10 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
 import { getAdminCards, deleteAllCards } from "@/db/queries";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
   const result = await requireAdmin();
@@ -39,9 +44,17 @@ export async function GET(request: Request) {
   return Response.json(data);
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  // Delete-all is the most destructive admin op. Apply the bulk bucket AFTER
+  // auth so an auth bug never gets masked by a 429.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
+  });
+  if (rateLimited) return rateLimited;
 
   try {
     const { deleted } = await deleteAllCards({ actorEmail: result.user.email });

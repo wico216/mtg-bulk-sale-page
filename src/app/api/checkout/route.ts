@@ -2,6 +2,11 @@ import { NextRequest } from "next/server";
 import { placeCheckoutOrder } from "@/db/orders";
 import { generateOrderRef } from "@/lib/order";
 import { notifyOrder, type NotifyResult } from "@/lib/notifications";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +49,14 @@ async function notifyOrderAfterCommit(order: CheckoutResponse["order"]): Promise
 }
 
 export async function POST(request: NextRequest) {
+  // Rate-limit BEFORE parsing the body. This protects the JSON parse cost and
+  // the DB call from abusive repeat callers (D-02). Public surface -> per-IP key.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request),
+    config: RATE_LIMIT_BUCKETS.CHECKOUT,
+  });
+  if (rateLimited) return rateLimited;
+
   try {
     const body = (await request.json()) as CheckoutRequest;
     const validationError = validateCheckoutRequest(body);

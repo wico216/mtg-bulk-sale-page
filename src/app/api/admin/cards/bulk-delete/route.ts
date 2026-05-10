@@ -1,5 +1,10 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
 import { deleteCardsByIds } from "@/db/queries";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 
 const MAX_BULK_DELETE_IDS = 500;
 
@@ -29,6 +34,13 @@ function validateIds(value: unknown): string[] | Response {
 export async function POST(request: Request) {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
+
+  // Bulk delete is expensive -- apply the bulk bucket AFTER auth.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, result.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
+  });
+  if (rateLimited) return rateLimited;
 
   let body: unknown;
   try {

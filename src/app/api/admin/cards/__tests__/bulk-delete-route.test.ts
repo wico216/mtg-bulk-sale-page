@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRequireAdmin, mockDeleteCardsByIds, mockDeleteAllCards } = vi.hoisted(() => ({
-  mockRequireAdmin: vi.fn(),
-  mockDeleteCardsByIds: vi.fn(),
-  mockDeleteAllCards: vi.fn(),
-}));
+const { mockRequireAdmin, mockDeleteCardsByIds, mockDeleteAllCards, mockEnforceRateLimit } =
+  vi.hoisted(() => ({
+    mockRequireAdmin: vi.fn(),
+    mockDeleteCardsByIds: vi.fn(),
+    mockDeleteAllCards: vi.fn(),
+    mockEnforceRateLimit: vi.fn(),
+  }));
+
+vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/auth/admin-check", () => ({
   requireAdmin: mockRequireAdmin,
@@ -14,6 +18,14 @@ vi.mock("@/db/queries", () => ({
   deleteCardsByIds: mockDeleteCardsByIds,
   deleteAllCards: mockDeleteAllCards,
 }));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: mockEnforceRateLimit,
+  };
+});
 
 import { POST } from "../bulk-delete/route";
 
@@ -42,7 +54,9 @@ describe("POST /api/admin/cards/bulk-delete", () => {
     mockRequireAdmin.mockReset();
     mockDeleteCardsByIds.mockReset();
     mockDeleteAllCards.mockReset();
+    mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
+    mockEnforceRateLimit.mockResolvedValue(null);
   });
 
   it("deletes selected cards and never calls delete-all inventory", async () => {
@@ -141,5 +155,34 @@ describe("POST /api/admin/cards/bulk-delete", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Bulk delete failed — inventory unchanged",
     });
+  });
+
+  it("returns 429 and does not call deleteCardsByIds when rate-limited", async () => {
+    mockEnforceRateLimit.mockResolvedValueOnce(
+      Response.json(
+        { error: "rate_limited", code: "rate_limited", retryAfterSeconds: 30 },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+
+    const response = await POST(makeRequest({ ids: ["lea-232-normal-near_mint"] }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(mockDeleteCardsByIds).not.toHaveBeenCalled();
+  });
+
+  it("rate-limit runs AFTER auth so an unauthenticated caller still sees 401, not 429", async () => {
+    // If auth fails, the route must return the auth status -- rate-limit
+    // tarpitting must not hide an auth bug behind a 429.
+    mockRequireAdmin.mockResolvedValueOnce(
+      Response.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const response = await POST(makeRequest({ ids: ["lea-232-normal-near_mint"] }));
+
+    expect(response.status).toBe(401);
+    expect(mockEnforceRateLimit).not.toHaveBeenCalled();
+    expect(mockDeleteCardsByIds).not.toHaveBeenCalled();
   });
 });

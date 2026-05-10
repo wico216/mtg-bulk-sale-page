@@ -1,5 +1,10 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
 import { replaceAllCards } from "@/db/queries";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
 import type { CommitRequest, CommitResponse, CommitSummary } from "@/lib/import-contract";
 
 export const runtime = "nodejs";
@@ -42,6 +47,13 @@ function buildImportAuditMetadata(
 export async function POST(request: Request): Promise<Response> {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
+
+  // Import commit replaces inventory wholesale -- bulk bucket post-auth.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, auth.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
+  });
+  if (rateLimited) return rateLimited;
 
   let body: Partial<CommitRequest>;
   try {
