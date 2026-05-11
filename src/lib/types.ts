@@ -1,4 +1,13 @@
 /**
+ * Card finish enum — matches the `cards.finish` Postgres enum (Phase 16
+ * FIN-01 / D-07). The literal `"etched"` is the value Manabox emits in the
+ * `Foil` column for etched-foil cards (D-01, verified against the operator's
+ * 12,749-row export). Drives both Scryfall price selection (Phase 17 D-08
+ * etched mispricing fix) and the storefront display badge (D-09).
+ */
+export type Finish = "normal" | "foil" | "etched";
+
+/**
  * Raw row from a Manabox CSV export.
  * Maps directly to CSV headers when parsed with PapaParse header mode.
  */
@@ -7,10 +16,16 @@ export interface ManaboxRow {
   "Set code": string;
   "Set name": string;
   "Collector number": string;
-  Foil: "foil" | "normal";
+  Foil: Finish;
   Rarity: "common" | "uncommon" | "rare" | "mythic";
   Quantity: number;
   Condition: string;
+  // Phase 17 D-02 — binder columns are OPTIONAL because older Manabox
+  // exports (pre-binder-aware schema) lack them; the parser degrades
+  // gracefully by defaulting Binder Name to 'unsorted' and Binder Type to
+  // 'binder'.
+  "Binder Name"?: string;
+  "Binder Type"?: string;
   // Ignored fields (present in CSV but not used in processing)
   "ManaBox ID"?: string;
   "Scryfall ID"?: string;
@@ -26,7 +41,7 @@ export interface ManaboxRow {
  * Produced by CSV parsing (partial) then completed by Scryfall enrichment.
  */
 export interface Card {
-  /** Composite key: `${setCode}-${collectorNumber}-${foil}-${condition}` */
+  /** Composite key: `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}` */
   id: string;
   name: string;
   /** Lowercased set code (e.g., "sld") */
@@ -44,7 +59,14 @@ export interface Card {
   /** Oracle rules text, null if unavailable */
   oracleText: string | null;
   rarity: string;
-  foil: boolean;
+  /** Card finish — drives Scryfall price selection and display badge. */
+  finish: Finish;
+  /**
+   * Normalized binder name (lowercase, whitespace-collapsed,
+   * hyphens→underscores). Defaults to 'unsorted' for legacy or
+   * pre-binder-aware imports. See src/lib/binder-name.ts.
+   */
+  binder: string;
   // D-07: Optional DB fields (available for future phases)
   scryfallId?: string | null;
   createdAt?: string;
