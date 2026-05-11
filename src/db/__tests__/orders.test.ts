@@ -94,8 +94,8 @@ describe("placeCheckoutOrder", () => {
         available: 1,
       },
       {
-        cardId: "missing-card",
-        name: "missing-card",
+        cardId: "xxx-999-normal-near_mint",
+        name: "xxx-999-normal-near_mint",
         requested: 1,
         available: 0,
       },
@@ -108,7 +108,10 @@ describe("placeCheckoutOrder", () => {
       buyerEmail: "viki@example.com",
       items: [
         { cardId: "lea-232-normal-near_mint", quantity: 4 },
-        { cardId: "missing-card", quantity: 1 },
+        // 4-segment aggregated id for a card that doesn't exist in the db.
+        // The locked_rows CTE returns no rows for it; conflicts CTE
+        // produces a row with available=0 from the LEFT JOIN.
+        { cardId: "xxx-999-normal-near_mint", quantity: 1 },
       ],
     });
 
@@ -280,15 +283,15 @@ describe("placeCheckoutOrder", () => {
     });
 
     it("multi-line cart — partial fulfillment of one line aborts the entire order (PITFALLS Pitfall 2 / D-05)", async () => {
-      // Two lines: one fulfillable (5 of 5 available), one short (2 of 5
-      // requested available). Strict all-or-nothing: the conflict on the
-      // short line prevents ANY decrement; no order returned.
+      // Two lines: one fulfillable, one short. Strict all-or-nothing: the
+      // conflict on the short line prevents ANY decrement; no order returned.
+      // (Both cardIds are valid 4-segment aggregated keys.)
       mockExecute.mockResolvedValueOnce({
         rows: [{
           result: {
             ok: false,
             conflicts: [{
-              cardId: "short-line-id-a-b-c",
+              cardId: "yyy-100-foil-near_mint",
               name: "Short Line",
               requested: 5,
               available: 2,
@@ -302,8 +305,8 @@ describe("placeCheckoutOrder", () => {
         buyerName: "Viki",
         buyerEmail: "viki@example.com",
         items: [
-          { cardId: "fulfillable-x-y-z", quantity: 1 },
-          { cardId: "short-line-id-a-b-c", quantity: 5 },
+          { cardId: "lea-232-normal-near_mint", quantity: 1 },
+          { cardId: "yyy-100-foil-near_mint", quantity: 5 },
         ],
       });
 
@@ -313,7 +316,7 @@ describe("placeCheckoutOrder", () => {
       // Only the short line is in conflicts. The fulfillable line is silently
       // absent because no stock_write happened — we never partially fulfilled.
       expect(result.conflicts.length).toBe(1);
-      expect(result.conflicts[0].cardId).toBe("short-line-id-a-b-c");
+      expect(result.conflicts[0].cardId).toBe("yyy-100-foil-near_mint");
       // No order returned — zero items decremented.
       expect("order" in result).toBe(false);
     });
@@ -324,7 +327,7 @@ describe("placeCheckoutOrder", () => {
           result: {
             ok: false,
             conflicts: [{
-              cardId: "agg-key-with-segments-and-binder", // already 4-segment after parse; unreachable but validates shape
+              cardId: "lea-232-normal-near_mint", // 4-segment aggregated id
               name: "X",
               requested: 10,
               available: 6,
@@ -337,7 +340,7 @@ describe("placeCheckoutOrder", () => {
         orderRef: "ORD-D06",
         buyerName: "Viki",
         buyerEmail: "viki@example.com",
-        items: [{ cardId: "agg-key-with-segments-and-binder", quantity: 10 }],
+        items: [{ cardId: "lea-232-normal-near_mint", quantity: 10 }],
       });
 
       expect(result.ok).toBe(false);
@@ -351,6 +354,9 @@ describe("placeCheckoutOrder", () => {
         ["available", "cardId", "name", "requested"],
       );
       expect(result.conflicts[0].available).toBe(6); // SUM across binders, not per-row.
+      // The cardId returned is exactly the 4-segment aggregated id — never
+      // 5-segment per-binder.
+      expect(result.conflicts[0].cardId.split("-").length).toBe(4);
     });
 
     it("source contains the new allocator CTE markers and does not regress to JS-side pre-allocation (D-02, D-03, D-04)", () => {
@@ -375,14 +381,29 @@ describe("placeCheckoutOrder", () => {
       expect(source).toContain("LEAST(");
       expect(source).toContain("GREATEST(0,");
 
-      // Hard "do not regress" markers — neon-http has no interactive
-      // transactions and JS-side pre-allocation + lock-by-chosen-rows is
-      // the load-bearing concurrency bug PITFALLS Pitfall 1 prevents.
+      // Hard "do not regress" markers for placeCheckoutOrder. neon-http has
+      // no interactive transactions and JS-side pre-allocation +
+      // lock-by-chosen-rows is the load-bearing concurrency bug PITFALLS
+      // Pitfall 1 prevents.
       expect(source).not.toContain("db.transaction(");
-      expect(source).not.toMatch(/\bid IN \(/);
       expect(source).not.toContain("pickPlan");
       expect(source).not.toContain("preallocate");
       expect(source).not.toContain("preAllocate");
+
+      // Scope the `id IN (...)` anti-pattern check to the placeCheckoutOrder
+      // body only — cancelOrder legitimately uses `id IN (SELECT id FROM
+      // cancellable_order)` which is the unrelated cancel CTE pattern, not
+      // the allocator. Extract from `export async function placeCheckoutOrder`
+      // to the next top-level export to test only this function's SQL.
+      const allocatorMatch = source.match(
+        /export async function placeCheckoutOrder[\s\S]*?(?=\nexport (?:async )?function )/,
+      );
+      expect(allocatorMatch).toBeTruthy();
+      const allocatorBody = allocatorMatch?.[0] ?? "";
+      // Must NOT pre-pick rows in JS and lock by id IN (...) — that's the
+      // load-bearing concurrency bug. The allocator locks by aggregated
+      // join key (set_code, collector_number, finish, condition) instead.
+      expect(allocatorBody).not.toMatch(/\bid IN \(/);
     });
   });
 });

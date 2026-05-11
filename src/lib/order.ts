@@ -59,6 +59,12 @@ export function buildOrderData(
       quantity: reqItem.quantity,
       lineTotal,
       imageUrl: card?.imageUrl ?? null,
+      // Phase 18 D-11: binder snapshot per allocation. buildOrderData()
+      // operates on the legacy (cards.json era) flat-Card path — there is
+      // exactly one card row per cardId here, so the binder snapshot reads
+      // directly from the card. Defaults to 'unsorted' for legacy paths
+      // that predate the v1.3 binder column.
+      binder: card?.binder ?? "unsorted",
     };
   });
 

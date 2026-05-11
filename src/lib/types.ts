@@ -115,7 +115,15 @@ export interface ScryfallCard {
   layout: string;
 }
 
-/** A single item in a submitted order */
+/**
+ * A single item in a submitted order.
+ *
+ * v1.3 D-11: `binder` is the snapshot of the source binder for this
+ * allocation; admin order detail (Phase 21) reads it; survives subsequent
+ * inventory edits. A buyer line "Lightning Bolt × 3" split across A02:2 +
+ * A05:1 produces TWO OrderItem rows — one per binder source — each with
+ * its own `cardId` (the 5-segment per-binder id) and `binder` snapshot.
+ */
 export interface OrderItem {
   cardId: string;
   name: string;
@@ -127,8 +135,25 @@ export interface OrderItem {
   quantity: number;
   lineTotal: number | null;
   imageUrl?: string | null;
+  /**
+   * Snapshot of the binder this allocation was pulled from at order time.
+   * Defaults to 'unsorted' for legacy/migrated rows. Phase 21 admin order
+   * detail renders this as `[binder]` annotation per line.
+   */
+  binder: string;
 }
 
+/**
+ * v1.3 D-06: `cardId` is the AGGREGATED 4-segment id
+ * `${setCode}-${collectorNumber}-${finish}-${condition}` — NOT a per-binder
+ * 5-segment id. `available` is the SUM across all binders for that
+ * aggregated key — NEVER per-binder. The shape is preserved verbatim from
+ * v1.2; only the semantic meaning shifts.
+ *
+ * The buyer's cart submits aggregated keys; if the order can't be fully
+ * fulfilled (across all binders combined), they see this shape. Per-binder
+ * breakdowns are admin-only (PITFALLS Pitfall 6 / I-DISC-05).
+ */
 export interface StockConflict {
   cardId: string;
   name: string;

@@ -3,7 +3,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { createAdminAuditEntry, type AdminMutationAuditContext } from "@/db/queries";
-import type { OrderData, OrderItem } from "@/lib/types";
+import type { Finish, OrderData, OrderItem } from "@/lib/types";
 
 export interface CheckoutLineInput {
   cardId: string;
@@ -32,6 +32,58 @@ interface PersistedOrderItem {
   quantity: number;
   lineTotal: number | null;
   imageUrl: string | null;
+  // Phase 18 D-11: binder snapshot column (Phase 16 added it to
+  // order_items; the allocator's inserted_items returns it via RETURNING).
+  binder: string;
+}
+
+interface AggregatedCardKey {
+  setCode: string;
+  collectorNumber: string;
+  finish: Finish;
+  condition: string;
+}
+
+const FINISH_VALUES = new Set<Finish>(["normal", "foil", "etched"]);
+
+/**
+ * Phase 18 D-04: Splits the buyer's 4-segment aggregated cardId
+ * `${setCode}-${collectorNumber}-${finish}-${condition}` into typed fields
+ * for the allocator's VALUES list.
+ *
+ * Throws on:
+ *   - Segment count != 4 (e.g., 5-segment per-binder ids accidentally
+ *     submitted by stale carts; Phase 20's silent reconciliation in
+ *     cart-page-client.tsx is the upstream gate, this is defense-in-depth)
+ *   - Empty segments
+ *   - Unknown `finish` (must be 'normal' | 'foil' | 'etched')
+ *
+ * A throw here surfaces as `checkout.unexpected_error` (HTTP 500) at the
+ * route layer — the buyer's cart has bad keys and they need to refresh.
+ */
+function parseAggregatedCardId(cardId: string): AggregatedCardKey {
+  if (typeof cardId !== "string" || cardId.length === 0) {
+    throw new Error(`Invalid aggregated card id: ${cardId}`);
+  }
+  const segments = cardId.split("-");
+  if (segments.length !== 4) {
+    throw new Error(
+      `Invalid aggregated card id (expected 4 segments, got ${segments.length}): ${cardId}`,
+    );
+  }
+  const [setCode, collectorNumber, finish, condition] = segments;
+  if (!setCode || !collectorNumber || !finish || !condition) {
+    throw new Error(`Invalid aggregated card id (empty segment): ${cardId}`);
+  }
+  if (!FINISH_VALUES.has(finish as Finish)) {
+    throw new Error(`Invalid aggregated card id (unknown finish '${finish}'): ${cardId}`);
+  }
+  return {
+    setCode,
+    collectorNumber,
+    finish: finish as Finish,
+    condition,
+  };
 }
 
 interface PersistedOrder {
@@ -71,6 +123,11 @@ function normalizeOrder(order: PersistedOrder): OrderData {
     quantity: item.quantity,
     lineTotal: centsToDollars(item.lineTotal),
     imageUrl: item.imageUrl,
+    // Phase 18 D-11: binder snapshot from order_items.binder column
+    // (Phase 16 BIND-03 / D-09). Defaults to 'unsorted' for legacy rows;
+    // the SQL column is NOT NULL DEFAULT 'unsorted' so the SQL payload
+    // always carries a string here.
+    binder: item.binder,
   }));
 
   return {
@@ -347,6 +404,37 @@ function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
   };
 }
 
+/**
+ * Phase 18 multi-binder allocator (extends Phase 11's CTE-chain checkout).
+ *
+ * The buyer's cart submits AGGREGATED 4-segment cardIds
+ * (`${setCode}-${collectorNumber}-${finish}-${condition}`). The allocator
+ * deterministically distributes each line across binder source rows in
+ * ONE SQL CTE chain — never overselling under concurrent checkout, never
+ * silently partial-fulfilling, producing one `order_items` row per binder
+ * source so admin order detail (Phase 21) renders the operator's pick path.
+ *
+ * The CTE chain (single `db.execute` round-trip on neon-http):
+ *   requested → locked_rows (FOR UPDATE OF cards on the AGGREGATED key,
+ *   ORDER BY binder ASC, window functions for running_supply / total_supply)
+ *   → conflicts → can_fulfill → allocations (LEAST(quantity, GREATEST(0,
+ *   requested - prior_running_supply))) → nonzero_allocations → stock_write
+ *   → write_check → order_totals → inserted_order → inserted_items
+ *
+ * Load-bearing concurrency guarantee (PITFALLS Pitfall 1 / ARCHITECTURE
+ * Q3 walk-through): EVERY cards row matching the aggregated key is locked
+ * via `FOR UPDATE OF cards` BEFORE the allocator decides which rows to
+ * decrement. NO JS-side pre-allocation. NO `id IN (...)` lock pattern.
+ * neon-http has no interactive transactions; pre-computing a pick plan in
+ * JavaScript and then locking by chosen rows is the load-bearing
+ * concurrency bug this milestone was scoped to fix.
+ *
+ * Strict all-or-nothing (D-05): if ANY aggregated line cannot be filled
+ * across all available binders, the entire order fails with StockConflict
+ * — no partial fulfillment. `StockConflict.cardId` is the AGGREGATED
+ * 4-segment id (D-06); `available` is SUM across binders. Per-binder
+ * breakdowns are admin-only.
+ */
 export async function placeCheckoutOrder(input: {
   orderRef: string;
   buyerName: string;
@@ -354,126 +442,130 @@ export async function placeCheckoutOrder(input: {
   message?: string;
   items: CheckoutLineInput[];
 }): Promise<PlaceCheckoutOrderResult> {
-  const requested = aggregateCheckoutLines(input.items);
-  if (requested.length === 0) {
+  const aggregated = aggregateCheckoutLines(input.items);
+  if (aggregated.length === 0) {
     throw new Error("Checkout requires at least one item");
   }
 
+  // Parse each 4-segment aggregated cardId into typed columns. Throws on
+  // 5-segment or otherwise malformed input — defense-in-depth above
+  // Phase 20's silent reconciliation in cart-page-client.tsx.
+  const parsed = aggregated.map((item) => ({
+    ...parseAggregatedCardId(item.cardId),
+    quantity: item.quantity,
+    aggregatedId: item.cardId,
+  }));
+
   const requestedValues = sql.join(
-    requested.map(
-      (item) => sql`(${item.cardId}::text, ${item.quantity}::integer)`,
+    parsed.map(
+      (p) => sql`(${p.setCode}::text, ${p.collectorNumber}::text, ${p.finish}::finish, ${p.condition}::text, ${p.quantity}::integer, ${p.aggregatedId}::text)`,
     ),
     sql`, `,
   );
 
   const result = await db.execute<{ result: unknown }>(sql`
-    WITH requested(card_id, requested_qty) AS (
+    WITH requested(set_code, collector_number, finish, condition, requested_qty, aggregated_id) AS (
       VALUES ${requestedValues}
     ),
-    requested_agg AS (
-      SELECT card_id, SUM(requested_qty)::integer AS requested_qty
-      FROM requested
-      GROUP BY card_id
-    ),
-    locked_cards AS (
-      SELECT cards.*
+    locked_rows AS (
+      SELECT cards.*,
+             requested.aggregated_id AS aggregated_id,
+             ROW_NUMBER() OVER (
+               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
+               ORDER BY cards.binder ASC
+             ) AS bucket_rank,
+             SUM(cards.quantity) OVER (
+               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
+               ORDER BY cards.binder ASC
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+             ) AS running_supply,
+             SUM(cards.quantity) OVER (
+               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
+             ) AS total_supply
       FROM cards
-      INNER JOIN requested_agg ON requested_agg.card_id = cards.id
-      ORDER BY cards.id
-      FOR UPDATE
+      INNER JOIN requested USING (set_code, collector_number, finish, condition)
+      ORDER BY cards.set_code, cards.collector_number, cards.finish, cards.condition, cards.binder
+      FOR UPDATE OF cards
     ),
     conflicts AS (
       SELECT
-        requested_agg.card_id,
-        COALESCE(locked_cards.name, requested_agg.card_id) AS name,
-        requested_agg.requested_qty AS requested,
-        COALESCE(locked_cards.quantity, 0) AS available
-      FROM requested_agg
-      LEFT JOIN locked_cards ON locked_cards.id = requested_agg.card_id
-      WHERE locked_cards.id IS NULL
-         OR locked_cards.quantity < requested_agg.requested_qty
+        r.aggregated_id AS card_id,
+        COALESCE(MAX(l.name), r.aggregated_id) AS name,
+        r.requested_qty AS requested,
+        COALESCE(MAX(l.total_supply), 0)::integer AS available
+      FROM requested r
+      LEFT JOIN locked_rows l USING (set_code, collector_number, finish, condition)
+      GROUP BY r.aggregated_id, r.requested_qty
+      HAVING COALESCE(MAX(l.total_supply), 0) < r.requested_qty
     ),
     can_fulfill AS (
       SELECT NOT EXISTS (SELECT 1 FROM conflicts) AS ok
     ),
+    allocations AS (
+      SELECT l.id AS card_id,
+             l.binder,
+             l.name,
+             l.set_name,
+             l.set_code,
+             l.collector_number,
+             l.condition,
+             l.price,
+             l.image_url,
+             LEAST(
+               l.quantity,
+               GREATEST(0, r.requested_qty - (l.running_supply - l.quantity))
+             )::integer AS take_qty
+      FROM locked_rows l
+      INNER JOIN requested r USING (set_code, collector_number, finish, condition)
+      CROSS JOIN can_fulfill
+      WHERE can_fulfill.ok
+    ),
+    nonzero_allocations AS (
+      SELECT * FROM allocations WHERE take_qty > 0
+    ),
     stock_write AS (
       UPDATE cards
-      SET
-        quantity = cards.quantity - requested_agg.requested_qty,
-        updated_at = now()
-      FROM requested_agg, can_fulfill
-      WHERE can_fulfill.ok
-        AND cards.id = requested_agg.card_id
-      RETURNING cards.id
+         SET quantity = cards.quantity - nz.take_qty,
+             updated_at = now()
+        FROM nonzero_allocations nz
+       WHERE cards.id = nz.card_id
+       RETURNING cards.id
     ),
     write_check AS (
       SELECT
         (SELECT ok FROM can_fulfill)
-        AND (SELECT COUNT(*) FROM stock_write) = (SELECT COUNT(*) FROM requested_agg)
+        AND (SELECT COUNT(*) FROM stock_write) = (SELECT COUNT(*) FROM nonzero_allocations)
         AS ok
     ),
     order_totals AS (
-      SELECT
-        SUM(requested_agg.requested_qty)::integer AS total_items,
-        COALESCE(SUM(COALESCE(locked_cards.price, 0) * requested_agg.requested_qty), 0)::integer AS total_price
-      FROM requested_agg
-      INNER JOIN locked_cards ON locked_cards.id = requested_agg.card_id
+      SELECT SUM(nz.take_qty)::integer AS total_items,
+             COALESCE(SUM(COALESCE(nz.price, 0) * nz.take_qty), 0)::integer AS total_price
+        FROM nonzero_allocations nz
     ),
     inserted_order AS (
-      INSERT INTO orders (
-        id,
-        buyer_name,
-        buyer_email,
-        message,
-        total_items,
-        total_price,
-        status
-      )
-      SELECT
-        ${input.orderRef},
-        ${input.buyerName},
-        ${input.buyerEmail},
-        ${input.message ?? null},
-        order_totals.total_items,
-        order_totals.total_price,
-        'pending'::order_status
-      FROM order_totals, write_check
-      WHERE write_check.ok
+      INSERT INTO orders (id, buyer_name, buyer_email, message, total_items, total_price, status)
+      SELECT ${input.orderRef}, ${input.buyerName}, ${input.buyerEmail}, ${input.message ?? null},
+             order_totals.total_items, order_totals.total_price, 'pending'::order_status
+        FROM order_totals, write_check
+       WHERE write_check.ok
       RETURNING id, buyer_name, buyer_email, message, total_items, total_price, status, created_at
     ),
     inserted_items AS (
       INSERT INTO order_items (
-        order_id,
-        card_id,
-        name,
-        set_name,
-        set_code,
-        collector_number,
-        condition,
-        price,
-        quantity,
-        line_total,
-        image_url
+        order_id, card_id, name, set_name, set_code, collector_number,
+        condition, price, quantity, line_total, image_url, binder
       )
       SELECT
         inserted_order.id,
-        locked_cards.id,
-        locked_cards.name,
-        locked_cards.set_name,
-        locked_cards.set_code,
-        locked_cards.collector_number,
-        locked_cards.condition,
-        locked_cards.price,
-        requested_agg.requested_qty,
-        CASE
-          WHEN locked_cards.price IS NULL THEN NULL
-          ELSE locked_cards.price * requested_agg.requested_qty
-        END,
-        locked_cards.image_url
+        nz.card_id,
+        nz.name, nz.set_name, nz.set_code, nz.collector_number, nz.condition,
+        nz.price, nz.take_qty,
+        CASE WHEN nz.price IS NULL THEN NULL ELSE nz.price * nz.take_qty END,
+        nz.image_url,
+        nz.binder
       FROM inserted_order
-      INNER JOIN requested_agg ON TRUE
-      INNER JOIN locked_cards ON locked_cards.id = requested_agg.card_id
-      RETURNING id, card_id, name, set_name, set_code, collector_number, condition, price, quantity, line_total, image_url
+      CROSS JOIN nonzero_allocations nz
+      RETURNING id, card_id, name, set_name, set_code, collector_number, condition, price, quantity, line_total, image_url, binder
     )
     SELECT jsonb_build_object(
       'ok', (SELECT ok FROM write_check),
@@ -506,8 +598,9 @@ export async function placeCheckoutOrder(input: {
               'price', inserted_items.price,
               'quantity', inserted_items.quantity,
               'lineTotal', inserted_items.line_total,
-              'imageUrl', inserted_items.image_url
-            ) ORDER BY inserted_items.id)
+              'imageUrl', inserted_items.image_url,
+              'binder', inserted_items.binder
+            ) ORDER BY inserted_items.binder)
             FROM inserted_items
           ), '[]'::jsonb)
         )
@@ -607,7 +700,8 @@ export async function getOrderById(
       price,
       quantity,
       line_total AS "lineTotal",
-      image_url AS "imageUrl"
+      image_url AS "imageUrl",
+      binder
     FROM order_items
     WHERE order_id = ${id}
     ORDER BY id ASC
@@ -634,6 +728,9 @@ export async function getOrderById(
       quantity: item.quantity,
       lineTotal: centsToDollars(item.lineTotal),
       imageUrl: item.imageUrl,
+      // Phase 18 D-11: binder snapshot from order_items.binder column.
+      // Phase 21 admin order detail renders this as `[binder]` annotation.
+      binder: item.binder,
     })),
   };
 }
