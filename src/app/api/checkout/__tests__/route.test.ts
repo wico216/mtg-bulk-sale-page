@@ -39,7 +39,7 @@ const sampleOrder = {
   message: "pickup tomorrow",
   items: [
     {
-      cardId: "lea-232-normal-near_mint",
+      cardId: "lea-232-normal-near_mint-a02",
       name: "Lightning Bolt",
       setName: "Alpha",
       setCode: "lea",
@@ -49,6 +49,7 @@ const sampleOrder = {
       quantity: 2,
       lineTotal: 2.5,
       imageUrl: "https://example.com/bolt.jpg",
+      binder: "a02",
     },
   ],
   totalItems: 2,
@@ -288,5 +289,117 @@ describe("POST /api/checkout", () => {
 
     expect(response.status).toBe(429);
     expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
+  });
+
+  it("responds 503 with stock_check_violation code on CHECK-constraint trip (D-08)", async () => {
+    // Simulate the Postgres `cards_quantity_check` constraint trip — the
+    // schema-level safety net (Phase 16 BIND-04) that should NEVER fire
+    // if the allocator's per-binder math is correct. neon-http surfaces
+    // the error with `code` and `constraint` fields per node-postgres.
+    const constraintError = Object.assign(new Error("check constraint cards_quantity_check violated"), {
+      code: "23514",
+      constraint: "cards_quantity_check",
+    });
+    mockPlaceCheckoutOrder.mockRejectedValueOnce(constraintError);
+
+    // Capture the structured log so we can assert the new check_constraint
+    // event fired (operators grep this name in logs).
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const response = await POST(makeCheckoutRequest(validBody()));
+      const data = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(data).toEqual({
+        success: false,
+        error: "Inventory check failed — please refresh and try again",
+        code: "stock_check_violation",
+      });
+      expect(mockNotifyOrder).not.toHaveBeenCalled();
+
+      // Assert the structured log event was emitted with the new event name.
+      const errorLines: Array<Record<string, unknown>> = [];
+      for (const call of errorSpy.mock.calls) {
+        const raw = call[0];
+        if (typeof raw !== "string") continue;
+        try {
+          errorLines.push(JSON.parse(raw));
+        } catch {
+          // not JSON; skip
+        }
+      }
+      const constraintLog = errorLines.find(
+        (line) => line.event === "checkout.check_constraint_violation",
+      );
+      expect(constraintLog).toBeDefined();
+      expect(constraintLog!.route).toBe("/api/checkout");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("emits binderSourceCount on order_committed log event (D-13)", async () => {
+    // Mock an order with 4 items spread across 3 distinct binders.
+    // binderSourceCount should equal 3 (the count of DISTINCT binders).
+    const multiBinderOrder = {
+      ...sampleOrder,
+      items: [
+        { ...sampleOrder.items[0], binder: "a02", quantity: 1 },
+        {
+          ...sampleOrder.items[0],
+          cardId: "lea-232-normal-near_mint-a05",
+          binder: "a02", // duplicate binder; should NOT inflate count
+          quantity: 1,
+        },
+        {
+          ...sampleOrder.items[0],
+          cardId: "lea-232-normal-near_mint-a07",
+          binder: "a05",
+          quantity: 1,
+        },
+        {
+          ...sampleOrder.items[0],
+          cardId: "lea-232-normal-near_mint-a09",
+          binder: "a07",
+          quantity: 1,
+        },
+      ],
+      totalItems: 4,
+    };
+    mockPlaceCheckoutOrder.mockResolvedValueOnce({ ok: true, order: multiBinderOrder });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      const response = await POST(makeCheckoutRequest(validBody()));
+      expect(response.status).toBe(201);
+
+      // Find the order_committed log event and assert binderSourceCount.
+      const logLines: Array<Record<string, unknown>> = [];
+      for (const call of logSpy.mock.calls) {
+        const raw = call[0];
+        if (typeof raw !== "string") continue;
+        try {
+          logLines.push(JSON.parse(raw));
+        } catch {
+          // not JSON; skip
+        }
+      }
+      const committed = logLines.find(
+        (line) => line.event === "checkout.order_committed",
+      );
+      expect(committed).toBeDefined();
+      const meta = committed!.metadata as Record<string, unknown>;
+      // 3 distinct binders: a02, a05, a07 (the duplicate a02 doesn't inflate).
+      expect(meta.binderSourceCount).toBe(3);
+      // Per D-12, no per-binder breakdown leaks into metadata.
+      const serialized = JSON.stringify(committed);
+      expect(serialized).not.toContain("a02");
+      expect(serialized).not.toContain("a05");
+      expect(serialized).not.toContain("a07");
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });

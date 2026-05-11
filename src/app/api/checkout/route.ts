@@ -13,6 +13,25 @@ import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
 const ROUTE = "/api/checkout";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Phase 18 D-08: Detects the Postgres `cards_quantity_check` CHECK
+ * constraint violation. The constraint is the schema-level safety net
+ * (Phase 16 BIND-04) that guards against a logic bug ever leading to
+ * `cards.quantity < 0`. If the allocator's per-binder running-supply
+ * arithmetic is correct, this should never fire — but if it does, we
+ * surface it as HTTP 503 (transient/retry-safe) instead of a silent
+ * oversell, and emit a structured log event so operators can spot it.
+ *
+ * Postgres error code 23514 = `check_violation`. neon-http surfaces the
+ * error as an object with `code` and `constraint` fields per node-postgres
+ * convention.
+ */
+function isCheckConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; constraint?: string };
+  return err.code === "23514" && err.constraint === "cards_quantity_check";
+}
+
 function validateCheckoutRequest(body: CheckoutRequest): string | null {
   if (!body.buyerName || typeof body.buyerName !== "string" || !body.buyerName.trim()) {
     return "Name is required";
@@ -100,6 +119,28 @@ export async function POST(request: NextRequest) {
         })),
       });
     } catch (dbError) {
+      // Phase 18 D-08: detect the schema-level safety-net trip explicitly.
+      // The cards_quantity_check CHECK constraint should NEVER fire if the
+      // allocator's per-binder allocation math is correct; if it does,
+      // surface HTTP 503 with a distinguishable error code so retries are
+      // safe and operators can grep logs for the (should-never-happen)
+      // event.
+      if (isCheckConstraintError(dbError)) {
+        logError({
+          event: "checkout.check_constraint_violation",
+          route: ROUTE,
+          error: dbError,
+          metadata: { itemCount: body.items.length },
+        });
+        return Response.json(
+          {
+            success: false,
+            error: "Inventory check failed — please refresh and try again",
+            code: "stock_check_violation",
+          },
+          { status: 503 },
+        );
+      }
       logError({
         event: "checkout.db_failed",
         route: ROUTE,
@@ -130,6 +171,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Phase 18 D-13: pick complexity signal — count of distinct binder
+    // sources for this order. Bounded, no PII, no per-binder breakdown.
+    // Operators can log-aggregate to spot orders with high binder spread
+    // (operator pull-friction signal). Per-line binder is in
+    // order_items.binder snapshot for Phase 21's admin order detail; we
+    // explicitly avoid duplicating it in audit metadata (D-12 — 4KB cap).
+    const binderSourceCount = new Set(
+      checkoutResult.order.items.map((item) => item.binder),
+    ).size;
     logEvent({
       level: "info",
       event: "checkout.order_committed",
@@ -138,6 +188,7 @@ export async function POST(request: NextRequest) {
         orderRef: checkoutResult.order.orderRef,
         totalItems: checkoutResult.order.totalItems,
         totalPrice: checkoutResult.order.totalPrice,
+        binderSourceCount,
       },
     });
 
