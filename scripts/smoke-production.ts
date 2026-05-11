@@ -4,9 +4,17 @@
  *
  * Goals (per 15-CONTEXT D-09 and 15-02 PLAN):
  *   - Repeatable, checked in, runnable as `npm run smoke:production`.
- *   - Default mode is READ-ONLY and guard-focused. It never mutates production
- *     data unless a future flag explicitly enables that, which is intentionally
- *     not implemented here -- mutation must remain an explicit operator choice.
+ *   - Guard-focused. The script is read-only AGAINST PRODUCTION DATA but
+ *     intentionally issues an UNAUTHENTICATED `DELETE /api/admin/cards` as
+ *     part of check #4 to verify that the route's `requireAdmin()` guard
+ *     returns 401 BEFORE any state is touched. The expectation -- the only
+ *     valid response -- is HTTP 401. If the deployment is misconfigured
+ *     such that the guard is bypassed and the DELETE returns 200, this
+ *     script BAILS LOUDLY (FAIL result + non-zero exit) so the operator
+ *     does not silently destroy inventory. See WR-04: the failure mode of
+ *     a deployment with broken auth is exactly the case the smoke is
+ *     designed to catch, and it is the deployment's misconfiguration --
+ *     not the smoke -- that would be the destructive event.
  *   - Help is available without secrets so a fresh operator can read the
  *     interface before running anything against a real deployment.
  *
@@ -15,7 +23,8 @@
  *   2. GET /admin/login        -> 200, "Sign in with Google" visible,
  *                                       no local password field in production
  *   3. GET /admin              -> 302/307 redirect to /admin/login when no auth
- *   4. DELETE /api/admin/cards -> 401 (route-handler guard returns JSON 401)
+ *   4. DELETE /api/admin/cards -> MUST be 401 (auth guard). Anything else
+ *                                 (especially 200) is treated as a hard FAIL.
  *   5. GET  /api/admin/health  -> 401 (admin-only)
  *
  * Vercel protection bypass:
@@ -40,8 +49,12 @@ Optional:
   -h, --help                 Show this help and exit.
 
 Behavior:
-  - Default mode is READ-ONLY and guard-focused. Authenticated mutation paths
-    are NOT exercised here.
+  - Guard-focused. The script is read-only against production data, but
+    issues a guarded, unauthenticated DELETE /api/admin/cards probe to
+    verify that requireAdmin() rejects with 401 BEFORE any state is
+    touched. The expected (and only valid) response is 401. If the
+    DELETE ever returns 200, the smoke fails loudly so a misconfigured
+    deployment's broken auth is surfaced immediately.
   - Exit code is 0 if every check passes, 1 otherwise.
   - No secret values are printed (env vars, tokens, cookies all redacted).
 
@@ -201,11 +214,26 @@ async function checkAdminMutationGuard(base: string, args: Args): Promise<CheckR
   // must return 401 JSON via requireAdmin(). We intentionally use DELETE so
   // the test exercises a mutation method -- but the route returns 401 before
   // touching any state.
+  //
+  // WR-04: if the deployment is misconfigured such that the auth guard is
+  // bypassed, this call would (in the worst case) reach the delete-all
+  // handler and destroy inventory. We treat that case as a hard FAIL with
+  // an explicit "CRITICAL" detail string so the operator notices
+  // immediately; the smoke is the right place to surface this because
+  // catching a broken auth guard is precisely its purpose.
   const res = await fetchWithTimeout(`${base}/api/admin/cards`, {
     method: "DELETE",
     headers: bypassHeaders(args.bypassToken),
     timeoutMs: args.timeoutMs,
   });
+  if (res.status === 200) {
+    return {
+      name: "DELETE /api/admin/cards (unauth)",
+      ok: false,
+      detail:
+        "CRITICAL: status=200 from unauthenticated DELETE -- requireAdmin guard is broken on this deployment. Inventory may have been touched. Investigate auth env (AUTH_SECRET, ADMIN_EMAIL, AUTH_GOOGLE_*) immediately.",
+    };
+  }
   if (res.status !== 401) {
     return {
       name: "DELETE /api/admin/cards (unauth)",
