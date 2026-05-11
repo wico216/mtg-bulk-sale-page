@@ -28,25 +28,28 @@ const selectBuilder = {
   groupBy: vi.fn(),
 };
 
-// Insert call counter — first call returns insertBuilder (cards), second is
-// audit (admin_audit_log), third is import_history.
-let insertCallCount = 0;
-
-vi.mock("@/db/client", () => ({
-  db: {
-    batch: vi.fn().mockResolvedValue([]),
-    delete: vi.fn(() => deleteBuilder),
-    insert: vi.fn(() => {
-      insertCallCount += 1;
-      if (insertCallCount === 1) return insertBuilder;
-      if (insertCallCount === 2) return auditInsertBuilder;
-      return importHistoryInsertBuilder;
-    }),
-    select: vi.fn(() => selectBuilder),
-    $count: vi.fn().mockResolvedValue(100),
-    transaction: undefined,
-  },
-}));
+// Route db.insert(table) to the right builder based on the table identity
+// (not call order), so empty-cards paths that skip the cards-insert still map
+// audit/importHistory inserts to the correct builders.
+vi.mock("@/db/client", async () => {
+  const schema = await import("@/db/schema");
+  return {
+    db: {
+      batch: vi.fn().mockResolvedValue([]),
+      delete: vi.fn(() => deleteBuilder),
+      insert: vi.fn((table: unknown) => {
+        if (table === schema.cards) return insertBuilder;
+        if (table === schema.adminAuditLog) return auditInsertBuilder;
+        if (table === schema.importHistory) return importHistoryInsertBuilder;
+        // Fallback for unexpected tables — should never happen in this suite.
+        return insertBuilder;
+      }),
+      select: vi.fn(() => selectBuilder),
+      $count: vi.fn().mockResolvedValue(100),
+      transaction: undefined,
+    },
+  };
+});
 
 import { db } from "@/db/client";
 import { replaceCardsForBinders, deleteAllCards } from "../queries";
@@ -73,7 +76,6 @@ function makeCard(overrides: Partial<Card> = {}): Card {
 }
 
 beforeEach(() => {
-  insertCallCount = 0;
   vi.mocked(db.batch).mockClear();
   vi.mocked(db.batch).mockResolvedValue([] as never);
   vi.mocked(db.delete).mockClear();

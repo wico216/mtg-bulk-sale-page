@@ -5,6 +5,9 @@ import { db } from "@/db/client";
 import { adminAuditLog, cards, importHistory } from "@/db/schema";
 import { cardToRow } from "@/db/seed";
 import type { Card, CardData } from "@/lib/types";
+import type { ScopedImportAuditMetadata } from "@/lib/import-contract";
+
+export type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 
 /**
  * Data access layer for the storefront.
@@ -798,24 +801,112 @@ export async function getAllCardsForExport() {
 }
 
 /**
- * Atomic destructive replace of the entire cards table.
+ * Atomic destructive replace of inventory in the SELECTED binders only.
+ * Inventory in unselected binders is bit-for-bit unchanged.
  *
- * CRITICAL: uses db.batch([...]) -- NOT db.transaction().
- * Reason: drizzle-orm/neon-http does not support interactive transactions
- * (source: node_modules/drizzle-orm/neon-http/session.js throws
- * "No transactions support in neon-http driver"). db.batch() is routed through
- * Neon's HTTP transaction() endpoint and is atomic end-to-end -- all statements
- * commit together or nothing is written (Phase 10 CSV-01 "single transaction").
+ * SCOPED DELETE WHERE binder IN (selectedBinders) — NEVER an unbounded
+ * DELETE. The function THROWS BEFORE any DB work if (a) selectedBinders
+ * is empty (would unbound the DELETE — D-18), or (b) any newCards entry
+ * has a binder NOT in selectedBinders (would silently lose data — D-18
+ * belt-and-suspenders against the typed deletedFromUnselected: 0 invariant).
  *
- * Empty input is supported: replaceAllCards([]) wipes the table in a
- * single-statement batch and returns { inserted: 0 }. The API layer should
- * still block this at the UI (Pitfall 7) but the helper remains defensive.
+ * Uses db.batch([...]) — see Phase 10 rationale (drizzle-orm neon-http has
+ * no interactive transactions). The order is:
+ *   1. SELECT before-counts (NOT in the batch — pre-flight read)
+ *   2. db.$count(cards) for totalBefore (also pre-flight)
+ *   3. db.batch([
+ *        DELETE cards WHERE binder IN (selectedBinders),
+ *        INSERT cards VALUES (rows),    // omitted when newCards is []
+ *        INSERT adminAuditLog (...),    // when audit is present
+ *        INSERT importHistory (...),    // when audit.importHistory is present
+ *      ])
+ *
+ * Audit + importHistory metadata is the bounded ScopedImportAuditMetadata
+ * shape (D-17), capped per list at MAX_AUDIT_ARRAY_LENGTH; total payload
+ * stays under MAX_AUDIT_METADATA_BYTES (4KB).
  */
-export async function replaceAllCards(
+export async function replaceCardsForBinders(
   newCards: Card[],
-  audit?: AdminMutationAuditContext,
-): Promise<{ inserted: number }> {
+  selectedBinders: string[],
+  audit?: AdminMutationAuditContext & { knownBinders?: string[] },
+): Promise<{ inserted: number; deleted: number }> {
+  // ---- Pre-flight invariants (D-18) -----------------------------------------
+  if (selectedBinders.length === 0) {
+    throw new Error(
+      "replaceCardsForBinders: selectedBinders is empty (would unbound DELETE)",
+    );
+  }
+  const selectedBinderSet = new Set(selectedBinders);
+  for (const card of newCards) {
+    if (!selectedBinderSet.has(card.binder)) {
+      throw new Error(
+        `replaceCardsForBinders: card ${card.id} has binder "${card.binder}" not in selectedBinders`,
+      );
+    }
+  }
+
+  // ---- Per-binder before-counts (single SELECT) -----------------------------
+  const beforeRows = await db
+    .select({ binder: cards.binder, count: sql<number>`count(*)::int` })
+    .from(cards)
+    .where(inArray(cards.binder, selectedBinders))
+    .groupBy(cards.binder);
+  const beforeCounts: Record<string, number> = {};
+  for (const r of beforeRows) {
+    beforeCounts[r.binder] = r.count;
+  }
+  // Selected binders that had zero rows before are absent from beforeRows;
+  // backfill them with 0 so the audit map enumerates every selected binder.
+  for (const b of selectedBinders) {
+    if (!(b in beforeCounts)) beforeCounts[b] = 0;
+  }
+  const totalBeforeForSelected = Object.values(beforeCounts).reduce(
+    (s, n) => s + n,
+    0,
+  );
+
+  // ---- Per-binder after-counts (purely from input array) --------------------
+  const afterCounts: Record<string, number> = Object.fromEntries(
+    selectedBinders.map((b) => [b, 0]),
+  );
+  for (const c of newCards) {
+    afterCounts[c.binder] = (afterCounts[c.binder] ?? 0) + 1;
+  }
+
+  // ---- totalCardsAfterImport via db.$count (pre-commit) ---------------------
+  const currentTotal = await db.$count(cards);
+
+  // ---- newBinders / missingBinders relative to known ------------------------
+  const known = audit?.knownBinders ?? [];
+  const knownSet = new Set(known);
+  const newBindersInExport = selectedBinders.filter((b) => !knownSet.has(b));
+  const missingBindersFromExport = known.filter(
+    (b) => !selectedBinderSet.has(b),
+  );
+
+  // ---- Build ScopedImportAuditMetadata (D-17, list caps applied) ------------
+  const scopedMetadata: ScopedImportAuditMetadata = {
+    selectedBinders: selectedBinders.slice(0, MAX_AUDIT_ARRAY_LENGTH),
+    totalBindersInExport: new Set(newCards.map((c) => c.binder)).size,
+    scopedReplaceCounts: {
+      before: beforeCounts,
+      after: afterCounts,
+      deletedFromUnselected: 0,
+    },
+    totalCardsAfterImport: currentTotal - totalBeforeForSelected + newCards.length,
+    newBindersInExport: newBindersInExport.slice(0, MAX_AUDIT_ARRAY_LENGTH),
+    missingBindersFromExport: missingBindersFromExport.slice(
+      0,
+      MAX_AUDIT_ARRAY_LENGTH,
+    ),
+  };
+
+  // ---- Build batch statements -----------------------------------------------
   const rows = newCards.map(cardToRow);
+  const deleteStatement = db.delete(cards).where(
+    inArray(cards.binder, selectedBinders),
+  );
+  const insertStatement = rows.length > 0 ? db.insert(cards).values(rows) : null;
   const auditInsert = audit
     ? db.insert(adminAuditLog).values(
         buildAdminAuditInsertValues({
@@ -826,6 +917,7 @@ export async function replaceAllCards(
           targetCount: rows.length,
           metadata: {
             ...(audit.metadata ?? {}),
+            ...scopedMetadata,
             insertedCards: rows.length,
           },
         }),
@@ -835,34 +927,24 @@ export async function replaceAllCards(
     ? db.insert(importHistory).values(
         buildImportHistoryInsertValues({
           ...audit.importHistory,
-          actorEmail: audit.importHistory.actorEmail ?? audit.actorEmail ?? null,
+          actorEmail:
+            audit.importHistory.actorEmail ?? audit.actorEmail ?? null,
           insertedCards: rows.length,
+          metadata: {
+            ...(audit.importHistory.metadata ?? {}),
+            ...scopedMetadata,
+          },
         }),
       )
     : null;
 
-  if (newCards.length === 0) {
-    if (auditInsert || importHistoryInsert) {
-      await db.batch(
-        [db.delete(cards), auditInsert, importHistoryInsert].filter(Boolean) as unknown as Parameters<typeof db.batch>[0],
-      );
-    } else {
-      await db.batch([db.delete(cards)]);
-    }
-    return { inserted: 0 };
-  }
+  await db.batch(
+    [deleteStatement, insertStatement, auditInsert, importHistoryInsert].filter(
+      Boolean,
+    ) as unknown as Parameters<typeof db.batch>[0],
+  );
 
-  if (auditInsert || importHistoryInsert) {
-    await db.batch([
-      db.delete(cards),
-      db.insert(cards).values(rows),
-      auditInsert,
-      importHistoryInsert,
-    ].filter(Boolean) as unknown as Parameters<typeof db.batch>[0]);
-  } else {
-    await db.batch([db.delete(cards), db.insert(cards).values(rows)]);
-  }
-  return { inserted: rows.length };
+  return { inserted: rows.length, deleted: totalBeforeForSelected };
 }
 
 /** Delete every card from inventory. Returns the number of rows removed. */
