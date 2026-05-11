@@ -68,14 +68,20 @@ echo
 # Then check the orders table — no rows inserted from this burst.
 ```
 
-result: [pending]
+result: passed (2026-05-10)
+evidence: |
+  Ran against https://wikos-spellbinder.vercel.app/api/checkout
+  Burst (15 parallel POSTs): 13 × 400 (body validation, rate gate passed) + 2 × 429 with Retry-After:60.
+  Follow-up serial probe: 3 × 429 with countdown Retry-After 35 → 34 → 33 (proves Postgres store is shared cross-instance).
+  No orders inserted from burst (every non-429 hit was rejected at body validation, well before any DB write).
+  Note: the 13 burst-admits over the documented limit=10 are the WR-A race-window slack (concurrent CTE inserts can admit ≤ N over the limit during the same statement evaluation). Documented and expected.
 
 ## Summary
 
 total: 3
-passed: 1
+passed: 2
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
