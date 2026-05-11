@@ -404,7 +404,12 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
         <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {order.items.map((item) => (
             <div
-              key={`${item.cardId}-${item.quantity}`}
+              // Phase 21 D-07: include binder in the React key so multi-binder
+              // same-card lines (two OrderItems with identical cardId+qty but
+              // different binders) reconcile as distinct rows. Belt-and-
+              // suspenders: the 5-segment cardId already disambiguates per-
+              // binder per Phase 18 D-04.
+              key={`${item.cardId}-${item.binder}-${item.quantity}`}
               className="flex items-center gap-4 p-4"
             >
               <div className="h-[70px] w-[50px] flex-shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
@@ -424,8 +429,22 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {item.name}
+                {/* Phase 21 D-05/D-06: [binder] pill rendered inline with the
+                    name. Sourced from item.binder (order_items.binder
+                    SNAPSHOT) — NEVER from a join to live `cards`. Survives
+                    re-imports that delete the source row. Square brackets
+                    are literal. Legacy pre-v1.3 rows render '[unsorted]'
+                    (Phase 16 D-09 migration default; D-08). */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {item.name}
+                  </span>
+                  <span
+                    data-binder-pill
+                    className="ml-2 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  >
+                    [{item.binder}]
+                  </span>
                 </div>
                 <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                   {item.setCode.toUpperCase()} #{item.collectorNumber} · {item.setName} · {conditionToAbbr(item.condition)}
