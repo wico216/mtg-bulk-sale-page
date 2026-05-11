@@ -20,13 +20,9 @@ import type { Card, CardData } from "@/lib/types";
  * Convert a Drizzle row to the application Card interface.
  * Exported for testing.
  *
- * Phase 16 schema migration:
- *   The DB column `foil: boolean` was replaced by `finish: enum(normal|foil|etched)`
- *   (D-07 / FIN-01). The application `Card` type still carries `foil: boolean`
- *   in Phase 16; we derive it from `row.finish === 'foil'` so existing UI code
- *   keeps working. Phase 17 will redesign Card to carry `finish` + `binder`
- *   directly. Note: `etched` rows currently appear as `foil: false` to the
- *   storefront (matches the v1.2 UI behavior — the etched fix lives in Phase 17).
+ * Maps a Drizzle cards row to the application Card shape. The DB columns
+ * map 1:1 to the application fields after the v1.3 migration (binder +
+ * finish enum). See `src/lib/types.ts` for the Card contract.
  */
 export function rowToCard(row: typeof cards.$inferSelect): Card {
   return {
@@ -42,7 +38,8 @@ export function rowToCard(row: typeof cards.$inferSelect): Card {
     imageUrl: row.imageUrl,
     oracleText: row.oracleText,
     rarity: row.rarity,
-    foil: row.finish === "foil",
+    finish: row.finish,
+    binder: row.binder,
     scryfallId: row.scryfallId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

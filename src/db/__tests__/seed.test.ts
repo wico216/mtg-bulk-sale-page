@@ -3,7 +3,7 @@ import { cardToRow } from "../seed";
 import type { Card } from "@/lib/types";
 
 const makeCard = (overrides: Partial<Card> = {}): Card => ({
-  id: "sld-123-normal-NearMint",
+  id: "sld-123-normal-NearMint-unsorted",
   name: "Test Card",
   setCode: "sld",
   setName: "Secret Lair Drop",
@@ -15,7 +15,8 @@ const makeCard = (overrides: Partial<Card> = {}): Card => ({
   imageUrl: "https://example.com/card.jpg",
   oracleText: "Flying, vigilance",
   rarity: "rare",
-  foil: false,
+  finish: "normal",
+  binder: "unsorted",
   ...overrides,
 });
 
@@ -45,11 +46,11 @@ describe("cardToRow", () => {
     expect(row.colorIdentity).toEqual([]);
   });
 
-  it("maps all Card fields to row fields (Phase 16: foil -> finish, +binder)", () => {
+  it("maps all Card fields to row fields 1:1 (Phase 17: finish + binder pass through directly)", () => {
     const card = makeCard();
     const row = cardToRow(card);
 
-    expect(row.id).toBe("sld-123-normal-NearMint");
+    expect(row.id).toBe("sld-123-normal-NearMint-unsorted");
     expect(row.name).toBe("Test Card");
     expect(row.setCode).toBe("sld");
     expect(row.setName).toBe("Secret Lair Drop");
@@ -59,17 +60,25 @@ describe("cardToRow", () => {
     expect(row.imageUrl).toBe("https://example.com/card.jpg");
     expect(row.oracleText).toBe("Flying, vigilance");
     expect(row.rarity).toBe("rare");
-    // Phase 16 D-07: foil boolean -> finish enum. card.foil=false -> 'normal'.
+    // Phase 17 D-07: finish + binder pass through 1:1; no derivation.
     expect(row.finish).toBe("normal");
-    // Phase 16 D-06: binder defaults to 'unsorted' (Phase 17 will plumb the
-    // real binder name through from the parser).
     expect(row.binder).toBe("unsorted");
     expect(row.scryfallId).toBeNull();
   });
 
-  it("derives finish='foil' when card.foil is true (Phase 16 D-07 backfill)", () => {
-    const row = cardToRow(makeCard({ foil: true }));
+  it("passes through card.finish='foil' to row.finish (Phase 17 — no derivation)", () => {
+    const row = cardToRow(makeCard({ finish: "foil" }));
     expect(row.finish).toBe("foil");
+  });
+
+  it("passes through card.finish='etched' to row.finish (Phase 17 etched first-class)", () => {
+    const row = cardToRow(makeCard({ finish: "etched" }));
+    expect(row.finish).toBe("etched");
+  });
+
+  it("passes through card.binder to row.binder (Phase 17 — no hard-coded 'unsorted')", () => {
+    const row = cardToRow(makeCard({ binder: "a07" }));
+    expect(row.binder).toBe("a07");
   });
 
   it("rounds prices correctly using Math.round (Pitfall 3)", () => {

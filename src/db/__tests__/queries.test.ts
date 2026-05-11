@@ -18,7 +18,7 @@ import { rowToCard } from "../queries";
  * type safety is ensured by the production code.
  */
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
-  id: "sld-123-normal-NearMint",
+  id: "sld-123-normal-NearMint-unsorted",
   name: "Test Card",
   setCode: "sld",
   setName: "Secret Lair Drop",
@@ -30,7 +30,9 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
   imageUrl: "https://example.com/card.jpg",
   oracleText: "Flying, vigilance",
   rarity: "rare",
-  foil: false,
+  // Phase 17: row carries finish enum + binder; foil boolean is gone.
+  finish: "normal",
+  binder: "unsorted",
   scryfallId: null,
   createdAt: new Date("2026-04-11T12:00:00Z"),
   updatedAt: new Date("2026-04-11T14:00:00Z"),
@@ -82,7 +84,7 @@ describe("rowToCard", () => {
     const result = rowToCard(makeRow() as any);
 
     expect(result).toEqual({
-      id: "sld-123-normal-NearMint",
+      id: "sld-123-normal-NearMint-unsorted",
       name: "Test Card",
       setCode: "sld",
       setName: "Secret Lair Drop",
@@ -94,11 +96,21 @@ describe("rowToCard", () => {
       imageUrl: "https://example.com/card.jpg",
       oracleText: "Flying, vigilance",
       rarity: "rare",
-      foil: false,
+      finish: "normal",
+      binder: "unsorted",
       scryfallId: null,
       createdAt: "2026-04-11T12:00:00.000Z",
       updatedAt: "2026-04-11T14:00:00.000Z",
     });
+  });
+
+  it("passes through binder column to Card.binder (Phase 17 — no longer hard-coded)", () => {
+    expect(rowToCard(makeRow({ binder: "a07" }) as any).binder).toBe("a07");
+  });
+
+  it("passes through finish='etched' to Card.finish (Phase 17 etched first-class)", () => {
+    const card = rowToCard(makeRow({ finish: "etched" }) as any);
+    expect(card.finish).toBe("etched");
   });
 });
 

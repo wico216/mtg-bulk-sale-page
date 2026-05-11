@@ -28,7 +28,7 @@ import type { Card } from "@/lib/types";
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
-    id: "lea-232-normal-near_mint",
+    id: "lea-232-normal-near_mint-unsorted",
     name: "Lightning Bolt",
     setCode: "lea",
     setName: "Alpha",
@@ -40,7 +40,8 @@ function makeCard(overrides: Partial<Card> = {}): Card {
     imageUrl: "https://example.com/lightning-bolt.jpg",
     oracleText: "Lightning Bolt deals 3 damage to any target.",
     rarity: "rare",
-    foil: false,
+    finish: "normal",
+    binder: "unsorted",
     ...overrides,
   };
 }
@@ -57,7 +58,7 @@ beforeEach(() => {
 
 describe("replaceAllCards", () => {
   it("calls db.batch exactly once with [delete, insert] for a non-empty input (Test A)", async () => {
-    const result = await replaceAllCards([makeCard(), makeCard({ id: "lea-233-normal-near_mint", collectorNumber: "233" })]);
+    const result = await replaceAllCards([makeCard(), makeCard({ id: "lea-233-normal-near_mint-unsorted", collectorNumber: "233" })]);
 
     expect(db.batch).toHaveBeenCalledTimes(1);
     const batchArgs = vi.mocked(db.batch).mock.calls[0][0] as unknown[];
@@ -119,9 +120,9 @@ describe("replaceAllCards", () => {
 describe("deleteAllCards", () => {
   it("deletes every card and reports the deleted row count", async () => {
     deleteBuilder.returning.mockResolvedValueOnce([
-      { id: "lea-232-normal-near_mint" },
-      { id: "mh2-45-foil-lightly_played" },
-      { id: "sld-1-normal-near_mint" },
+      { id: "lea-232-normal-near_mint-unsorted" },
+      { id: "mh2-45-foil-lightly_played-unsorted" },
+      { id: "sld-1-normal-near_mint-unsorted" },
     ]);
 
     const result = await deleteAllCards();

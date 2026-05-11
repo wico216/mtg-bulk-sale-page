@@ -10,13 +10,11 @@ config({ path: ".env.local" });
  * Convert a Card (dollars) to a database row (cents).
  * Exported for unit testing.
  *
- * Phase 16 schema migration:
- *   - The legacy `cards.foil` boolean is replaced by `cards.finish` enum
- *     (D-07 / FIN-01). We derive `finish` from the in-memory `Card.foil`
- *     flag so the application contract stays unchanged in this phase;
- *     Phase 17's parser fix will redesign Card to carry `finish` + `binder`
- *     directly.
- *   - `binder` is added with default 'unsorted' (BIND-01 / BIND-02 / D-06).
+ * Card and the DB row are 1:1 on `finish` and `binder` after the Phase 17
+ * parser update (the Phase 16 transitional foil-derived shim has been
+ * removed). The parser plumbs the real binder name through; legacy
+ * callers that build a Card by hand without a binder will surface as a
+ * TypeScript error at the call site, which is the intended contract.
  */
 export function cardToRow(card: Card) {
   return {
@@ -32,8 +30,8 @@ export function cardToRow(card: Card) {
     imageUrl: card.imageUrl,
     oracleText: card.oracleText,
     rarity: card.rarity,
-    finish: (card.foil ? "foil" : "normal") as "normal" | "foil" | "etched",
-    binder: "unsorted",
+    finish: card.finish,
+    binder: card.binder,
     scryfallId: null, // Not in cards.json; populated by Phase 10 CSV import (D-07)
   };
 }
