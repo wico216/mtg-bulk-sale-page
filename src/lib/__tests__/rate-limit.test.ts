@@ -161,6 +161,61 @@ describe("checkRateLimit", () => {
   });
 });
 
+describe("checkRateLimit atomic path (CR-01)", () => {
+  it("uses the store's checkAndRecord when present and respects exactly the configured limit under concurrent calls", async () => {
+    // CR-01: at the limit boundary with N concurrent callers, the previous
+    // two-step protocol (count then record) admitted (limit + N) requests.
+    // With the atomic path, exactly `limit` are admitted.
+    const store = createMemoryRateLimitStore();
+    expect(typeof store.checkAndRecord).toBe("function");
+    const config = { bucket: "checkout", limit: 5, windowMs: 60_000 };
+    const now = Date.parse("2026-04-27T00:00:00.000Z");
+
+    // 20 concurrent callers for the same (bucket, key) at the same instant.
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        checkRateLimit({ store, key: "ip:1.2.3.4", config, now }),
+      ),
+    );
+
+    const allowed = results.filter((r) => r.allowed).length;
+    const blocked = results.filter((r) => !r.allowed).length;
+    expect(allowed).toBe(5);
+    expect(blocked).toBe(15);
+    // The store must have exactly `limit` hits recorded.
+    const count = await store.countHits({
+      bucket: config.bucket,
+      key: "ip:1.2.3.4",
+      windowMs: config.windowMs,
+      now,
+    });
+    expect(count).toBe(5);
+  });
+
+  it("falls back to two-step path when the store does not implement checkAndRecord", async () => {
+    // A legacy store missing checkAndRecord still works -- checkRateLimit
+    // uses count + earliestHit + recordHit as before.
+    const inner = createMemoryRateLimitStore();
+    const legacy: RateLimitStore = {
+      countHits: inner.countHits.bind(inner),
+      earliestHit: inner.earliestHit.bind(inner),
+      recordHit: inner.recordHit.bind(inner),
+      // checkAndRecord intentionally omitted.
+    };
+    expect(legacy.checkAndRecord).toBeUndefined();
+
+    const config = { bucket: "checkout", limit: 2, windowMs: 60_000 };
+    const now = Date.parse("2026-04-27T00:00:00.000Z");
+    const r1 = await checkRateLimit({ store: legacy, key: "k", config, now });
+    const r2 = await checkRateLimit({ store: legacy, key: "k", config, now: now + 100 });
+    const r3 = await checkRateLimit({ store: legacy, key: "k", config, now: now + 200 });
+
+    expect(r1.allowed).toBe(true);
+    expect(r2.allowed).toBe(true);
+    expect(r3.allowed).toBe(false);
+  });
+});
+
 describe("enforceRateLimit (CR-02 / WR-05: fail-open on store failure)", () => {
   it("returns null (fail-open) when the store throws instead of bubbling the error", async () => {
     // Defense-in-depth: rate-limit store failure must never deny service or

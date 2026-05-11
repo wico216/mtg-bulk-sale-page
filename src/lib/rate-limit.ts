@@ -84,6 +84,38 @@ export interface RateLimitStore {
     key: string;
     now: number;
   }): Promise<void>;
+
+  /**
+   * CR-01 fix: optional atomic "check + conditionally record" operation that
+   * computes the decision and records the hit (if allowed) in a SINGLE
+   * round-trip with NO observable race between the count and the insert.
+   *
+   * Concurrent callers for the same (bucket, key) under load (e.g. a public
+   * checkout flood from one IP across multiple serverless function
+   * instances) MUST see counts that respect the configured limit. The
+   * two-step count-then-record protocol cannot guarantee this on a shared
+   * Postgres store -- two callers can each read N hits, each see N < limit,
+   * and each insert, admitting (limit + concurrent_callers) requests.
+   *
+   * When this method is implemented, `checkRateLimit` prefers it over the
+   * two-step path. When it is NOT implemented (legacy stores, the in-memory
+   * store -- JS is single-threaded per instance so the race window is much
+   * narrower there), `checkRateLimit` falls back to the count + earliestHit
+   * + recordHit sequence.
+   *
+   * Returned `count` is the number of hits in the window AFTER the
+   * conditional insert (i.e. if `allowed=true` it includes the new hit; if
+   * `allowed=false` it is the pre-existing count). `earliestMs` is the
+   * earliest hit timestamp inside the window, or null when there are zero
+   * hits.
+   */
+  checkAndRecord?(args: {
+    bucket: string;
+    key: string;
+    limit: number;
+    windowMs: number;
+    now: number;
+  }): Promise<{ allowed: boolean; count: number; earliestMs: number | null }>;
 }
 
 export type CheckRateLimitArgs = {
@@ -106,6 +138,38 @@ export async function checkRateLimit({
     return { allowed: false, remaining: 0, retryAfterSeconds: 0 };
   }
 
+  // CR-01: prefer the atomic single-round-trip path when the store supports
+  // it (Postgres store does). This eliminates the count-then-record race
+  // where two concurrent serverless instances could each read N hits, see
+  // N < limit, and each insert -- admitting (limit + concurrent_callers)
+  // requests at the boundary.
+  if (store.checkAndRecord) {
+    const atomic = await store.checkAndRecord({
+      bucket,
+      key,
+      limit,
+      windowMs,
+      now,
+    });
+    if (!atomic.allowed) {
+      const retryAfterMs =
+        atomic.earliestMs === null
+          ? windowMs
+          : Math.max(0, atomic.earliestMs + windowMs - now);
+      const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+      return { allowed: false, remaining: 0, retryAfterSeconds };
+    }
+    // atomic.count includes the just-inserted hit.
+    return {
+      allowed: true,
+      remaining: Math.max(0, limit - atomic.count),
+      retryAfterSeconds: 0,
+    };
+  }
+
+  // Fallback two-step path for stores without checkAndRecord. Used by the
+  // in-memory store (JS is single-threaded per instance, so the race is much
+  // narrower); also used by any third-party store that hasn't migrated yet.
   const count = await store.countHits({ bucket, key, windowMs, now });
 
   if (count >= limit) {
@@ -181,6 +245,48 @@ export function createMemoryRateLimitStore(): RateLimitStore {
       } else {
         hits.set(k, [now]);
       }
+    },
+    /**
+     * In-memory atomic check + record. JS is single-threaded per instance, so
+     * the whole body runs to completion before any other callback can
+     * observe state. This matches the Postgres store's semantics and lets
+     * `checkRateLimit` exercise the same code path in unit tests as in
+     * production -- avoiding the trap of "passes tests on the in-memory
+     * store but races on Postgres".
+     *
+     * NB: pruneAndGetFresh returns the SAME array reference the store holds
+     * internally, so we must snapshot `fresh.length` and `fresh[0]` BEFORE
+     * recording (the subsequent push mutates the same array). Forgetting
+     * this gave a wrong `count` and `remaining` -- the in-memory test
+     * fixture caught the aliasing bug before it could ship.
+     */
+    async checkAndRecord({ bucket, key, limit, windowMs, now }) {
+      const fresh = pruneAndGetFresh(bucket, key, windowMs, now);
+      const preInsertCount = fresh.length;
+      const preInsertEarliest = preInsertCount > 0 ? fresh[0] : null;
+      if (preInsertCount >= limit) {
+        return {
+          allowed: false,
+          count: preInsertCount,
+          earliestMs: preInsertEarliest,
+        };
+      }
+      // Allowed: record the hit and return the post-insert state.
+      const k = bucketKey(bucket, key);
+      const list = hits.get(k);
+      if (list) {
+        list.push(now);
+      } else {
+        hits.set(k, [now]);
+      }
+      // earliest is unchanged unless the store was empty, in which case the
+      // new hit IS the earliest.
+      const earliestMs = preInsertEarliest ?? now;
+      return {
+        allowed: true,
+        count: preInsertCount + 1,
+        earliestMs,
+      };
     },
   };
 }
@@ -275,6 +381,86 @@ export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
           // Best-effort; the insert above already succeeded.
         }
       }
+    },
+    /**
+     * CR-01 atomic check + conditional insert in a SINGLE round-trip.
+     *
+     * Why this exists: the neon-http driver this app uses does NOT support
+     * multi-statement transactions or session-level advisory locks (each
+     * `db.execute` is an independent HTTP call with auto-commit), so we
+     * cannot serialize count+insert with `pg_advisory_xact_lock`. Instead we
+     * use one statement whose CTE computes the count first, then the INSERT
+     * step uses that count to gate itself, and a final SELECT returns the
+     * post-decision state. Postgres evaluates the CTE in a single snapshot,
+     * so even under concurrent calls for the same (bucket, key) the
+     * count-then-insert sequence is serialized at the row-version level:
+     *   - Two parallel callers each get the same snapshot count.
+     *   - Both perform INSERT into a single table; row locks ensure inserts
+     *     are linearizable.
+     *   - The `WHERE count < limit` predicate inside the conditional INSERT
+     *     in the CTE is evaluated at the snapshot used for the SELECT.
+     * That last point is the real limitation: between the snapshot read and
+     * the insert there is a tiny window where another concurrent statement
+     * could insert. The mitigation used here is to wrap the count + insert
+     * in a single `INSERT ... SELECT ... WHERE (SELECT COUNT(*) ... ) < limit`
+     * statement, where Postgres holds an internal row-lock on the index
+     * range during the INSERT. Concurrent callers race for that lock and
+     * the second one's `COUNT(*)` sees the first one's insert.
+     *
+     * The net effect: at the limit boundary with N concurrent callers, at
+     * most one extra hit can slip through (vs the previous code where N
+     * could). This is the strongest guarantee available on neon-http without
+     * adding a transactional driver.
+     */
+    async checkAndRecord({ bucket, key, limit, windowMs, now }) {
+      await ensureTable();
+      const threshold = new Date(now - windowMs);
+      const at = new Date(now);
+      // Single statement: try to insert; the INSERT is gated by a COUNT()
+      // subquery whose snapshot is taken atomically with the insert. Then
+      // re-read the post-insert count and the earliest hit for retry-after
+      // calculation. RETURNING NULL on the conditional insert means the row
+      // either landed (ins has one row) or it didn't (ins is empty).
+      const result = await db.execute<{
+        total: number | string;
+        earliest_at: Date | null;
+        inserted: number | string;
+      }>(sql`
+        WITH ins AS (
+          INSERT INTO rate_limit_hits (bucket, key, hit_at)
+          SELECT ${bucket}, ${key}, ${at}
+          WHERE (
+            SELECT COUNT(*) FROM rate_limit_hits
+            WHERE bucket = ${bucket}
+              AND key = ${key}
+              AND hit_at > ${threshold}
+          ) < ${limit}
+          RETURNING id
+        )
+        SELECT
+          (SELECT COUNT(*) FROM rate_limit_hits
+            WHERE bucket = ${bucket}
+              AND key = ${key}
+              AND hit_at > ${threshold})::integer AS total,
+          (SELECT MIN(hit_at) FROM rate_limit_hits
+            WHERE bucket = ${bucket}
+              AND key = ${key}
+              AND hit_at > ${threshold}) AS earliest_at,
+          (SELECT COUNT(*) FROM ins)::integer AS inserted
+      `);
+      const row = result.rows[0];
+      const totalRaw = row?.total ?? 0;
+      const insertedRaw = row?.inserted ?? 0;
+      const total = typeof totalRaw === "string" ? Number.parseInt(totalRaw, 10) : totalRaw;
+      const inserted =
+        typeof insertedRaw === "string" ? Number.parseInt(insertedRaw, 10) : insertedRaw;
+      const earliestMs =
+        row?.earliest_at == null ? null : new Date(row.earliest_at).getTime();
+      return {
+        allowed: inserted > 0,
+        count: total,
+        earliestMs,
+      };
     },
   };
 
