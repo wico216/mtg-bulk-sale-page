@@ -206,8 +206,32 @@ describe("GET /api/admin/health", () => {
     const res = await GET(makeRequest());
     const body = await res.json();
 
+    // 503 lets external HTTP-status monitors alert on DB outage; the detailed
+    // body still says ok=false for human/admin consumption.
+    expect(res.status).toBe(503);
     expect(body.checks.database).toBe("error");
     expect(body.ok).toBe(false);
+  });
+
+  it("returns 200 when only env config is missing (deficiency, not outage)", async () => {
+    // A missing SELLER_EMAIL is a configuration deficiency surfaced via the
+    // admin UI -- it must NOT trip an external HTTP-status monitor.
+    setEnv({
+      AUTH_SECRET: "non-empty",
+      AUTH_GOOGLE_ID: "client-id",
+      AUTH_GOOGLE_SECRET: "client-secret",
+      RESEND_API_KEY: "re_xxx",
+      SELLER_EMAIL: undefined,
+    });
+    mockRequireAdmin.mockResolvedValueOnce(adminSession);
+    mockGetAdminHealthSnapshot.mockResolvedValueOnce(happySnapshot());
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(false);
+    expect(body.checks.email).toBe("missing");
   });
 
   it("never includes secret values in the response, even when env values are set to obvious markers", async () => {

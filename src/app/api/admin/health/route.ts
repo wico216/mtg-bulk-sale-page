@@ -106,5 +106,12 @@ export async function GET(_request: Request) {
     },
   };
 
-  return Response.json(body);
+  // External HTTP-status monitors (Pingdom, Datadog HTTP checks, Vercel Uptime,
+  // etc.) typically alert on status code, not body content. When the database
+  // is unreachable we must surface 503 so a DB outage trips the monitor; we
+  // still keep the detailed body for human/admin consumption. Env-config
+  // "missing" states are intentionally NOT 503 -- a missing SELLER_EMAIL is a
+  // configuration deficiency surfaced via the admin UI, not an outage.
+  const status = checks.database === "error" ? 503 : 200;
+  return Response.json(body, { status });
 }
