@@ -383,34 +383,54 @@ export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
       }
     },
     /**
-     * CR-01 atomic check + conditional insert in a SINGLE round-trip.
+     * CR-01 / WR-A: best-effort atomic snapshot check + conditional insert
+     * in a SINGLE round-trip.
      *
      * Why this exists: the neon-http driver this app uses does NOT support
      * multi-statement transactions or session-level advisory locks (each
      * `db.execute` is an independent HTTP call with auto-commit), so we
-     * cannot serialize count+insert with `pg_advisory_xact_lock`. Instead we
-     * use one statement whose CTE computes the count first, then the INSERT
-     * step uses that count to gate itself, and a final SELECT returns the
-     * post-decision state. Postgres evaluates the CTE in a single snapshot,
-     * so even under concurrent calls for the same (bucket, key) the
-     * count-then-insert sequence is serialized at the row-version level:
-     *   - Two parallel callers each get the same snapshot count.
-     *   - Both perform INSERT into a single table; row locks ensure inserts
-     *     are linearizable.
-     *   - The `WHERE count < limit` predicate inside the conditional INSERT
-     *     in the CTE is evaluated at the snapshot used for the SELECT.
-     * That last point is the real limitation: between the snapshot read and
-     * the insert there is a tiny window where another concurrent statement
-     * could insert. The mitigation used here is to wrap the count + insert
-     * in a single `INSERT ... SELECT ... WHERE (SELECT COUNT(*) ... ) < limit`
-     * statement, where Postgres holds an internal row-lock on the index
-     * range during the INSERT. Concurrent callers race for that lock and
-     * the second one's `COUNT(*)` sees the first one's insert.
+     * cannot serialize count+insert with `pg_advisory_xact_lock`. Instead
+     * we use one statement whose CTE evaluates the gating
+     * `SELECT COUNT(*) ... < limit` predicate and the conditional INSERT
+     * in the same statement-level MVCC snapshot, and a final SELECT
+     * returns the post-decision state.
      *
-     * The net effect: at the limit boundary with N concurrent callers, at
-     * most one extra hit can slip through (vs the previous code where N
-     * could). This is the strongest guarantee available on neon-http without
-     * adding a transactional driver.
+     * WR-A honesty note on residual concurrency:
+     * -----------------------------------------
+     * Plain Postgres INSERTs against a table with NO unique/exclusion
+     * constraint on (bucket, key, hit_at) are NOT serialized by row or
+     * range locks. Two concurrent statements each read their own MVCC
+     * snapshot of `COUNT(*)`, each see `count < limit`, and each insert.
+     * The CTE only ensures the count and the insert see the SAME snapshot
+     * *within one statement*; it does NOT prevent a second concurrent
+     * statement on a different connection from inserting against an
+     * identical snapshot.
+     *
+     * What this implementation actually buys us, relative to the prior
+     * two-step `count` then `recordHit` protocol, is that the race window
+     * shrinks from "the HTTP round-trip time between the count and the
+     * insert" (10s of ms over neon-http) to "the statement evaluation
+     * time inside Postgres" (microseconds). Under N concurrent callers
+     * for the same (bucket, key), the boundary may still admit up to
+     * `limit + N` hits, but the race is much narrower in time and
+     * neon-http per-instance HTTP serialization usually collapses N
+     * to a small number in practice.
+     *
+     * For the friend-store threat model this is acceptable -- the bucket
+     * is a soft abuse cap, not a strict admission gate. If we ever need
+     * a strict guarantee, the right fix is one of:
+     *   (a) add a UNIQUE constraint on a synthetic (bucket, key, slot)
+     *       column and let Postgres reject the duplicate insert, or
+     *   (b) acquire `pg_advisory_xact_lock` inside a transactional
+     *       driver (not neon-http).
+     *
+     * The in-memory store's `checkAndRecord` IS truly atomic (JS is
+     * single-threaded per instance), and `rate-limit.test.ts` exercises
+     * the exact-limit invariant only on the memory store (see the
+     * "Promise.all(20) admits exactly 5" test at
+     * `src/lib/__tests__/rate-limit.test.ts:165-193`). That test
+     * deliberately does NOT prove the Postgres path's atomicity, only
+     * the shared `checkRateLimit` plumbing around it.
      */
     async checkAndRecord({ bucket, key, limit, windowMs, now }) {
       await ensureTable();
@@ -456,9 +476,19 @@ export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
         typeof insertedRaw === "string" ? Number.parseInt(insertedRaw, 10) : insertedRaw;
       const earliestMs =
         row?.earliest_at == null ? null : new Date(row.earliest_at).getTime();
+      // WR-C: the CTE's outer `SELECT COUNT(*)` runs in the same
+      // statement-level MVCC snapshot as the gating count inside the
+      // conditional INSERT, so `total` reflects the PRE-insert state even
+      // when the row landed. The store's documented contract is that
+      // `count` is the POST-insert count when allowed (the in-memory store
+      // honors this), so add 1 when we inserted to keep both stores in
+      // agreement. Without this, `remaining = limit - count` was
+      // off-by-one on Postgres (returning `remaining=1` when memory
+      // returned `remaining=0` after the final admit).
+      const count = inserted > 0 ? total + 1 : total;
       return {
         allowed: inserted > 0,
-        count: total,
+        count,
         earliestMs,
       };
     },
