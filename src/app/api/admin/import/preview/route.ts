@@ -1,11 +1,14 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
+import { normalizeBinderName } from "@/lib/binder-name";
 import { parseManaboxCsvContents } from "@/lib/csv-parser";
 import { enrichCards } from "@/lib/enrichment";
 import {
   IMPORT_FILE_FIELD,
+  type BinderSummary,
   type ImportStreamMessage,
   type PreviewPayload,
 } from "@/lib/import-contract";
+import type { Card } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -15,6 +18,40 @@ export const runtime = "nodejs";
 // while still fitting inside Vercel Pro's 300s Route Handler ceiling.
 // Subsequent imports hit the 24h Scryfall cache and finish in under a second.
 export const maxDuration = 300;
+
+// Phase 19 D-16: defense against client tampering.
+const MAX_SELECTED_BINDERS = 200;
+const MAX_KNOWN_BINDERS = 200;
+
+/**
+ * Group parsed cards by binder and produce the picker-ready BinderSummary[]
+ * surface. Sort is alphabetical-by-name for deterministic snapshots; the
+ * client (Plan 19-02) re-sorts visually per D-05 (NEW first, unsorted last).
+ */
+function buildBindersFromParsed(
+  cards: Card[],
+  knownBinders: string[],
+): BinderSummary[] {
+  const knownSet = new Set(knownBinders.map(normalizeBinderName));
+  const groups = new Map<string, { rowCount: number; sampleNames: string[] }>();
+  for (const card of cards) {
+    let group = groups.get(card.binder);
+    if (!group) {
+      group = { rowCount: 0, sampleNames: [] };
+      groups.set(card.binder, group);
+    }
+    group.rowCount += 1;
+    if (group.sampleNames.length < 5) group.sampleNames.push(card.name);
+  }
+  return Array.from(groups.entries())
+    .map(([name, g]) => ({
+      name,
+      rowCount: g.rowCount,
+      sampleNames: g.sampleNames,
+      isNew: !knownSet.has(name),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export async function POST(request: Request): Promise<Response> {
   const auth = await requireAdmin();
@@ -48,6 +85,78 @@ export async function POST(request: Request): Promise<Response> {
   );
   const parsed = parseManaboxCsvContents(uploaded);
 
+  // ---- knownBinders parsing (loose; never 400s) -----------------------------
+  const knownBindersRaw = formData.get("knownBinders");
+  let knownBinders: string[] = [];
+  if (typeof knownBindersRaw === "string") {
+    try {
+      const knownBindersInput = JSON.parse(knownBindersRaw) as unknown;
+      if (Array.isArray(knownBindersInput)) {
+        knownBinders = knownBindersInput
+          .filter((s): s is string => typeof s === "string")
+          .slice(0, MAX_KNOWN_BINDERS)
+          .map(normalizeBinderName);
+      }
+    } catch {
+      // Silently ignore malformed knownBinders; worst case every binder
+      // shows as NEW which is a benign UI degradation (D-16 forgiving rule).
+    }
+  }
+
+  // ---- selectedBinders validation (strict; 400 on any failure, BEFORE
+  //      stream opens — D-16) -------------------------------------------------
+  let selectedBinders: string[] | undefined;
+  const selectedBindersRaw = formData.get("selectedBinders");
+  if (typeof selectedBindersRaw === "string") {
+    try {
+      const selectedBindersInput = JSON.parse(selectedBindersRaw) as unknown;
+      if (!Array.isArray(selectedBindersInput)) {
+        throw new Error("selectedBinders must be a JSON array");
+      }
+      if (selectedBindersInput.length > MAX_SELECTED_BINDERS) {
+        throw new Error(
+          `selectedBinders length exceeds ${MAX_SELECTED_BINDERS}`,
+        );
+      }
+      if (
+        !selectedBindersInput.every((s): s is string => typeof s === "string")
+      ) {
+        throw new Error("selectedBinders entries must be strings");
+      }
+      // D-16: every entry must equal its normalized form.
+      for (const s of selectedBindersInput) {
+        if (s !== normalizeBinderName(s)) {
+          throw new Error(`selectedBinders entry "${s}" is not normalized`);
+        }
+      }
+      // Defense: every selectedBinder MUST be a binder the parser actually
+      // found in this upload (catches stale localStorage from a prior import
+      // referencing a binder no longer in the export).
+      const uploadedBinderSet = new Set(parsed.cards.map((c) => c.binder));
+      for (const s of selectedBindersInput) {
+        if (!uploadedBinderSet.has(s)) {
+          throw new Error(
+            `selectedBinders entry "${s}" not present in this upload`,
+          );
+        }
+      }
+      selectedBinders = selectedBindersInput;
+    } catch (err) {
+      return Response.json(
+        { error: err instanceof Error ? err.message : "Invalid selectedBinders" },
+        { status: 400 },
+      );
+    }
+  }
+
+  // ---- Stage 1 binders summary (built once, sent FIRST in the stream) ------
+  const bindersSummary = buildBindersFromParsed(parsed.cards, knownBinders);
+  // Scope enrichment input: when selectedBinders is defined, only enrich
+  // those rows. Phase 19 D-02.
+  const cardsToEnrich = selectedBinders
+    ? parsed.cards.filter((c) => selectedBinders!.includes(c.binder))
+    : parsed.cards;
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -56,14 +165,18 @@ export async function POST(request: Request): Promise<Response> {
       };
 
       try {
-        const total = parsed.cards.length;
+        // FIRST: binders message (D-01 — fires after parse, BEFORE
+        // any progress/enrichment). Always sent.
+        send({ type: "binders", binders: bindersSummary });
+
+        const total = cardsToEnrich.length;
         send({ type: "progress", done: 0, total, stage: "enrich" });
 
         const {
           cards: enriched,
           stats,
           scryfallMisses,
-        } = await enrichCards(parsed.cards, {
+        } = await enrichCards(cardsToEnrich, {
           onProgress: (done, totalCount) => {
             send({ type: "progress", done, total: totalCount, stage: "enrich" });
           },

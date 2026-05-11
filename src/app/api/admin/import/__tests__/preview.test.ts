@@ -241,4 +241,166 @@ describe("POST /api/admin/import/preview", () => {
       (errors[0] as { type: "error"; message: string }).message,
     ).toBe("Scryfall unreachable");
   });
+
+  // ---- Phase 19: two-stage NDJSON tests --------------------------------------
+
+  function multiBinderFixture() {
+    return {
+      cards: [
+        sampleCard("a02-1"),
+        sampleCard("a02-2"),
+        sampleCard("a05-1"),
+        sampleCard("a07-1"),
+        sampleCard("a07-2"),
+        sampleCard("a07-3"),
+      ].map((c, i) => ({
+        ...c,
+        binder: i < 2 ? "a02" : i < 3 ? "a05" : "a07",
+      })),
+      skippedRows: [],
+      sourceFiles: [{ name: "x.csv", parsedCards: 6, skippedRows: 0 }],
+    };
+  }
+
+  it("binders message is the FIRST NDJSON line (Phase 19 D-01)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    enrichCardsMock.mockResolvedValueOnce({
+      cards: multiBinderFixture().cards,
+      stats: { processed: 6, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    });
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+
+    const res = await POST(makeRequest(fd));
+    const msgs = await readStream(res);
+    expect(msgs[0].type).toBe("binders");
+    const binders = (msgs[0] as { type: "binders"; binders: Array<{ name: string; rowCount: number; sampleNames: string[]; isNew: boolean }> }).binders;
+    expect(binders.map((b) => b.name).sort()).toEqual(["a02", "a05", "a07"]);
+    const a07 = binders.find((b) => b.name === "a07")!;
+    expect(a07.rowCount).toBe(3);
+    expect(a07.sampleNames.length).toBeGreaterThan(0);
+  });
+
+  it("binders message respects knownBinders for isNew (Phase 19 D-04)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    enrichCardsMock.mockResolvedValueOnce({
+      cards: multiBinderFixture().cards,
+      stats: { processed: 6, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    });
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    fd.append("knownBinders", JSON.stringify(["a02"]));
+
+    const res = await POST(makeRequest(fd));
+    const msgs = await readStream(res);
+    const binders = (msgs[0] as { type: "binders"; binders: Array<{ name: string; isNew: boolean }> }).binders;
+    expect(binders.find((b) => b.name === "a02")!.isNew).toBe(false);
+    expect(binders.find((b) => b.name === "a05")!.isNew).toBe(true);
+    expect(binders.find((b) => b.name === "a07")!.isNew).toBe(true);
+  });
+
+  it("knownBinders silently normalizes drift — capital A02 still matches a02", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    enrichCardsMock.mockResolvedValueOnce({
+      cards: multiBinderFixture().cards,
+      stats: { processed: 6, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    });
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    fd.append("knownBinders", JSON.stringify(["A02"]));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(200);
+    const msgs = await readStream(res);
+    const binders = (msgs[0] as { type: "binders"; binders: Array<{ name: string; isNew: boolean }> }).binders;
+    expect(binders.find((b) => b.name === "a02")!.isNew).toBe(false);
+  });
+
+  it("selectedBinders scopes enrichment input (Phase 19 D-02)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    enrichCardsMock.mockImplementationOnce(async (cards) => ({
+      cards,
+      stats: { processed: cards.length, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    }));
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    fd.append("selectedBinders", JSON.stringify(["a02"]));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(200);
+    const cardsArg = enrichCardsMock.mock.calls[0][0] as Card[];
+    expect(cardsArg.length).toBe(2); // only a02 cards (2 of them)
+    const msgs = await readStream(res);
+    const result = msgs.find((m) => m.type === "result") as { type: "result"; preview: PreviewPayload };
+    expect(result.preview.cards.length).toBe(2);
+  });
+
+  it("selectedBinders === undefined preserves legacy behavior (full enrichment)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    enrichCardsMock.mockImplementationOnce(async (cards) => ({
+      cards,
+      stats: { processed: cards.length, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    }));
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    // NO selectedBinders field — legacy single-stage flow.
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(200);
+    const cardsArg = enrichCardsMock.mock.calls[0][0] as Card[];
+    expect(cardsArg.length).toBe(6); // all 6 cards
+  });
+
+  it("returns 400 for selectedBinders entry that is not normalized (Phase 19 D-16)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    fd.append("selectedBinders", JSON.stringify(["A02"]));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/not normalized/);
+    expect(enrichCardsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for selectedBinders entry not present in upload (Phase 19 D-16)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    fd.append("selectedBinders", JSON.stringify(["a99"]));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/not present in this upload/);
+    expect(enrichCardsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for selectedBinders length > 200 (Phase 19 D-16)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
+    const fd = new FormData();
+    fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
+    const oversize = Array.from({ length: 201 }, (_, i) => `b_${i}`);
+    fd.append("selectedBinders", JSON.stringify(oversize));
+
+    const res = await POST(makeRequest(fd));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/exceeds 200/);
+    expect(enrichCardsMock).not.toHaveBeenCalled();
+  });
 });
