@@ -221,6 +221,7 @@ export interface AdminCardsParams {
   search?: string;
   set?: string;
   condition?: string;
+  binder?: string;
   sortBy?: "name" | "price" | "quantity";
   sortDir?: "asc" | "desc";
 }
@@ -774,6 +775,7 @@ export async function getAdminCards(
     search = "",
     set = "",
     condition = "",
+    binder = "",
     sortBy = "name",
     sortDir = "asc",
   } = params;
@@ -782,6 +784,7 @@ export async function getAdminCards(
   if (search) conditions.push(ilike(cards.name, `%${search}%`));
   if (set) conditions.push(eq(cards.setCode, set));
   if (condition) conditions.push(eq(cards.condition, condition));
+  if (binder) conditions.push(eq(cards.binder, binder));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
