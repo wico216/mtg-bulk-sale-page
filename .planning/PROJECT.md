@@ -42,11 +42,11 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] High-impact admin mutations create durable audit log entries — Validated locally in Phase 14
 - [x] Import commits create durable import history — Validated locally in Phase 14
 - [x] Admin can view audit and import history from `/admin/audit` — Validated locally in Phase 14
+- [x] Production hardening: rate limits, structured logs, health checks, repeatable smoke, runbook, and security review — Validated in Phase 15 (3 live-deploy UAT items pending in `15-HUMAN-UAT.md`)
 
 ### Active
 
 - [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
-- [ ] Production hardening: rate limits, structured logs, health checks, repeatable smoke, runbook, and security review
 
 ### Out of Scope
 
@@ -65,7 +65,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 - Public storefront (no password) — admin panel is Google OAuth protected
 - v1.0 shipped: browse, search, filter, cart, email checkout — all static/build-time
 - v1.1 shipped: live database-backed storefront/admin inventory, multi-CSV import, bulk operations, dashboard, transactional checkout, and admin order history
-- v1.2 in progress: order workflow and audit trail are complete locally; production hardening remains
+- v1.2 in progress: order workflow, audit trail, and production hardening complete in code (Phase 15); deployed to Vercel for live human verification
 
 ## Constraints
 
@@ -111,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-28 after Phase 14 local completion*
+*Last updated: 2026-05-10 after Phase 15 completion + Vercel deploy*
