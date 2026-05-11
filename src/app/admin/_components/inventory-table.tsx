@@ -103,12 +103,14 @@ export function InventoryTable() {
   const [search, setSearch] = useState("");
   const [setFilter, setSetFilter] = useState("");
   const [conditionFilter, setConditionFilter] = useState("");
+  const [binderFilter, setBinderFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastVariant, setToastVariant] = useState<"success" | "error">("error");
   const [availableSets, setAvailableSets] = useState<string[]>([]);
+  const [availableBinders, setAvailableBinders] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [inventoryTotal, setInventoryTotal] = useState(0);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
@@ -129,6 +131,7 @@ export function InventoryTable() {
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (setFilter) params.set("set", setFilter);
       if (conditionFilter) params.set("condition", conditionFilter);
+      if (binderFilter) params.set("binder", binderFilter);
       if (sortBy) {
         params.set("sortBy", sortBy);
         params.set("sortDir", sortDir);
@@ -140,7 +143,7 @@ export function InventoryTable() {
       setCards(data.cards);
       setTotal(data.total);
       setTotalPages(data.totalPages);
-      if (!debouncedSearch && !setFilter && !conditionFilter) {
+      if (!debouncedSearch && !setFilter && !conditionFilter && !binderFilter) {
         setInventoryTotal(data.total);
       }
     } catch {
@@ -148,7 +151,7 @@ export function InventoryTable() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, setFilter, conditionFilter, sortBy, sortDir]);
+  }, [page, debouncedSearch, setFilter, conditionFilter, binderFilter, sortBy, sortDir]);
 
   // D-15: Post-import success toast handoff via sessionStorage.
   // import-client sets "admin-toast" to a JSON { message, variant: "success" } before router.push("/admin").
@@ -179,6 +182,17 @@ export function InventoryTable() {
           ),
         ].sort();
         setAvailableSets(sets);
+        // Phase 21 D-02: also derive distinct binders from the same response.
+        // Mirrors the availableSets pattern; v1.3 acceptable for total
+        // inventory of ~136-12,749 rows where limit=200 covers the vast
+        // majority of binder names. Operators can still filter via URL
+        // ?binder=... if a binder appears only in rows beyond the sample.
+        const binders = [
+          ...new Set<string>(
+            data.cards.map((c: InventoryRow) => c.binder),
+          ),
+        ].sort();
+        setAvailableBinders(binders);
         setInventoryTotal(data.total);
       } catch {
         // Non-critical, filters just won't have set options
@@ -197,7 +211,7 @@ export function InventoryTable() {
     setPage(1);
     setSelectedCardIds([]);
     setConfirmingDeleteSelected(false);
-  }, [debouncedSearch, setFilter, conditionFilter]);
+  }, [debouncedSearch, setFilter, conditionFilter, binderFilter]);
 
   // Clear selection when the visible page or sort order changes
   useEffect(() => {
@@ -499,7 +513,7 @@ export function InventoryTable() {
   }
 
   // Empty states
-  const hasFilters = debouncedSearch || setFilter || conditionFilter;
+  const hasFilters = debouncedSearch || setFilter || conditionFilter || binderFilter;
   if (total === 0 && !loading) {
     if (hasFilters) {
       return (
@@ -509,9 +523,12 @@ export function InventoryTable() {
             onSearchChange={setSearch}
             setFilter={setFilter}
             onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
+            binderFilter={binderFilter}
+            onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
             conditionFilter={conditionFilter}
             onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
             availableSets={availableSets}
+            availableBinders={availableBinders}
             exporting={exporting}
             onExport={handleExport}
             deletingAll={deletingAll}
@@ -533,6 +550,7 @@ export function InventoryTable() {
                 setSearch("");
                 setSetFilter("");
                 setConditionFilter("");
+                setBinderFilter("");
               }}
               className="mt-3 text-sm text-accent hover:text-accent-hover font-semibold"
             >
@@ -550,9 +568,12 @@ export function InventoryTable() {
           onSearchChange={setSearch}
           setFilter={setFilter}
           onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
+          binderFilter={binderFilter}
+          onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
           conditionFilter={conditionFilter}
           onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
           availableSets={availableSets}
+          availableBinders={availableBinders}
           exporting={exporting}
           onExport={handleExport}
           deletingAll={deletingAll}
@@ -582,9 +603,12 @@ export function InventoryTable() {
         onSearchChange={setSearch}
         setFilter={setFilter}
         onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
+        binderFilter={binderFilter}
+        onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
         conditionFilter={conditionFilter}
         onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
         availableSets={availableSets}
+        availableBinders={availableBinders}
         exporting={exporting}
         onExport={handleExport}
         deletingAll={deletingAll}
@@ -642,6 +666,12 @@ export function InventoryTable() {
               <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-16">
                 Cond
               </th>
+              {/* Phase 21 D-01: Binder column placement after Cond before Qty.
+                  w-24 chosen as compact-but-readable middle ground (the Set
+                  column uses w-20 but binder names like 'unsorted' are longer). */}
+              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-24">
+                Binder
+              </th>
               <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-14">
                 <button
                   onClick={() => handleSort("quantity")}
@@ -667,7 +697,8 @@ export function InventoryTable() {
                     key={card.id}
                     className="bg-red-50 dark:bg-red-950/20 border-b border-zinc-100 dark:border-zinc-800"
                   >
-                    <td colSpan={8}>
+                    {/* Phase 21 D-01: 9 columns (was 8) after Binder col added */}
+                    <td colSpan={9}>
                       <DeleteConfirmation
                         cardName={card.name}
                         onConfirm={() => handleDelete(card.id)}
@@ -733,6 +764,12 @@ export function InventoryTable() {
                       onSave={handleSave}
                       onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
                     />
+                  </td>
+                  {/* Phase 21 D-01: render binder verbatim (lowercase
+                      normalized per Phase 17 D-04). Mirrors the set-cell
+                      muted-zinc style. */}
+                  <td className="px-4 py-2 text-zinc-500 dark:text-zinc-400">
+                    {card.binder}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5">
