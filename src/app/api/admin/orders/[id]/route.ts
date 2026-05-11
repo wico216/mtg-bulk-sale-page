@@ -40,13 +40,28 @@ export async function GET(
   if (result instanceof Response) return result;
 
   const { id } = await params;
-  const order = await getOrderById(id);
-
-  if (!order) {
-    return Response.json({ error: "Order not found" }, { status: 404 });
+  try {
+    const order = await getOrderById(id);
+    if (!order) {
+      return Response.json({ error: "Order not found" }, { status: 404 });
+    }
+    return Response.json({ order });
+  } catch (err) {
+    logError({
+      event: "admin.order_detail.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { orderId: id },
+    });
+    // WR-B: match the "5xx -> JSON" invariant the rest of the admin routes
+    // uphold. Re-throwing surfaces Next's default HTML 500 and breaks the
+    // admin UI's fetch(...).json() consumer.
+    return Response.json(
+      { error: "Failed to load order" },
+      { status: 500 },
+    );
   }
-
-  return Response.json({ order });
 }
 
 export async function PATCH(

@@ -6,6 +6,9 @@ import {
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
+
+const ROUTE = "/api/admin/cards/[id]";
 
 export async function PATCH(
   request: Request,
@@ -23,13 +26,25 @@ export async function PATCH(
   if (rateLimited) return rateLimited;
 
   const { id } = await params;
-  const body = await request.json();
+  // WR-B: every admin route's 5xx must be structured JSON so the admin UI's
+  // `fetch(...).then(r => r.json())` consumer never trips on an HTML error
+  // page. A malformed JSON body falls into 400 JSON, not Next's HTML 500.
+  let body: { price?: unknown; quantity?: unknown; condition?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
   // Build validated updates
   const updates: { price?: number; quantity?: number; condition?: string } = {};
 
   if (body.price !== undefined) {
-    const price = parseFloat(body.price);
+    const price = parseFloat(body.price as string);
     if (isNaN(price) || price < 0) {
       return Response.json({ error: "Invalid price" }, { status: 400 });
     }
@@ -37,7 +52,7 @@ export async function PATCH(
   }
 
   if (body.quantity !== undefined) {
-    const qty = parseInt(body.quantity, 10);
+    const qty = parseInt(body.quantity as string, 10);
     if (isNaN(qty) || qty < 0) {
       return Response.json({ error: "Invalid quantity" }, { status: 400 });
     }
@@ -64,12 +79,31 @@ export async function PATCH(
     );
   }
 
-  const updated = await updateCard(id, updates, { actorEmail: result.user.email });
-  if (!updated) {
-    return Response.json({ error: "Card not found" }, { status: 404 });
+  try {
+    const updated = await updateCard(id, updates, {
+      actorEmail: result.user.email,
+    });
+    if (!updated) {
+      return Response.json({ error: "Card not found" }, { status: 404 });
+    }
+    return Response.json({ success: true, card: updated });
+  } catch (err) {
+    logError({
+      event: "admin.card_update.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { cardId: id },
+    });
+    // WR-B: match the "5xx -> JSON" invariant the rest of the admin routes
+    // uphold (orders/[id] PATCH, orders/[id]/cancel POST, cards/bulk-delete,
+    // delete-all, import-commit). Re-throwing surfaces Next's default HTML
+    // 500 and breaks the admin UI's fetch(...).json() consumer.
+    return Response.json(
+      { error: "Card update failed — card unchanged" },
+      { status: 500 },
+    );
   }
-
-  return Response.json({ success: true, card: updated });
 }
 
 export async function DELETE(
@@ -86,11 +120,24 @@ export async function DELETE(
   if (rateLimited) return rateLimited;
 
   const { id } = await params;
-  const deleted = await deleteCard(id, { actorEmail: result.user.email });
-
-  if (!deleted) {
-    return Response.json({ error: "Card not found" }, { status: 404 });
+  try {
+    const deleted = await deleteCard(id, { actorEmail: result.user.email });
+    if (!deleted) {
+      return Response.json({ error: "Card not found" }, { status: 404 });
+    }
+    return Response.json({ success: true });
+  } catch (err) {
+    logError({
+      event: "admin.card_delete.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { cardId: id },
+    });
+    // WR-B: see PATCH handler comment.
+    return Response.json(
+      { error: "Card delete failed — card unchanged" },
+      { status: 500 },
+    );
   }
-
-  return Response.json({ success: true });
 }

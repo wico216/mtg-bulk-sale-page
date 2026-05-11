@@ -164,6 +164,19 @@ describe("GET /api/admin/cards", () => {
     const response = await GET(makeGetRequest());
     expect(response.status).toBe(403);
   });
+
+  it("returns 500 JSON when getAdminCards throws", async () => {
+    // WR-B: prior to the fix, a thrown DB error bubbled out to Next's
+    // default HTML 500. The admin UI consumes this with fetch().json(),
+    // which then trips on "Unexpected token < in JSON". Match the 5xx
+    // -> structured JSON invariant the other admin routes uphold.
+    mockGetAdminCards.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const response = await GET(makeGetRequest());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Failed to load cards" });
+  });
 });
 
 describe("DELETE /api/admin/cards", () => {
@@ -319,6 +332,36 @@ describe("PATCH /api/admin/cards/[id]", () => {
     const response = await PATCH(req, ctx);
     expect(response.status).toBe(403);
   });
+
+  it("returns 400 JSON for a malformed JSON body", async () => {
+    // WR-B: an unparseable body (e.g. UI bug, mis-set Content-Type) must
+    // not propagate the request.json() SyntaxError into Next's default
+    // HTML 500. Validate via raw body so request.json() rejects.
+    const req = new Request(`http://localhost:3000/api/admin/cards/card-1`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    const ctx = { params: Promise.resolve({ id: "card-1" }) };
+    const response = await PATCH(req, ctx);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid JSON body" });
+    expect(mockUpdateCard).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 JSON when updateCard throws", async () => {
+    // WR-B: match the structured-500-JSON invariant the rest of the admin
+    // routes uphold (orders/[id] PATCH, cancel, bulk-delete, delete-all).
+    mockUpdateCard.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const [req, ctx] = makePatchRequest("card-1", { price: 1.0 });
+    const response = await PATCH(req, ctx);
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Card update failed — card unchanged",
+    });
+  });
 });
 
 describe("DELETE /api/admin/cards/[id]", () => {
@@ -366,5 +409,19 @@ describe("DELETE /api/admin/cards/[id]", () => {
     const [req, ctx] = makeDeleteRequest("card-1");
     const response = await DELETE(req, ctx);
     expect(response.status).toBe(403);
+  });
+
+  it("returns 500 JSON when deleteCard throws", async () => {
+    // WR-B: match the structured-500-JSON invariant the rest of the admin
+    // routes uphold.
+    mockDeleteCard.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const [req, ctx] = makeDeleteRequest("card-1");
+    const response = await DELETE(req, ctx);
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Card delete failed — card unchanged",
+    });
   });
 });

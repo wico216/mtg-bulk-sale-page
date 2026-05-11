@@ -256,6 +256,22 @@ describe("GET /api/admin/orders/[id]", () => {
     expect(response.status).toBe(403);
     expect(mockGetOrderById).not.toHaveBeenCalled();
   });
+
+  it("returns 500 JSON when getOrderById throws", async () => {
+    // WR-B: match the "5xx -> JSON" invariant the rest of the admin
+    // routes uphold (PATCH and cancel here, plus delete-all and
+    // bulk-delete on cards). Re-throwing surfaces Next's default HTML
+    // 500 and breaks the admin UI's fetch(...).json() consumer.
+    mockGetOrderById.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const response = await GET_DETAIL(
+      new Request("http://localhost:3000/api/admin/orders/ORD-20260427-020304-ABC123"),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Failed to load order" });
+  });
 });
 
 describe("PATCH /api/admin/orders/[id]", () => {

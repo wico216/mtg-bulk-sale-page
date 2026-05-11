@@ -35,16 +35,32 @@ export async function GET(request: Request) {
     );
   }
 
-  const data = await getAdminCards({
-    page,
-    limit,
-    search,
-    set,
-    condition,
-    sortBy,
-    sortDir,
-  });
-  return Response.json(data);
+  try {
+    const data = await getAdminCards({
+      page,
+      limit,
+      search,
+      set,
+      condition,
+      sortBy,
+      sortDir,
+    });
+    return Response.json(data);
+  } catch (err) {
+    logError({
+      event: "admin.cards_list.failed",
+      route: ROUTE,
+      actor: result.user.email,
+      error: err,
+      metadata: { page, limit, search, set, condition, sortBy, sortDir },
+    });
+    // WR-B: match the structured-JSON 5xx invariant. The admin UI consumes
+    // this with fetch(...).json(); an HTML 500 from Next breaks the page.
+    return Response.json(
+      { error: "Failed to load cards" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(request: Request) {
