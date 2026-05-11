@@ -5,6 +5,17 @@ interface CartState {
   /** Card ID to quantity mapping */
   items: Map<string, number>;
 
+  /**
+   * v1.3 Phase 20 D-12/D-13 — persisted cart-schema version sentinel.
+   * Initial / steady state is "1.3". Pre-v1.3 carts in production have
+   * `version === undefined` because the field wasn't shipped before; the
+   * `needsCartMigration` predicate flags those as needing the one-time
+   * v1.2 → v1.3 reconciliation pipeline (see cart-page-client.tsx).
+   * String compare suffices because '1.3' is the first sentinel ever
+   * shipped — any future bump (e.g., '1.4') is naturally `> '1.3'`.
+   */
+  version: string;
+
   // Actions
   addItem: (cardId: string, maxStock?: number) => void;
   removeItem: (cardId: string) => void;
@@ -21,6 +32,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: new Map<string, number>(),
+      version: "1.3",
 
       addItem: (cardId, maxStock) =>
         set((state) => {
@@ -85,7 +97,30 @@ export const useCartStore = create<CartState>()(
           return value;
         },
       }),
-      partialize: (state) => ({ items: state.items }),
+      // v1.3 Phase 20 D-13: persist the version sentinel alongside items
+      // so `needsCartMigration` can read it on next load to decide whether
+      // to fire the one-time migration toast.
+      partialize: (state) => ({ items: state.items, version: state.version }),
     },
   ),
 );
+
+/**
+ * v1.3 Phase 20 D-13 — advance the cart-version sentinel to '1.3'.
+ * Called by cart-page-client.tsx after the v1.2 → v1.3 reconciliation
+ * effect completes so the one-time migration toast fires exactly once.
+ * Idempotent: safe to call multiple times.
+ */
+export function markCartMigrated(): void {
+  useCartStore.setState({ version: "1.3" });
+}
+
+/**
+ * v1.3 Phase 20 D-13 — returns true iff the cart was persisted under a
+ * pre-v1.3 schema (version missing or string < '1.3'). String compare
+ * suffices because '1.3' is the first sentinel ever shipped; every
+ * pre-v1.3 cart in production has `version === undefined`.
+ */
+export function needsCartMigration(state: Pick<CartState, "version">): boolean {
+  return state.version == null || state.version < "1.3";
+}
