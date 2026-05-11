@@ -45,20 +45,19 @@ _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 
 </details>
 
-<details open>
-<summary>🚧 v1.3 Binder-Aware Inventory & Pick Workflow (Phases 16-22) — IN PROGRESS</summary>
+### 🚧 v1.3 Binder-Aware Inventory & Pick Workflow (Phases 16-22) — IN PROGRESS
 
 **Milestone Goal:** Every card in the storefront knows which physical binder it lives in, so the admin can pull orders without flipping through every binder.
 
 - [ ] **Phase 16: Schema & Migration** — Custom Drizzle migration adds `binder` dimension, `finish` enum, and CHECK constraint, with idempotency pre-flights and a Neon-branch dry-run gate
 - [ ] **Phase 17: Parser & Etched** — Manabox CSV parser reads `Binder Name`/`Binder Type`, normalizes binder names, and fixes the latent v1.2 etched-as-normal bug
-- [ ] **Phase 20: Storefront Aggregation & Cart Migration** — Storefront aggregates quantity across binders, splits `PublicCard`/`AdminCard` types, and reconciles v1.2 carts forward
-- [ ] **Phase 19: Import Preview & Picker** — Two-stage NDJSON binder picker with remembered selection, scoped replace, and bounded audit metadata
 - [ ] **Phase 18: Allocator** — Server-side multi-binder allocator inside the existing CTE chain with extended concurrent-checkout proof
+- [ ] **Phase 19: Import Preview & Picker** — Two-stage NDJSON binder picker with remembered selection, scoped replace, and bounded audit metadata
+- [ ] **Phase 20: Storefront Aggregation & Cart Migration** — Storefront aggregates quantity across binders, splits `PublicCard`/`AdminCard` types, and reconciles v1.2 carts forward
 - [ ] **Phase 21: Admin Visibility & Audit** — Admin inventory binder column + filter, `[binder]` annotation on order detail, and audit page renders scoped-import metadata
 - [ ] **Phase 22: Hardening & UAT** — STRIDE delta (I-DISC-05 + D-DOS-01 resolution), multi-binder concurrent-proof, parser perf pin, and live-deployment UAT
 
-</details>
+_Execution order is custom (16 → 17 → 20 → 19 → 18 → 21 → 22) per research recommendation; see STATE.md `execution_order` field._
 
 ## Phase Details
 
