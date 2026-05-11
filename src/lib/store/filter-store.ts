@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Card } from "@/lib/types";
+import type { Card, Finish } from "@/lib/types";
 
 export type SortOption =
   | "name-asc"
@@ -32,8 +32,8 @@ interface FilterState {
   selectedSets: Set<string>;
   /** Rarity filter */
   selectedRarities: Set<string>;
-  /** Finish filter — "foil" | "nonfoil" */
-  selectedFinishes: Set<string>;
+  /** Finish filter — 'normal' | 'foil' | 'etched' (Phase 17 — etched is first-class). */
+  selectedFinishes: Set<Finish>;
   /** Price range in USD, [min, max]. PRICE_MAX means "no upper bound". */
   priceRange: PriceRange;
   /** Current sort order */
@@ -44,7 +44,7 @@ interface FilterState {
   toggleColor: (color: string) => void;
   toggleSet: (set: string) => void;
   toggleRarity: (rarity: string) => void;
-  toggleFinish: (finish: string) => void;
+  toggleFinish: (finish: Finish) => void;
   setPriceRange: (range: PriceRange) => void;
   setSortBy: (sort: SortOption) => void;
   clearFilters: () => void;
@@ -59,7 +59,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
   selectedColors: new Set<string>(),
   selectedSets: new Set<string>(),
   selectedRarities: new Set<string>(),
-  selectedFinishes: new Set<string>(),
+  selectedFinishes: new Set<Finish>(),
   priceRange: [0, PRICE_MAX],
   sortBy: DEFAULT_SORT,
 
@@ -88,7 +88,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       return { selectedRarities: next };
     }),
 
-  toggleFinish: (finish) =>
+  toggleFinish: (finish: Finish) =>
     set((state) => {
       const next = new Set(state.selectedFinishes);
       next.has(finish) ? next.delete(finish) : next.add(finish);
@@ -105,7 +105,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       selectedColors: new Set<string>(),
       selectedSets: new Set<string>(),
       selectedRarities: new Set<string>(),
-      selectedFinishes: new Set<string>(),
+      selectedFinishes: new Set<Finish>(),
       priceRange: [0, PRICE_MAX],
       sortBy: state.sortBy,
     })),
@@ -155,10 +155,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
     }
 
     if (selectedFinishes.size > 0) {
-      result = result.filter((card) => {
-        const key = card.foil ? "foil" : "nonfoil";
-        return selectedFinishes.has(key);
-      });
+      result = result.filter((card) => selectedFinishes.has(card.finish));
     }
 
     const [minPrice, maxPrice] = priceRange;

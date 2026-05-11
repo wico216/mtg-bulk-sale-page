@@ -709,14 +709,19 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
       <FilterSection title="Finish">
         <div style={{ display: "flex", flexDirection: "column" }}>
           <Checkbox
+            label="Normal"
+            checked={selectedFinishes.has("normal")}
+            onToggle={() => toggleFinish("normal")}
+          />
+          <Checkbox
             label="Foil"
             checked={selectedFinishes.has("foil")}
             onToggle={() => toggleFinish("foil")}
           />
           <Checkbox
-            label="Nonfoil"
-            checked={selectedFinishes.has("nonfoil")}
-            onToggle={() => toggleFinish("nonfoil")}
+            label="Etched"
+            checked={selectedFinishes.has("etched")}
+            onToggle={() => toggleFinish("etched")}
           />
         </div>
       </FilterSection>

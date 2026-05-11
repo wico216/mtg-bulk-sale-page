@@ -1,12 +1,47 @@
 "use client";
 
 import Image from "next/image";
-import type { Card } from "@/lib/types";
+import type { Card, Finish } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 
 function formatPrice(price: number | null): string {
   if (price === null) return "—";
   return `$${price.toFixed(2)}`;
+}
+
+/**
+ * Phase 17 D-09 — finish badge in the top-left of a tile.
+ * - 'normal' renders nothing (the absence of a badge IS the signal).
+ * - 'foil' uses the existing var(--ink) on var(--bg) pill (preserved from v1.2).
+ * - 'etched' uses an inline-style purple pill (#e9d5ff bg / #581c87 text;
+ *   Tailwind bg-purple-200 text-purple-900) to differentiate visually.
+ *
+ * Inline styles are used to match the prevailing pattern in this file
+ * (the file does not use Tailwind classes anywhere; CardTile is built on
+ * inline `style={{}}` and CSS variables).
+ */
+function FinishPill({ finish }: { finish: Finish }) {
+  if (finish === "normal") return null;
+
+  const isEtched = finish === "etched";
+  return (
+    <span
+      style={{
+        position: "absolute",
+        top: 6,
+        left: 6,
+        fontSize: 9,
+        fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+        letterSpacing: "0.1em",
+        background: isEtched ? "#e9d5ff" : "var(--ink)",
+        color: isEtched ? "#581c87" : "var(--bg)",
+        padding: "2px 5px",
+        borderRadius: 2,
+      }}
+    >
+      {isEtched ? "ETCHED" : "FOIL"}
+    </span>
+  );
 }
 
 interface CardTileProps {
@@ -74,24 +109,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
             [ card art ]
           </div>
         )}
-        {card.foil && (
-          <span
-            style={{
-              position: "absolute",
-              top: 6,
-              left: 6,
-              fontSize: 9,
-              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-              letterSpacing: "0.1em",
-              background: "var(--ink)",
-              color: "var(--bg)",
-              padding: "2px 5px",
-              borderRadius: 2,
-            }}
-          >
-            FOIL
-          </span>
-        )}
+        <FinishPill finish={card.finish} />
         {card.price == null && (
           <span
             style={{

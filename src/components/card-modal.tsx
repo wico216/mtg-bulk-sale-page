@@ -260,7 +260,21 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
             <dt style={{ color: "var(--muted)" }}>Condition</dt>
             <dd style={{ margin: 0, color: "var(--ink)" }}>{formatCondition(card.condition)}</dd>
             <dt style={{ color: "var(--muted)" }}>Finish</dt>
-            <dd style={{ margin: 0 }}>{card.foil ? "Foil" : "Nonfoil"}</dd>
+            <dd
+              style={{
+                margin: 0,
+                // Phase 17 D-09: echo the storefront pill color for etched
+                // so the modal Finish row visually matches the tile badge.
+                color:
+                  card.finish === "etched" ? "#581c87" : undefined,
+              }}
+            >
+              {card.finish === "etched"
+                ? "Etched"
+                : card.finish === "foil"
+                  ? "Foil"
+                  : "Nonfoil"}
+            </dd>
             <dt style={{ color: "var(--muted)" }}>Color identity</dt>
             <dd style={{ margin: 0, color: "var(--muted)", fontSize: 11 }}>
               {card.colorIdentity.length ? card.colorIdentity.join(" / ") : "Colorless"}

@@ -188,7 +188,11 @@ export default function CartItem({
           }}
         >
           {card.setCode.toUpperCase()} · {card.setName}
-          {card.foil ? " · Foil" : ""}
+          {card.finish === "etched"
+            ? " · Etched"
+            : card.finish === "foil"
+              ? " · Foil"
+              : ""}
         </p>
         <p
           style={{
