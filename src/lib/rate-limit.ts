@@ -243,13 +243,47 @@ export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
  * is deliberately permissive in dev so it never blocks the test suite, but it
  * is NOT correct across serverless instances -- production MUST have
  * DATABASE_URL configured.
+ *
+ * CR-02 fix: previously a rejected Postgres-init promise (DB unreachable at
+ * boot, ensureTable failure, etc.) was memoised and every subsequent call
+ * awaited the same rejection — turning a transient outage into a permanent
+ * denial of service for the lifetime of the serverless function instance.
+ * Now we (a) reset the memo on rejection so the next call retries, and
+ * (b) fall back to the in-memory store on failure so requests do not
+ * cascade into 500s while the DB recovers. Same-instance fallback is
+ * deliberately permissive — a per-instance memory store is less correct
+ * across serverless instances than a Postgres store, but it is strictly
+ * better than denying every write surface.
  */
 let defaultStorePromise: Promise<RateLimitStore> | null = null;
 
 export function getDefaultRateLimitStore(): Promise<RateLimitStore> {
   if (defaultStorePromise) return defaultStorePromise;
   if (process.env.DATABASE_URL) {
-    defaultStorePromise = createPostgresRateLimitStore();
+    const attempt = createPostgresRateLimitStore().catch((err) => {
+      // Reset the memo so the next caller can retry the Postgres path once
+      // the DB recovers; do NOT keep a poisoned rejected promise in place.
+      if (defaultStorePromise === attempt) defaultStorePromise = null;
+      // Best-effort log; the import is lazy to avoid a cycle in tests that
+      // mock the logger module.
+      import("@/lib/logger")
+        .then(({ logError }) =>
+          logError({
+            event: "rate_limit.store_init_failed",
+            route: "lib/rate-limit",
+            error: err,
+          }),
+        )
+        .catch(() => {
+          // If even the logger import fails, swallow — the fall-through to
+          // the memory store still gives the caller a working store.
+        });
+      // Fail-open with a per-instance memory store. The next call to
+      // getDefaultRateLimitStore() will retry Postgres because we just
+      // cleared defaultStorePromise above.
+      return createMemoryRateLimitStore();
+    });
+    defaultStorePromise = attempt;
   } else {
     defaultStorePromise = Promise.resolve(createMemoryRateLimitStore());
   }
@@ -311,6 +345,15 @@ export const RATE_LIMIT_BUCKETS = {
  * Convenience wrapper around `checkRateLimit` that builds a JSON 429 Response
  * with retry-after metadata when blocked. Returns null when allowed so callers
  * can keep their early-return shape consistent with `requireAdmin()`.
+ *
+ * CR-02 / WR-05 fix: defense-in-depth — if the underlying store throws
+ * (DB outage on the Postgres path, transient network blip, ensure-table DDL
+ * failure), the rate-limit subsystem MUST NOT take down the route. We log
+ * the failure and fail-open (return null = "allowed") rather than letting
+ * an unhandled rejection bubble past every admin route's try/catch and
+ * surface as a Next.js generic 500 / HTML error page. The route's stated
+ * invariant -- "rate-limit failure should never trump auth result or
+ * business logic" -- is now enforced here.
  */
 export async function enforceRateLimit(args: {
   store?: RateLimitStore;
@@ -318,13 +361,31 @@ export async function enforceRateLimit(args: {
   config: RateLimitConfig;
   now?: number;
 }): Promise<Response | null> {
-  const store = args.store ?? (await getDefaultRateLimitStore());
-  const decision = await checkRateLimit({
-    store,
-    key: args.key,
-    config: args.config,
-    now: args.now,
-  });
+  let decision: RateLimitDecision;
+  try {
+    const store = args.store ?? (await getDefaultRateLimitStore());
+    decision = await checkRateLimit({
+      store,
+      key: args.key,
+      config: args.config,
+      now: args.now,
+    });
+  } catch (err) {
+    // Best-effort log; never throw further. We deliberately do NOT block the
+    // request when the rate-limit store is unavailable.
+    try {
+      const { logError } = await import("@/lib/logger");
+      logError({
+        event: "rate_limit.enforce_failed",
+        route: "lib/rate-limit",
+        error: err,
+        metadata: { bucket: args.config.bucket },
+      });
+    } catch {
+      // logger import unavailable — swallow and continue.
+    }
+    return null;
+  }
   if (decision.allowed) return null;
   return Response.json(
     {

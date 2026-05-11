@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 import {
   checkRateLimit,
   createMemoryRateLimitStore,
+  enforceRateLimit,
   type RateLimitStore,
 } from "@/lib/rate-limit";
 
@@ -157,5 +158,61 @@ describe("checkRateLimit", () => {
       now: now + 60_001,
     });
     expect(reAllowed.allowed).toBe(true);
+  });
+});
+
+describe("enforceRateLimit (CR-02 / WR-05: fail-open on store failure)", () => {
+  it("returns null (fail-open) when the store throws instead of bubbling the error", async () => {
+    // Defense-in-depth: rate-limit store failure must never deny service or
+    // surface a generic Next.js 500 to the route handler.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failingStore: RateLimitStore = {
+        async countHits() {
+          throw new Error("simulated DB outage");
+        },
+        async earliestHit() {
+          throw new Error("simulated DB outage");
+        },
+        async recordHit() {
+          throw new Error("simulated DB outage");
+        },
+      };
+
+      const result = await enforceRateLimit({
+        store: failingStore,
+        key: "ip:1.2.3.4",
+        config: { bucket: "checkout", limit: 1, windowMs: 60_000 },
+      });
+
+      // Fail-open: caller continues without a 429.
+      expect(result).toBeNull();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("still emits a 429 response when the store works and the limit is exceeded", async () => {
+    const store = createMemoryRateLimitStore();
+    const config = { bucket: "checkout", limit: 1, windowMs: 60_000 };
+    const now = Date.parse("2026-04-27T00:00:00.000Z");
+
+    const allowed = await enforceRateLimit({
+      store,
+      key: "ip:1.2.3.4",
+      config,
+      now,
+    });
+    expect(allowed).toBeNull();
+
+    const blocked = await enforceRateLimit({
+      store,
+      key: "ip:1.2.3.4",
+      config,
+      now: now + 1_000,
+    });
+    expect(blocked).not.toBeNull();
+    expect(blocked?.status).toBe(429);
+    expect(blocked?.headers.get("Retry-After")).not.toBeNull();
   });
 });
