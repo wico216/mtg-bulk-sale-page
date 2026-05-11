@@ -8,7 +8,11 @@ import {
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
 import { logEvent, logError } from "@/lib/logger";
-import type { CheckoutRequest, CheckoutResponse } from "@/lib/types";
+import type {
+  CheckoutRequest,
+  CheckoutResponse,
+  OrderData,
+} from "@/lib/types";
 
 const ROUTE = "/api/checkout";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,7 +64,7 @@ function validateCheckoutRequest(body: CheckoutRequest): string | null {
   return null;
 }
 
-async function notifyOrderAfterCommit(order: CheckoutResponse["order"]): Promise<NotifyResult> {
+async function notifyOrderAfterCommit(order: OrderData): Promise<NotifyResult> {
   try {
     return await notifyOrder(order);
   } catch (error) {

@@ -2,12 +2,12 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
-import type { Card } from "@/lib/types";
+import type { PublicCard } from "@/lib/types";
 
 interface CartItemProps {
   cardId: string;
   quantity: number;
-  card: Card | undefined;
+  card: PublicCard | undefined;
   onQuantityChange: (qty: number) => void;
   onRemove: () => void;
   maxStock: number;

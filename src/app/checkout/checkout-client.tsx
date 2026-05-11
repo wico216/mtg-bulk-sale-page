@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Card, StockConflict } from "@/lib/types";
+import type { PublicCard, StockConflict } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import OrderSummary from "@/components/order-summary";
 import type { OrderSummaryItem } from "@/components/order-summary";
 
 interface CheckoutClientProps {
-  cards: Card[];
+  cards: PublicCard[];
 }
 
 interface CheckoutErrorResponse {

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Card, Finish } from "@/lib/types";
+import type { PublicCard, Finish } from "@/lib/types";
 
 export type SortOption =
   | "name-asc"
@@ -23,7 +23,7 @@ const RARITY_RANK: Record<string, number> = {
 
 interface FilterState {
   /** Source data set once on mount */
-  allCards: Card[];
+  allCards: PublicCard[];
   /** Text search input */
   searchQuery: string;
   /** Mana color filter (W, U, B, R, G, C) */
@@ -39,7 +39,7 @@ interface FilterState {
   /** Current sort order */
   sortBy: SortOption;
 
-  setAllCards: (cards: Card[]) => void;
+  setAllCards: (cards: PublicCard[]) => void;
   setSearchQuery: (query: string) => void;
   toggleColor: (color: string) => void;
   toggleSet: (set: string) => void;
@@ -49,7 +49,7 @@ interface FilterState {
   setSortBy: (sort: SortOption) => void;
   clearFilters: () => void;
 
-  getFilteredCards: () => Card[];
+  getFilteredCards: () => PublicCard[];
   hasActiveFilters: () => boolean;
 }
 

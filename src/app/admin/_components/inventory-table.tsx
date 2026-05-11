@@ -175,7 +175,7 @@ export function InventoryTable() {
         const data = await res.json();
         const sets = [
           ...new Set<string>(
-            data.cards.map((c: Card) => c.setCode),
+            data.cards.map((c: InventoryRow) => c.setCode),
           ),
         ].sort();
         setAvailableSets(sets);

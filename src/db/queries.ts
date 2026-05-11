@@ -62,9 +62,12 @@ export function rowToCard(row: typeof cards.$inferSelect): InventoryRow {
 /**
  * v1.3 Phase 20 D-01 — raw DB row shape returned by getCardsAggregated.
  * Mirrors the AS-aliased columns produced by the SQL GROUP BY query so
- * `db.execute<AggregatedCardRow>` types correctly.
+ * `db.execute<AggregatedCardRow>` types correctly. Index signature is
+ * required to satisfy the Drizzle `db.execute<T extends Record<string, any>>`
+ * generic constraint.
  */
 interface AggregatedCardRow {
+  [key: string]: unknown;
   id: string;
   name: string;
   setCode: string;

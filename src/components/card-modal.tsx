@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
-import type { Card } from "@/lib/types";
+import type { PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 
 const CONDITION_MAP: Record<string, string> = {
@@ -107,7 +107,7 @@ const btnGhost: React.CSSProperties = {
 };
 
 interface CardModalProps {
-  card: Card;
+  card: PublicCard;
   onClose: () => void;
   onImageClick: () => void;
 }

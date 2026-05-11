@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Card, CardData } from "@/lib/types";
+import type { PublicCard, CardData } from "@/lib/types";
 import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
 import CardModal from "@/components/card-modal";
 
 interface CardGridProps {
-  cards: Card[];
+  cards: PublicCard[];
   meta: CardData["meta"];
 }
 
@@ -39,7 +39,7 @@ export default function CardGrid({ cards }: CardGridProps) {
     ],
   );
 
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCard, setSelectedCard] = useState<PublicCard | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Card, CardData } from "@/lib/types";
+import type { PublicCard, CardData } from "@/lib/types";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
 import CardGrid from "@/components/card-grid";
 import { useFilterStore } from "@/lib/store/filter-store";
 
 interface StorefrontShellProps {
-  cards: Card[];
+  cards: PublicCard[];
   meta: CardData["meta"];
 }
 

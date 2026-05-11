@@ -6,9 +6,9 @@ vi.mock("@/lib/scryfall", () => ({
 
 import { fetchCard } from "@/lib/scryfall";
 import { enrichCards } from "../enrichment";
-import type { Card, ScryfallCard } from "@/lib/types";
+import type { InventoryRow, ScryfallCard } from "@/lib/types";
 
-function makeCard(overrides: Partial<Card> = {}): Card {
+function makeCard(overrides: Partial<InventoryRow> = {}): InventoryRow {
   return {
     id: "lea-232-normal-near_mint-unsorted",
     name: "Lightning Bolt",

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { Card, Finish } from "@/lib/types";
+import type { PublicCard, Finish } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 
 function formatPrice(price: number | null): string {
@@ -45,7 +45,7 @@ function FinishPill({ finish }: { finish: Finish }) {
 }
 
 interface CardTileProps {
-  card: Card;
+  card: PublicCard;
   onClick: () => void;
 }
 

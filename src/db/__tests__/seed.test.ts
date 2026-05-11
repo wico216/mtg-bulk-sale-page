@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { cardToRow } from "../seed";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
-const makeCard = (overrides: Partial<Card> = {}): Card => ({
+const makeCard = (overrides: Partial<InventoryRow> = {}): InventoryRow => ({
   id: "sld-123-normal-NearMint-unsorted",
   name: "Test Card",
   setCode: "sld",

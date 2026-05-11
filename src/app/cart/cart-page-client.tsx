@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import type { Card } from "@/lib/types";
+import type { PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import CartItem from "@/components/cart-item";
 import CartSummaryBar from "@/components/cart-summary-bar";
 
 interface CartPageClientProps {
-  cards: Card[];
+  cards: PublicCard[];
 }
 
 export default function CartPageClient({ cards }: CartPageClientProps) {
