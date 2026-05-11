@@ -19,6 +19,28 @@ export interface ImportSourceFile {
 
 // ---- NDJSON stream messages (preview endpoint) -----------------------------
 
+/**
+ * One row in the binder picker (Phase 19 D-01/D-04). Surfaced by the
+ * /preview NDJSON stream BEFORE Scryfall enrichment so the operator
+ * can scope the import.
+ */
+export interface BinderSummary {
+  /** Normalized binder name (already passed through normalizeBinderName at parse time). */
+  name: string;
+  /** Number of parsed cards belonging to this binder in this upload. */
+  rowCount: number;
+  /** First 3-5 card names from this binder, for at-a-glance recognition. */
+  sampleNames: string[];
+  /** True iff this binder name was NOT in the operator's previous selection. */
+  isNew: boolean;
+}
+
+/** Emitted exactly once after parse, BEFORE the first progress message. */
+export interface ImportBindersMessage {
+  type: "binders";
+  binders: BinderSummary[];
+}
+
 /** Emitted one or more times while enrichment progresses. */
 export interface ImportProgressMessage {
   type: "progress";
@@ -42,6 +64,7 @@ export interface ImportErrorMessage {
 
 /** Union of every NDJSON line the preview route may emit. */
 export type ImportStreamMessage =
+  | ImportBindersMessage
   | ImportProgressMessage
   | ImportResultMessage
   | ImportErrorMessage;
@@ -104,10 +127,57 @@ export interface CommitSummary {
 export interface CommitRequest {
   cards: Card[];
   summary?: CommitSummary;
+  /**
+   * Phase 19 D-15/D-16: when omitted, server defaults to all distinct
+   * binders mentioned in `cards` (legacy wholesale-replace behavior
+   * over the binders this upload touches). When present, MUST contain
+   * every binder name appearing in `cards` (server validates).
+   */
+  selectedBinders?: string[];
+  /**
+   * Phase 19: operator's previous selection from useBinderImportStore.
+   * Used to compute `newBindersInExport` / `missingBindersFromExport`
+   * for the audit metadata. Loose contract — silently normalized
+   * server-side; never causes a 400.
+   */
+  knownBinders?: string[];
 }
 
 /** Success response returned by /api/admin/import/commit. */
 export interface CommitResponse {
   success: true;
   inserted: number;
+}
+
+// ---- Audit metadata (commit endpoint) ---------------------------------------
+
+/**
+ * Phase 19 D-17: bounded shape captured into both adminAuditLog.metadata
+ * and importHistory.metadata for a scoped-replace commit. Estimated
+ * ~1.5KB serialized for typical (30 binders, ~10 selected); fits the
+ * existing 4KB MAX_AUDIT_METADATA_BYTES cap. List fields are capped
+ * at MAX_AUDIT_ARRAY_LENGTH (50) by sanitizeAdminAuditMetadata before
+ * write — `selectedBinders`, `newBindersInExport`,
+ * `missingBindersFromExport` MAY exceed 50 in rare cases and the
+ * shape pre-truncates to keep the captured set deterministic.
+ */
+export interface ScopedImportAuditMetadata {
+  /** The set of binders this commit replaced. Capped at 50 by the helper. */
+  selectedBinders: string[];
+  /** Total binders the export contained (informational). */
+  totalBindersInExport: number;
+  scopedReplaceCounts: {
+    /** Per-binder row count BEFORE the commit (only for selected binders). */
+    before: Record<string, number>;
+    /** Per-binder row count AFTER the commit (only for selected binders). */
+    after: Record<string, number>;
+    /** TYPED INVARIANT: D-18. Asserted at runtime in replaceCardsForBinders. */
+    deletedFromUnselected: 0;
+  };
+  /** Total cards in the cards table after the commit. */
+  totalCardsAfterImport: number;
+  /** Binders present in this export but not in the operator's prior selection. Capped at 50. */
+  newBindersInExport: string[];
+  /** Binders in the prior selection but missing from this export. Capped at 50. */
+  missingBindersFromExport: string[];
 }
