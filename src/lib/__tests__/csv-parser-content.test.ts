@@ -65,6 +65,8 @@ describe("parseManaboxCsvContent", () => {
       rarity: "rare",
       finish: "normal",
       binder: "unsorted",
+      // v1.3.1 — parser now carries the Scryfall UUID; CSV here has none.
+      scryfallId: null,
     });
 
     expect(result.cards[1]).toEqual({
@@ -82,6 +84,7 @@ describe("parseManaboxCsvContent", () => {
       rarity: "uncommon",
       finish: "foil",
       binder: "unsorted",
+      scryfallId: null,
     });
   });
 
