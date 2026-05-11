@@ -1,4 +1,4 @@
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 import type { SkippedRow } from "@/lib/csv-parser";
 import type { SkippedCard } from "@/lib/enrichment";
 
@@ -87,7 +87,7 @@ export interface PreviewPayload {
   /** Number of enriched cards with price === null. */
   missingPrices: number;
   /** First up-to-20 enriched cards for the preview table. */
-  sample: Card[];
+  sample: InventoryRow[];
   /** Per-row detail for the preview's expandable "Skipped rows" section. */
   skippedRows: Array<
     | {
@@ -110,7 +110,7 @@ export interface PreviewPayload {
   /** Per-file parse totals shown when the admin imports multiple CSV files. */
   sourceFiles: ImportSourceFile[];
   /** Full enriched card list -- posted back to /commit verbatim. */
-  cards: Card[];
+  cards: InventoryRow[];
 }
 
 // ---- Commit endpoint --------------------------------------------------------
@@ -125,7 +125,7 @@ export interface CommitSummary {
 
 /** Shape of POST body accepted by /api/admin/import/commit. */
 export interface CommitRequest {
-  cards: Card[];
+  cards: InventoryRow[];
   summary?: CommitSummary;
   /**
    * Phase 19 D-15/D-16: when omitted, server defaults to all distinct

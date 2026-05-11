@@ -1,4 +1,4 @@
-import type { Card, Finish, ScryfallCard } from "./types";
+import type { InventoryRow, Finish, ScryfallCard } from "./types";
 import { fetchCard } from "./scryfall";
 
 /**
@@ -91,7 +91,7 @@ export interface SkippedCard {
 }
 
 export interface EnrichmentResult {
-  cards: Card[];
+  cards: InventoryRow[];
   stats: EnrichmentStats;
   /** Cards whose Scryfall lookup returned null. Empty array when all resolved. */
   scryfallMisses: SkippedCard[];
@@ -108,15 +108,16 @@ export interface EnrichmentOptions {
 }
 
 /**
- * Enrich parsed Card records with Scryfall data (image, price, color identity).
- * Cards not found on Scryfall are excluded from `cards[]` and recorded in
- * `scryfallMisses[]`. Processes sequentially to respect Scryfall rate limits.
+ * Enrich parsed InventoryRow records with Scryfall data (image, price, color
+ * identity). Rows not found on Scryfall are excluded from `cards[]` and
+ * recorded in `scryfallMisses[]`. Processes sequentially to respect Scryfall
+ * rate limits.
  */
 export async function enrichCards(
-  cards: Card[],
+  cards: InventoryRow[],
   opts: EnrichmentOptions = {},
 ): Promise<EnrichmentResult> {
-  const enriched: Card[] = [];
+  const enriched: InventoryRow[] = [];
   const scryfallMisses: SkippedCard[] = [];
   const stats: EnrichmentStats = {
     processed: 0,

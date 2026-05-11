@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
 import { EditableCell } from "./editable-cell";
 import { DeleteConfirmation } from "./delete-confirmation";
@@ -94,7 +94,7 @@ function SelectAllCheckbox({
 
 export function InventoryTable() {
   const router = useRouter();
-  const [cards, setCards] = useState<Card[]>([]);
+  const [cards, setCards] = useState<InventoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);

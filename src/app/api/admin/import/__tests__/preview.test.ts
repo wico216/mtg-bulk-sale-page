@@ -38,7 +38,7 @@ import {
   type ImportStreamMessage,
   type PreviewPayload,
 } from "@/lib/import-contract";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
 function adminOk() {
   return { user: { email: "admin@example.com", name: "Admin" } };
@@ -73,7 +73,7 @@ async function readStream(res: Response): Promise<ImportStreamMessage[]> {
   return messages;
 }
 
-function sampleCard(id = "lea-232-normal-near_mint-unsorted"): Card {
+function sampleCard(id = "lea-232-normal-near_mint-unsorted"): InventoryRow {
   return {
     id,
     name: "Lightning Bolt",
@@ -336,7 +336,7 @@ describe("POST /api/admin/import/preview", () => {
 
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(200);
-    const cardsArg = enrichCardsMock.mock.calls[0][0] as Card[];
+    const cardsArg = enrichCardsMock.mock.calls[0][0] as InventoryRow[];
     expect(cardsArg.length).toBe(2); // only a02 cards (2 of them)
     const msgs = await readStream(res);
     const result = msgs.find((m) => m.type === "result") as { type: "result"; preview: PreviewPayload };
@@ -357,7 +357,7 @@ describe("POST /api/admin/import/preview", () => {
 
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(200);
-    const cardsArg = enrichCardsMock.mock.calls[0][0] as Card[];
+    const cardsArg = enrichCardsMock.mock.calls[0][0] as InventoryRow[];
     expect(cardsArg.length).toBe(6); // all 6 cards
   });
 

@@ -1,11 +1,11 @@
 import Papa from "papaparse";
 import { readFileSync } from "node:fs";
 import { globSync } from "fast-glob";
-import type { ManaboxRow, Card, Finish } from "./types";
+import type { ManaboxRow, InventoryRow, Finish } from "./types";
 import { normalizeBinderName } from "./binder-name";
 
 /**
- * A row from the uploaded CSV that could not be converted to a Card.
+ * A row from the uploaded CSV that could not be converted to an InventoryRow.
  * Row numbers are 1-indexed where the header line is row 1 and the first data
  * row is row 2 (matches what a user sees in their spreadsheet app).
  */
@@ -21,7 +21,7 @@ export interface SkippedRow {
 
 /** Return shape of parseManaboxCsvContent. */
 export interface ParseResult {
-  cards: Card[];
+  cards: InventoryRow[];
   skippedRows: SkippedRow[];
   sourceFiles?: Array<{
     name: string;
@@ -31,9 +31,9 @@ export interface ParseResult {
 }
 
 /**
- * Shared row -> Card mapper. Returns either a Card or a SkippedRow with a
- * concrete reason so the admin import UI (Phase 10 D-05 zone 3) can show
- * per-row feedback.
+ * Shared row -> InventoryRow mapper. Returns either an InventoryRow or a
+ * SkippedRow with a concrete reason so the admin import UI (Phase 10 D-05
+ * zone 3) can show per-row feedback.
  *
  * Phase 17 extensions (D-02..D-06):
  *   - Skips rows with `Quantity === 0` (reason `'zero quantity'`, D-05).
@@ -53,7 +53,7 @@ export interface ParseResult {
 function rowToCardOrSkip(
   row: ManaboxRow,
   rowNumber: number,
-): { card: Card } | { skipped: SkippedRow } {
+): { card: InventoryRow } | { skipped: SkippedRow } {
   const rawSetCode = row["Set code"];
   const rawCollectorNumber = row["Collector number"];
   const name = row.Name;
@@ -158,7 +158,7 @@ function rowToCardOrSkip(
   const binder = normalizeBinderName(row["Binder Name"]);
 
   // Phase 17 D-06: 5-segment composite id (matches Phase 16 D-05).
-  const card: Card = {
+  const card: InventoryRow = {
     id: `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`,
     name,
     setCode,
@@ -178,10 +178,10 @@ function rowToCardOrSkip(
 }
 
 /**
- * Parse a single Manabox CSV file into partial Card objects.
+ * Parse a single Manabox CSV file into partial InventoryRow objects.
  * Enrichment fields (price, colorIdentity, imageUrl) are left as null/empty.
  */
-function parseSingleCsv(filePath: string): Card[] {
+function parseSingleCsv(filePath: string): InventoryRow[] {
   const content = readFileSync(filePath, "utf-8");
   const result = Papa.parse<ManaboxRow>(content, {
     header: true,
@@ -193,7 +193,7 @@ function parseSingleCsv(filePath: string): Card[] {
     console.warn(`CSV parse warnings for ${filePath}:`, result.errors);
   }
 
-  const cards: Card[] = [];
+  const cards: InventoryRow[] = [];
 
   for (const row of result.data) {
     // Skip rows missing required fields (filesystem path preserves silent-skip
@@ -210,8 +210,8 @@ function parseSingleCsv(filePath: string): Card[] {
  * Merge duplicate cards by summing quantities.
  * Duplicates are identified by the composite ID (set-collector-finish-condition-binder).
  */
-function mergeCards(cards: Card[]): Card[] {
-  const cardMap = new Map<string, Card>();
+function mergeCards(cards: InventoryRow[]): InventoryRow[] {
+  const cardMap = new Map<string, InventoryRow>();
 
   for (const card of cards) {
     const existing = cardMap.get(card.id);
@@ -227,10 +227,10 @@ function mergeCards(cards: Card[]): Card[] {
 
 /**
  * Parse all CSV files from the given inventory directory.
- * Maps Manabox fields to Card type, merges duplicates across files.
- * Returns Card[] with null/empty enrichment fields (price, colorIdentity, imageUrl).
+ * Maps Manabox fields to InventoryRow type, merges duplicates across files.
+ * Returns InventoryRow[] with null/empty enrichment fields (price, colorIdentity, imageUrl).
  */
-export function parseAllCsvFiles(inventoryDir: string): Card[] {
+export function parseAllCsvFiles(inventoryDir: string): InventoryRow[] {
   const csvFiles = globSync("**/*.csv", { cwd: inventoryDir, absolute: true });
 
   if (csvFiles.length === 0) {
@@ -240,7 +240,7 @@ export function parseAllCsvFiles(inventoryDir: string): Card[] {
 
   console.log(`Found ${csvFiles.length} CSV file(s) in ${inventoryDir}`);
 
-  const allCards: Card[] = [];
+  const allCards: InventoryRow[] = [];
 
   for (const csvFile of csvFiles) {
     const cards = parseSingleCsv(csvFile);
@@ -270,7 +270,7 @@ export function parseManaboxCsvContent(
     skipEmptyLines: true,
   });
 
-  const cards: Card[] = [];
+  const cards: InventoryRow[] = [];
   const skippedRows: SkippedRow[] = [];
 
   result.data.forEach((row, index) => {
@@ -328,7 +328,7 @@ export function parseManaboxCsvContent(
 export function parseManaboxCsvContents(
   files: Array<{ fileName: string; content: string }>,
 ): ParseResult {
-  const cards: Card[] = [];
+  const cards: InventoryRow[] = [];
   const skippedRows: SkippedRow[] = [];
   const sourceFiles: NonNullable<ParseResult["sourceFiles"]> = [];
 

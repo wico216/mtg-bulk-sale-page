@@ -2,21 +2,21 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { config } from "dotenv";
 import { count } from "drizzle-orm";
 import { cards } from "./schema";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
 config({ path: ".env.local" });
 
 /**
- * Convert a Card (dollars) to a database row (cents).
+ * Convert an InventoryRow (dollars) to a database row (cents).
  * Exported for unit testing.
  *
- * Card and the DB row are 1:1 on `finish` and `binder` after the Phase 17
- * parser update (the Phase 16 transitional foil-derived shim has been
- * removed). The parser plumbs the real binder name through; legacy
- * callers that build a Card by hand without a binder will surface as a
- * TypeScript error at the call site, which is the intended contract.
+ * InventoryRow and the DB row are 1:1 on `finish` and `binder` after the
+ * Phase 17 parser update (the Phase 16 transitional foil-derived shim has
+ * been removed). The parser plumbs the real binder name through; legacy
+ * callers that build an InventoryRow by hand without a binder will surface
+ * as a TypeScript error at the call site, which is the intended contract.
  */
-export function cardToRow(card: Card) {
+export function cardToRow(card: InventoryRow) {
   return {
     id: card.id,
     name: card.name,

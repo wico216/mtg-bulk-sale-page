@@ -45,7 +45,7 @@ vi.mock("@/lib/logger", async (importOriginal) => {
 });
 
 import { POST } from "../commit/route";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
 function adminOk() {
   return { user: { email: "admin@example.com", name: "Admin" } };
@@ -65,7 +65,7 @@ function makeJsonRequest(body: unknown): Request {
 function sampleCard(
   id = "lea-232-normal-near_mint-unsorted",
   binder = "unsorted",
-): Card {
+): InventoryRow {
   return {
     id,
     name: "Lightning Bolt",

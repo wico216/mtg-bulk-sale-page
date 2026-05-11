@@ -53,9 +53,9 @@ vi.mock("@/db/client", async () => {
 
 import { db } from "@/db/client";
 import { replaceCardsForBinders, deleteAllCards } from "../queries";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
-function makeCard(overrides: Partial<Card> = {}): Card {
+function makeCard(overrides: Partial<InventoryRow> = {}): InventoryRow {
   return {
     id: "lea-232-normal-near_mint-unsorted",
     name: "Lightning Bolt",
@@ -242,7 +242,7 @@ describe("replaceCardsForBinders", () => {
       { binder: "a05", count: 7 },
     ]);
     (db as unknown as { $count: ReturnType<typeof vi.fn> }).$count.mockResolvedValueOnce(100);
-    const cardsInput: Card[] = [
+    const cardsInput: InventoryRow[] = [
       ...Array.from({ length: 12 }, (_, i) =>
         makeCard({ binder: "a02", id: `lea-1-normal-near_mint-a02-${i}` }),
       ),
@@ -281,7 +281,7 @@ describe("replaceCardsForBinders", () => {
       { binder: "a02", count: 12 },
       { binder: "a05", count: 7 },
     ]);
-    const cardsInput: Card[] = [
+    const cardsInput: InventoryRow[] = [
       ...Array.from({ length: 12 }, (_, i) =>
         makeCard({ binder: "a02", id: `lea-1-normal-near_mint-a02-${i}` }),
       ),

@@ -1,4 +1,4 @@
-import type { Card, CheckoutRequest, OrderData, OrderItem } from "@/lib/types";
+import type { InventoryRow, CheckoutRequest, OrderData, OrderItem } from "@/lib/types";
 
 /**
  * Replaces HTML-sensitive characters with entities.
@@ -34,7 +34,7 @@ export function generateOrderRef(): string {
  */
 export function buildOrderData(
   request: CheckoutRequest,
-  cards: Card[],
+  cards: InventoryRow[],
 ): OrderData {
   const cardMap = new Map(cards.map((c) => [c.id, c]));
 

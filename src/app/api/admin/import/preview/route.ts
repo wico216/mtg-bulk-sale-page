@@ -8,7 +8,7 @@ import {
   type ImportStreamMessage,
   type PreviewPayload,
 } from "@/lib/import-contract";
-import type { Card } from "@/lib/types";
+import type { InventoryRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,7 @@ const MAX_KNOWN_BINDERS = 200;
  * client (Plan 19-02) re-sorts visually per D-05 (NEW first, unsorted last).
  */
 function buildBindersFromParsed(
-  cards: Card[],
+  cards: InventoryRow[],
   knownBinders: string[],
 ): BinderSummary[] {
   const knownSet = new Set(knownBinders.map(normalizeBinderName));
