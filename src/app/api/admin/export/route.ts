@@ -30,7 +30,7 @@ export async function GET() {
   const rows = await getAllCardsForExport();
 
   const header =
-    "Name,Set Code,Set Name,Collector Number,Price,Condition,Quantity,Rarity,Foil";
+    "Name,Set Code,Set Name,Collector Number,Price,Condition,Quantity,Rarity,Finish";
   const lines = rows.map((row) =>
     [
       csvEscape(row.name),
@@ -41,12 +41,8 @@ export async function GET() {
       csvEscape(row.condition),
       row.quantity.toString(),
       csvEscape(row.rarity),
-      // Phase 16 D-07: `cards.foil` boolean was replaced by `cards.finish`
-      // enum. The CSV export still emits the legacy 2-value 'foil'/'normal'
-      // header so downstream consumers (Manabox templates) keep parsing; an
-      // 'etched' row exports as 'foil' for now (Phase 17 will redesign the
-      // export header with first-class etched support).
-      row.finish === "foil" || row.finish === "etched" ? "foil" : "normal",
+      // Finish column emits the 3-value enum literal directly (Phase 17 D-08).
+      row.finish,
     ].join(","),
   );
 

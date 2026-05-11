@@ -73,7 +73,7 @@ async function readStream(res: Response): Promise<ImportStreamMessage[]> {
   return messages;
 }
 
-function sampleCard(id = "lea-232-normal-near_mint"): Card {
+function sampleCard(id = "lea-232-normal-near_mint-unsorted"): Card {
   return {
     id,
     name: "Lightning Bolt",
@@ -87,7 +87,8 @@ function sampleCard(id = "lea-232-normal-near_mint"): Card {
     imageUrl: "https://example.com/i.jpg",
     oracleText: "Lightning Bolt deals 3 damage to any target.",
     rarity: "common",
-    foil: false,
+    finish: "normal",
+    binder: "unsorted",
   };
 }
 
@@ -137,8 +138,8 @@ describe("POST /api/admin/import/preview", () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
     parseManaboxCsvContentsMock.mockReturnValueOnce({
       cards: [
-        sampleCard("lea-232-normal-near_mint"),
-        sampleCard("mh2-45-foil-lightly_played"),
+        sampleCard("lea-232-normal-near_mint-unsorted"),
+        sampleCard("mh2-45-foil-lightly_played-unsorted"),
       ],
       skippedRows: [{ rowNumber: 4, reason: "missing Name", fileName: "x.csv" }],
       sourceFiles: [{ name: "x.csv", parsedCards: 2, skippedRows: 1 }],

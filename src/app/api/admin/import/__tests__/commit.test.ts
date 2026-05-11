@@ -48,7 +48,7 @@ function makeJsonRequest(body: unknown): Request {
   });
 }
 
-function sampleCard(id = "lea-232-normal-near_mint"): Card {
+function sampleCard(id = "lea-232-normal-near_mint-unsorted"): Card {
   return {
     id,
     name: "Lightning Bolt",
@@ -62,7 +62,8 @@ function sampleCard(id = "lea-232-normal-near_mint"): Card {
     imageUrl: null,
     oracleText: null,
     rarity: "common",
-    foil: false,
+    finish: "normal",
+    binder: "unsorted",
   };
 }
 

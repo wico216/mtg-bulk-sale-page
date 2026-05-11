@@ -26,10 +26,10 @@ const adminSession = {
   user: { email: "admin@example.com", name: "Admin User" },
 };
 
-// Test card rows (raw DB rows, prices in cents). Phase 16 D-07: `foil`
-// boolean was replaced by `finish` enum in the cards table; the export route
-// now reads `row.finish` and renders 'foil' for both finish='foil' and
-// finish='etched' to preserve the legacy CSV header until Phase 17.
+// Test card rows (raw DB rows, prices in cents). Phase 17 D-08: the export
+// route renders the 3-value finish enum literal directly under a 'Finish'
+// column header (the Phase 16 transitional 2-value 'Foil' header coercion
+// has been removed).
 const testRows = [
   {
     id: "sld-123-normal-near_mint-unsorted",
@@ -69,6 +69,25 @@ const testRows = [
     createdAt: new Date("2026-04-10T12:00:00Z"),
     updatedAt: new Date("2026-04-10T14:00:00Z"),
   },
+  {
+    id: "2x2-10-etched-near_mint-unsorted",
+    name: "Wrath of God",
+    setCode: "2x2",
+    setName: "Double Masters 2022",
+    collectorNumber: "10",
+    price: 800,
+    condition: "near_mint",
+    quantity: 1,
+    colorIdentity: ["W"],
+    imageUrl: null,
+    oracleText: null,
+    rarity: "rare",
+    finish: "etched" as const,
+    binder: "unsorted",
+    scryfallId: null,
+    createdAt: new Date("2026-04-09T12:00:00Z"),
+    updatedAt: new Date("2026-04-09T14:00:00Z"),
+  },
 ];
 
 describe("GET /api/admin/export", () => {
@@ -92,12 +111,12 @@ describe("GET /api/admin/export", () => {
     );
   });
 
-  it("has correct CSV header row", async () => {
+  it("has correct CSV header row (Phase 17 D-08: 'Finish' replaces 'Foil')", async () => {
     const response = await GET();
     const text = await response.text();
     const headerLine = text.split("\n")[0];
     expect(headerLine).toBe(
-      "Name,Set Code,Set Name,Collector Number,Price,Condition,Quantity,Rarity,Foil",
+      "Name,Set Code,Set Name,Collector Number,Price,Condition,Quantity,Rarity,Finish",
     );
   });
 
@@ -134,14 +153,16 @@ describe("GET /api/admin/export", () => {
     expect(text).toContain("lightly_played");
   });
 
-  it("renders foil as 'foil' and non-foil as 'normal'", async () => {
+  it("renders the 3-value finish enum literal in the Finish column (Phase 17 D-08)", async () => {
     const response = await GET();
     const text = await response.text();
     const lines = text.split("\n");
-    // First data row: foil=false -> "normal"
-    expect(lines[1]).toMatch(/normal$/);
-    // Second data row: foil=true -> "foil"
-    expect(lines[2]).toMatch(/foil$/);
+    // First data row: finish='normal' -> ',normal' at line end.
+    expect(lines[1]).toMatch(/,normal$/);
+    // Second data row: finish='foil' -> ',foil' at line end.
+    expect(lines[2]).toMatch(/,foil$/);
+    // Third data row: finish='etched' -> ',etched' at line end.
+    expect(lines[3]).toMatch(/,etched$/);
   });
 
   it("returns 401 when requireAdmin returns 401 Response", async () => {
