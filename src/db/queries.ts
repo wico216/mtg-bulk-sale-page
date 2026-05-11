@@ -655,6 +655,7 @@ export interface AdminDashboardStats {
     bySet: Array<AdminDashboardBreakdown & { setCode: string }>;
     byColor: Array<AdminDashboardBreakdown & { color: string }>;
     byRarity: Array<AdminDashboardBreakdown & { rarity: string }>;
+    byBinder: Array<AdminDashboardBreakdown & { binder: string }>;
   };
 }
 
@@ -720,12 +721,14 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       quantity: cards.quantity,
       colorIdentity: cards.colorIdentity,
       rarity: cards.rarity,
+      binder: cards.binder,
     })
     .from(cards);
 
   const bySet = new Map<string, DashboardBreakdownAccumulator>();
   const byColor = new Map<string, DashboardBreakdownAccumulator>();
   const byRarity = new Map<string, DashboardBreakdownAccumulator>();
+  const byBinder = new Map<string, DashboardBreakdownAccumulator>();
 
   let totalQuantity = 0;
   let totalValueCents = 0;
@@ -747,6 +750,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       valueCents,
     );
     addBreakdownEntry(byRarity, row.rarity, row.quantity, valueCents);
+    addBreakdownEntry(byBinder, row.binder, row.quantity, valueCents);
   }
 
   return {
@@ -761,6 +765,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       bySet: mapBreakdown(bySet, "setCode"),
       byColor: mapBreakdown(byColor, "color"),
       byRarity: mapBreakdown(byRarity, "rarity"),
+      byBinder: mapBreakdown(byBinder, "binder"),
     },
   };
 }
