@@ -5,10 +5,10 @@ import {
   text,
   integer,
   bigserial,
-  boolean,
   jsonb,
   timestamp,
   index,
+  check,
 } from "drizzle-orm/pg-core";
 
 // D-05: Order status enum
@@ -19,11 +19,20 @@ export const orderStatusEnum = pgEnum("order_status", [
   "cancelled",
 ]);
 
+// Phase 16 D-07 / FIN-01: Card finish enum (replaces the legacy `foil` boolean
+// column after the v1.3 migration). Backfill mapping during migration:
+//   foil = true  -> finish = 'foil'
+//   foil = false -> finish = 'normal'
+// 'etched' is a third valid value introduced for the Phase 17 parser fix
+// (Pitfall 7); v1.2 baseline rows have zero etched entries.
+export const finishEnum = pgEnum("finish", ["normal", "foil", "etched"]);
+
 // Cards table
 export const cards = pgTable(
   "cards",
   {
-    // D-01: Composite string PK (${setCode}-${collectorNumber}-${foil}-${condition})
+    // Phase 16 D-05 / BIND-01: 5-segment composite PK
+    // (`${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`)
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     setCode: text("set_code").notNull(),
@@ -41,7 +50,15 @@ export const cards = pgTable(
     imageUrl: text("image_url"),
     oracleText: text("oracle_text"),
     rarity: text("rarity").notNull(),
-    foil: boolean("foil").notNull().default(false),
+    // Phase 16 FIN-01 / D-07: 3-value finish enum (replaces the legacy `foil`
+    // boolean). The migration script drops the foil column after backfilling
+    // finish from it; see `scripts/migrate-v1.3-binder.ts`.
+    finish: finishEnum("finish").notNull(),
+    // Phase 16 BIND-01 / BIND-02 / D-06: Binder dimension. Defaults to
+    // 'unsorted' for legacy rows + first-deploy seed; the picker (Phase 19)
+    // shows 'unsorted' as a default-unchecked checkbox so legacy data
+    // persists untouched on first import (D-10).
+    binder: text("binder").notNull().default("unsorted"),
     // D-07: Scryfall ID (null until Phase 10 CSV import populates it)
     scryfallId: text("scryfall_id"),
     // D-04: Timestamps with timezone
@@ -57,6 +74,10 @@ export const cards = pgTable(
     // D-08: Indexes for search performance
     index("cards_name_idx").on(table.name),
     index("cards_set_code_idx").on(table.setCode),
+    // Phase 16 BIND-04 / D-08: schema-level safety net for the Phase 18
+    // allocator. A double-decrement of the same row will surface as a
+    // constraint violation (HTTP 503) rather than a silent oversell.
+    check("cards_quantity_check", sql`${table.quantity} >= 0`),
   ],
 );
 
@@ -194,6 +215,10 @@ export const orderItems = pgTable(
     lineTotal: integer("line_total"),
     // Image URL snapshot for order history display
     imageUrl: text("image_url"),
+    // Phase 16 BIND-03 / D-09: Binder snapshot at time of order. Historical
+    // rows (pre-v1.3) carry 'unsorted' as the migration default. Phase 21
+    // admin order detail renders this as a [binder] annotation.
+    binder: text("binder").notNull().default("unsorted"),
   },
   (table) => [
     // Index on order_id (addresses Codex review concern)

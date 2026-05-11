@@ -45,7 +45,7 @@ describe("cardToRow", () => {
     expect(row.colorIdentity).toEqual([]);
   });
 
-  it("maps all Card fields to row fields", () => {
+  it("maps all Card fields to row fields (Phase 16: foil -> finish, +binder)", () => {
     const card = makeCard();
     const row = cardToRow(card);
 
@@ -59,8 +59,17 @@ describe("cardToRow", () => {
     expect(row.imageUrl).toBe("https://example.com/card.jpg");
     expect(row.oracleText).toBe("Flying, vigilance");
     expect(row.rarity).toBe("rare");
-    expect(row.foil).toBe(false);
+    // Phase 16 D-07: foil boolean -> finish enum. card.foil=false -> 'normal'.
+    expect(row.finish).toBe("normal");
+    // Phase 16 D-06: binder defaults to 'unsorted' (Phase 17 will plumb the
+    // real binder name through from the parser).
+    expect(row.binder).toBe("unsorted");
     expect(row.scryfallId).toBeNull();
+  });
+
+  it("derives finish='foil' when card.foil is true (Phase 16 D-07 backfill)", () => {
+    const row = cardToRow(makeCard({ foil: true }));
+    expect(row.finish).toBe("foil");
   });
 
   it("rounds prices correctly using Math.round (Pitfall 3)", () => {

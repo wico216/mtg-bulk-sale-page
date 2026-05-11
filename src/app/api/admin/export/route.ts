@@ -41,7 +41,12 @@ export async function GET() {
       csvEscape(row.condition),
       row.quantity.toString(),
       csvEscape(row.rarity),
-      row.foil ? "foil" : "normal",
+      // Phase 16 D-07: `cards.foil` boolean was replaced by `cards.finish`
+      // enum. The CSV export still emits the legacy 2-value 'foil'/'normal'
+      // header so downstream consumers (Manabox templates) keep parsing; an
+      // 'etched' row exports as 'foil' for now (Phase 17 will redesign the
+      // export header with first-class etched support).
+      row.finish === "foil" || row.finish === "etched" ? "foil" : "normal",
     ].join(","),
   );
 

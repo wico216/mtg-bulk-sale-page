@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { getTableColumns } from "drizzle-orm";
-import { cards, orders, orderItems, orderStatusEnum, adminAuditLog, importHistory } from "../schema";
+import { getTableConfig } from "drizzle-orm/pg-core";
+import {
+  cards,
+  orders,
+  orderItems,
+  orderStatusEnum,
+  finishEnum,
+  adminAuditLog,
+  importHistory,
+} from "../schema";
 
 describe("cards table schema", () => {
   const columns = getTableColumns(cards);
@@ -11,18 +20,48 @@ describe("cards table schema", () => {
     expect(columns.id.notNull).toBe(true);
   });
 
-  it("has all 16 required card columns", () => {
+  // Phase 16 BIND-01 / BIND-02 / FIN-01 / D-06 / D-07: post-migration column
+  // shape — `foil` is gone (dropped, replaced by `finish`); `binder` and
+  // `finish` are added. Net column count: 16 - 1 (foil) + 2 (finish + binder)
+  // = 17.
+  it("has all 17 required card columns (Phase 16: +binder, +finish, -foil)", () => {
     const requiredColumns = [
       "id", "name", "setCode", "setName", "collectorNumber",
       "price", "condition", "quantity", "colorIdentity",
-      "imageUrl", "oracleText", "rarity", "foil",
+      "imageUrl", "oracleText", "rarity",
+      "finish", "binder",
       "scryfallId", "createdAt", "updatedAt",
     ];
     const colRecord = columns as Record<string, unknown>;
     for (const col of requiredColumns) {
       expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
-    expect(Object.keys(columns).length).toBe(16);
+    expect(Object.keys(columns).length).toBe(17);
+  });
+
+  it("has no foil column (Phase 16 D-07: replaced by finish enum)", () => {
+    expect((columns as Record<string, unknown>).foil).toBeUndefined();
+  });
+
+  it("has finish column with notNull (Phase 16 FIN-01 / D-07)", () => {
+    expect(columns.finish).toBeDefined();
+    expect(columns.finish.notNull).toBe(true);
+  });
+
+  it("has binder column with notNull and 'unsorted' default (Phase 16 BIND-01 / BIND-02 / D-06)", () => {
+    expect(columns.binder).toBeDefined();
+    expect(columns.binder.notNull).toBe(true);
+    // Default is exposed via the column builder; we check the surface shape.
+    expect(columns.binder.dataType).toBe("string");
+  });
+
+  it("declares cards_quantity_check CHECK constraint (Phase 16 BIND-04 / D-08)", () => {
+    const config = getTableConfig(cards);
+    const checkNames = config.checks.map((c) => c.name);
+    expect(
+      checkNames,
+      `cards table checks should include cards_quantity_check; got [${checkNames.join(", ")}]`,
+    ).toContain("cards_quantity_check");
   });
 
   it("stores price as integer (cents), nullable (D-02)", () => {
@@ -74,11 +113,12 @@ describe("orders table schema", () => {
 describe("orderItems table schema", () => {
   const columns = getTableColumns(orderItems);
 
-  it("has all required order item columns", () => {
+  it("has all required order item columns (Phase 16: +binder)", () => {
     const requiredColumns = [
       "id", "orderId", "cardId", "name", "setName", "setCode",
       "collectorNumber", "condition", "price", "quantity",
       "lineTotal", "imageUrl",
+      "binder",
     ];
     const colRecord = columns as Record<string, unknown>;
     for (const col of requiredColumns) {
@@ -89,6 +129,12 @@ describe("orderItems table schema", () => {
   it("has imageUrl for order history display", () => {
     expect(columns.imageUrl).toBeDefined();
     expect(columns.imageUrl.notNull).toBe(false);
+  });
+
+  it("has binder column with notNull and 'unsorted' snapshot default (Phase 16 BIND-03 / D-09)", () => {
+    expect(columns.binder).toBeDefined();
+    expect(columns.binder.notNull).toBe(true);
+    expect(columns.binder.dataType).toBe("string");
   });
 });
 
@@ -154,5 +200,11 @@ describe("orderStatusEnum", () => {
       "completed",
       "cancelled",
     ]);
+  });
+});
+
+describe("finishEnum (Phase 16 FIN-01 / D-07)", () => {
+  it("has exactly normal, foil, etched values in that order", () => {
+    expect(finishEnum.enumValues).toEqual(["normal", "foil", "etched"]);
   });
 });

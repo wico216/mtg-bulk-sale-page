@@ -26,10 +26,13 @@ const adminSession = {
   user: { email: "admin@example.com", name: "Admin User" },
 };
 
-// Test card rows (raw DB rows, prices in cents)
+// Test card rows (raw DB rows, prices in cents). Phase 16 D-07: `foil`
+// boolean was replaced by `finish` enum in the cards table; the export route
+// now reads `row.finish` and renders 'foil' for both finish='foil' and
+// finish='etched' to preserve the legacy CSV header until Phase 17.
 const testRows = [
   {
-    id: "sld-123-normal-near_mint",
+    id: "sld-123-normal-near_mint-unsorted",
     name: "Avacyn, Angel of Hope",
     setCode: "sld",
     setName: "Secret Lair Drop",
@@ -41,13 +44,14 @@ const testRows = [
     imageUrl: "https://example.com/avacyn.jpg",
     oracleText: "Flying, vigilance, indestructible",
     rarity: "mythic",
-    foil: false,
+    finish: "normal" as const,
+    binder: "unsorted",
     scryfallId: null,
     createdAt: new Date("2026-04-11T12:00:00Z"),
     updatedAt: new Date("2026-04-11T14:00:00Z"),
   },
   {
-    id: "m21-001-normal-lightly_played",
+    id: "m21-001-foil-lightly_played-unsorted",
     name: "Simple Card",
     setCode: "m21",
     setName: "Core Set 2021",
@@ -59,7 +63,8 @@ const testRows = [
     imageUrl: null,
     oracleText: null,
     rarity: "common",
-    foil: true,
+    finish: "foil" as const,
+    binder: "unsorted",
     scryfallId: null,
     createdAt: new Date("2026-04-10T12:00:00Z"),
     updatedAt: new Date("2026-04-10T14:00:00Z"),

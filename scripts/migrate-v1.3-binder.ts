@@ -81,14 +81,13 @@ import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 // --- Apply-path probe (Task 1 spike) -----------------------------------------
 //
-// This existence/typing probe is shipped only as a comment-tier compile guard;
-// it proves db.batch accepts db.execute(sql`...`) under our installed
-// drizzle-orm version. Removing it would not change runtime; we leave it so
-// that a future drizzle-orm bump that breaks the typing fails CI loudly.
-//
-// We construct the probe lazily inside a function so it is not evaluated at
-// import time (no DB connection is opened just by importing this module).
-function _batchProbe(database: NeonHttpDatabase<Record<string, never>>) {
+// This export is a comment-tier compile guard that proves db.batch accepts
+// db.execute(sql`...`) under our installed drizzle-orm version. The function
+// is exported (not strictly used by main) so a future drizzle-orm bump that
+// breaks the typing fails CI loudly via `npx tsc --noEmit` rather than
+// silently changing migration semantics. Constructed lazily so importing
+// this module does not open a DB connection.
+export function _batchProbe(database: NeonHttpDatabase<Record<string, never>>) {
   const BATCH_PROBE: Parameters<typeof database.batch>[0] = [
     database.execute(sql`SELECT 1`),
   ];
