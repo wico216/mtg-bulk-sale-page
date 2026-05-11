@@ -253,11 +253,41 @@ export async function createPostgresRateLimitStore(): Promise<RateLimitStore> {
         INSERT INTO rate_limit_hits (bucket, key, hit_at)
         VALUES (${bucket}, ${key}, ${at})
       `);
+      // WR-02: opportunistically prune rows older than the longest configured
+      // sliding window (currently 60s, with safety margin -> 5 minutes) so the
+      // table does not grow without bound. We run with low probability per
+      // recordHit call so the amortized cost is small (~1% of inserts perform
+      // a bounded DELETE). LIMIT 1000 caps the per-sweep cost on a backlog.
+      // A failure of the prune step must NEVER fail the insert that just
+      // succeeded -- swallow errors from this best-effort cleanup.
+      if (Math.random() < 0.01) {
+        try {
+          const cutoff = new Date(now - PRUNE_OLDER_THAN_MS);
+          await db.execute(sql`
+            DELETE FROM rate_limit_hits
+            WHERE id IN (
+              SELECT id FROM rate_limit_hits
+              WHERE hit_at < ${cutoff}
+              LIMIT 1000
+            )
+          `);
+        } catch {
+          // Best-effort; the insert above already succeeded.
+        }
+      }
     },
   };
 
   return postgresStoreSingleton;
 }
+
+/**
+ * Cutoff for opportunistic prune: rows older than this lose relevance even
+ * for the longest sliding window currently configured (60s in
+ * RATE_LIMIT_BUCKETS). 5 minutes gives generous head-room if a future bucket
+ * config extends the window without remembering to bump this constant.
+ */
+const PRUNE_OLDER_THAN_MS = 5 * 60 * 1000;
 
 /**
  * Returns the runtime default store. Falls back to an in-memory store when

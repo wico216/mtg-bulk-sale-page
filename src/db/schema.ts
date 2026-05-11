@@ -4,6 +4,7 @@ import {
   pgEnum,
   text,
   integer,
+  bigserial,
   boolean,
   jsonb,
   timestamp,
@@ -132,6 +133,41 @@ export const orders = pgTable(
   (table) => [
     // D-08: Index for order listing by date
     index("orders_created_at_idx").on(table.createdAt),
+  ],
+);
+
+// Rate-limit hits table (Phase 15-01 + WR-02).
+//
+// Tracked here so drizzle-kit sees the schema -- previously this table was
+// only created by an idempotent `CREATE TABLE IF NOT EXISTS` inside
+// `createPostgresRateLimitStore.ensureTable()`, which meant the table
+// definition was invisible to migration tooling. Future schema changes
+// (e.g. adding a partition column or an EXPIRES_AT default) had to be
+// hand-coordinated.
+//
+// The runtime lazy-create still runs (it remains the source of truth for
+// existing deployments that pre-date this schema entry being added); the
+// drizzle definition simply lets `drizzle-kit generate` emit a migration
+// so the schema converges on tracked migrations going forward.
+//
+// The Postgres store opportunistically prunes rows older than the longest
+// configured window during recordHit (with low probability) to keep the
+// table from growing without bound. See `createPostgresRateLimitStore`.
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    bucket: text("bucket").notNull(),
+    key: text("key").notNull(),
+    hitAt: timestamp("hit_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Matches the index that ensureTable() creates at runtime.
+    index("rate_limit_hits_bucket_key_hit_at_idx").on(
+      table.bucket,
+      table.key,
+      table.hitAt.desc(),
+    ),
   ],
 );
 
