@@ -1,7 +1,8 @@
 import Papa from "papaparse";
 import { readFileSync } from "node:fs";
 import { globSync } from "fast-glob";
-import type { ManaboxRow, Card } from "./types";
+import type { ManaboxRow, Card, Finish } from "./types";
+import { normalizeBinderName } from "./binder-name";
 
 /**
  * A row from the uploaded CSV that could not be converted to a Card.
@@ -33,6 +34,21 @@ export interface ParseResult {
  * Shared row -> Card mapper. Returns either a Card or a SkippedRow with a
  * concrete reason so the admin import UI (Phase 10 D-05 zone 3) can show
  * per-row feedback.
+ *
+ * Phase 17 extensions (D-02..D-06):
+ *   - Skips rows with `Quantity === 0` (reason `'zero quantity'`, D-05).
+ *   - Skips rows with `Binder Type !== 'binder'` (reason `'non-binder row'`,
+ *     D-04). Manabox emits lowercase; non-binder values like `'deck'` /
+ *     `'list'` skip.
+ *   - Reads optional `Binder Name` (defaults to `'unsorted'` via
+ *     `normalizeBinderName`, D-02) and `Binder Type` (defaults to
+ *     `'binder'`, D-02).
+ *   - Emits `finish: Finish` (the literal Manabox value, including
+ *     `'etched'` per D-01) instead of the legacy `foil: boolean`. Defensive
+ *     guard maps unexpected values to `'normal'` and warns once per row
+ *     so a typo / legacy CSV doesn't break the import.
+ *   - Composite id is the 5-segment
+ *     `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}` (D-06).
  */
 function rowToCardOrSkip(
   row: ManaboxRow,
@@ -50,6 +66,36 @@ function rowToCardOrSkip(
     rawCollectorNumber != null && rawCollectorNumber !== ""
       ? String(rawCollectorNumber)
       : undefined;
+
+  // Phase 17 D-04: Skip non-binder rows (deck, list, etc.) with a named
+  // reason. Default to 'binder' when the column is missing entirely (D-02
+  // graceful degradation for legacy CSVs).
+  const binderType = row["Binder Type"] ?? "binder";
+  if (binderType !== "binder") {
+    return {
+      skipped: {
+        rowNumber,
+        reason: "non-binder row",
+        name: name || undefined,
+        setCode: bestEffortSetCode,
+        collectorNumber: bestEffortCollectorNumber,
+      },
+    };
+  }
+
+  // Phase 17 D-05: Skip Quantity=0 rows (no buyer-side purpose).
+  const quantity = row.Quantity ?? 0;
+  if (quantity === 0) {
+    return {
+      skipped: {
+        rowNumber,
+        reason: "zero quantity",
+        name: name || undefined,
+        setCode: bestEffortSetCode,
+        collectorNumber: bestEffortCollectorNumber,
+      },
+    };
+  }
 
   if (!name) {
     return {
@@ -84,23 +130,49 @@ function rowToCardOrSkip(
 
   const setCode = String(rawSetCode).toLowerCase();
   const collectorNumber = String(rawCollectorNumber);
-  const foil = row.Foil === "foil";
+
+  // Phase 17 D-01: Manabox emits Foil as one of 'normal' | 'foil' | 'etched'
+  // (verified against the operator's 12,749-row export, distribution
+  // normal=9357 / foil=1837 / etched=11). Defensive guard: map anything
+  // else (legacy CSV with unrecognized values, missing column, typo) to
+  // 'normal' rather than skipping — the row still has a valid name +
+  // setCode + collectorNumber + condition; mis-coded finish is a soft
+  // error worth logging but not worth dropping the listing.
+  const rawFoil = row.Foil;
+  let finish: Finish;
+  if (rawFoil === "normal" || rawFoil === "foil" || rawFoil === "etched") {
+    finish = rawFoil;
+  } else {
+    if (rawFoil !== undefined && rawFoil !== null) {
+      console.warn(
+        `Row ${rowNumber}: unexpected Foil value "${String(rawFoil)}", defaulting to 'normal'`,
+      );
+    }
+    finish = "normal";
+  }
+
   const condition = row.Condition || "unknown";
 
+  // Phase 17 D-02 / D-03: normalize binder name through the shared helper.
+  // Empty / missing input collapses to the literal 'unsorted' default.
+  const binder = normalizeBinderName(row["Binder Name"]);
+
+  // Phase 17 D-06: 5-segment composite id (matches Phase 16 D-05).
   const card: Card = {
-    id: `${setCode}-${collectorNumber}-${foil ? "foil" : "normal"}-${condition}`,
+    id: `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`,
     name,
     setCode,
     setName: row["Set name"] || "",
     collectorNumber,
     price: null,
     condition,
-    quantity: row.Quantity ?? 1,
+    quantity,
     colorIdentity: [],
     imageUrl: null,
     oracleText: null,
     rarity: row.Rarity || "unknown",
-    foil,
+    finish,
+    binder,
   };
   return { card };
 }
@@ -136,7 +208,7 @@ function parseSingleCsv(filePath: string): Card[] {
 
 /**
  * Merge duplicate cards by summing quantities.
- * Duplicates are identified by the composite ID (set-collector-foil-condition).
+ * Duplicates are identified by the composite ID (set-collector-finish-condition-binder).
  */
 function mergeCards(cards: Card[]): Card[] {
   const cardMap = new Map<string, Card>();
