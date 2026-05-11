@@ -8,17 +8,11 @@ A simple online store for selling Magic: The Gathering bulk cards to friends. Fr
 
 Friends can easily find and order cards from your bulk collection without friction — browse, pick, checkout, done.
 
-## Current Milestone: v1.2 Store Operations & Hardening
+## Current State
 
-**Goal:** Help the seller operate the live store after checkout, preserve a clear history of high-impact changes, and harden production before wider sharing.
+**Last shipped:** v1.2 Store Operations & Hardening (2026-05-11). Live at `wikos-spellbinder.vercel.app` with rate limits, structured logs, audit trail, and admin order workflow.
 
-**Target features:**
-- Admin order workflow with status updates, search/filter, notes, and cancellation
-- Audit log for high-impact admin mutations
-- Import history for full-replace CSV commits
-- Admin-visible audit/history page
-- Production-compatible rate limits and operational logs
-- Health checks, repeatable production smoke, runbook docs, and security review
+**Next milestone:** TBD — start with `/gsd:new-milestone`.
 
 ## Requirements
 
@@ -42,11 +36,12 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] High-impact admin mutations create durable audit log entries — Validated locally in Phase 14
 - [x] Import commits create durable import history — Validated locally in Phase 14
 - [x] Admin can view audit and import history from `/admin/audit` — Validated locally in Phase 14
-- [x] Production hardening: rate limits, structured logs, health checks, repeatable smoke, runbook, and security review — Validated in Phase 15 (3 live-deploy UAT items pending in `15-HUMAN-UAT.md`)
+- [x] Production hardening: rate limits, structured logs, health checks, repeatable smoke, runbook, and security review — Validated in Phase 15 + 15-HUMAN-UAT.md (3/3 passed against `wikos-spellbinder.vercel.app`)
+- [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
 
 ### Active
 
-- [x] Admin panel with Google OAuth authentication — Validated in Phase 8: Authentication
+(None — define next milestone with `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -63,9 +58,10 @@ Friends can easily find and order cards from your bulk collection without fricti
 - Target audience is a small friend group, so scale is not a concern
 - No payment gateway needed — all transactions settled in person
 - Public storefront (no password) — admin panel is Google OAuth protected
-- v1.0 shipped: browse, search, filter, cart, email checkout — all static/build-time
-- v1.1 shipped: live database-backed storefront/admin inventory, multi-CSV import, bulk operations, dashboard, transactional checkout, and admin order history
-- v1.2 in progress: order workflow, audit trail, and production hardening complete in code (Phase 15); deployed to Vercel for live human verification
+- v1.0 shipped 2026-04-11: browse, search, filter, cart, email checkout — all static/build-time
+- v1.1 shipped 2026-04-27: live database-backed storefront/admin inventory, multi-CSV import, bulk operations, dashboard, transactional checkout, and admin order history
+- v1.2 shipped 2026-05-11: admin order workflow (status/search/filter/notes/cancellation), inventory audit trail (`admin_audit_log` + `import_history` + `/admin/audit`), production hardening (rate limits + structured logs + `/admin/health` + smoke script + STRIDE review). Live and human-verified on `wikos-spellbinder.vercel.app`.
+- Codebase: ~19,661 LOC TypeScript across 38 files touched in v1.2 (+5,423 / −130). 28 test files, 272 tests passing.
 
 ## Constraints
 
@@ -92,6 +88,13 @@ Friends can easily find and order cards from your bulk collection without fricti
 | Checkout database commit is source of truth | Phase 11 treats the atomic stock decrement + order insert as the placed order; notification emails are post-commit side effects so email failure does not erase persisted inventory/order state | ✓ Good |
 | Audit metadata is safe and bounded | Phase 14 records operational context without secrets, raw CSV bodies, or unbounded payloads | ✓ Good |
 | Import history is first-class | Full-replace CSV commits create dedicated import-history rows in addition to audit entries | ✓ Good |
+| Sliding-window rate limit, not token bucket | Phase 15 — correct on serverless without distributed clock sync; "blocked attempts don't extend the window" is trivial to enforce | ✓ Good |
+| Postgres-backed rate-limit store, no new vendor | Phase 15 — reuses existing Neon connection; satisfies budget constraint; verified shared cross-instance via UAT #3 | ✓ Good |
+| Rate-limit BEFORE body parse on /api/checkout | Phase 15 — abuse cannot starve real users via JSON-parse cost | ✓ Good |
+| Rate-limit AFTER requireAdmin() on admin routes | Phase 15 — auth bugs are not hidden behind 429; unauth always sees 401 | ✓ Good |
+| Health endpoint exposes literals only ("configured"/"missing"), never env values | Phase 15 — STATUS_LABELS lookup is the only path from env-state to UI text; pinning test enforces this | ✓ Good |
+| `notificationFailuresLast24h` reserved as `null` | Phase 15 — keeps API contract stable so a future log-drain phase can flip null → number without breaking consumers | ⚠️ Revisit when log drain lands |
+| STRIDE security review documented in-repo with named follow-up owners | Phase 15 — 0 High-severity; 4 deferred Medium with remediation steps | ✓ Good |
 
 ## Evolution
 
@@ -111,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-10 after Phase 15 completion + Vercel deploy*
+*Last updated: 2026-05-11 after v1.2 milestone completion*

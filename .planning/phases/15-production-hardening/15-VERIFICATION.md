@@ -1,8 +1,15 @@
 ---
 phase: 15-production-hardening
 verified: 2026-05-10T20:45:00Z
-status: human_needed
-score: 5/5 success criteria verified in code
+status: passed
+status_history:
+  - at: 2026-05-10T20:45:00Z
+    status: human_needed
+    note: "5/5 code-verifiable criteria PASS; 3 live-deploy items routed to human verification"
+  - at: 2026-05-11T00:00:00Z
+    status: passed
+    note: "All 3 human-verification items completed and recorded as passed in 15-HUMAN-UAT.md (UAT #1 structural proof, UAT #2 production smoke against wikos-spellbinder.vercel.app, UAT #3 rate-limit hammer with Postgres store proof)"
+score: 5/5 success criteria verified in code; 3/3 human-verification items passed
 success_criteria_met: 5/5
 overrides_applied: 0
 requirements_traceability:

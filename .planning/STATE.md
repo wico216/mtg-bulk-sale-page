@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Store Operations & Hardening
-status: milestone_complete
-last_updated: "2026-05-10T22:06:55.029Z"
-last_activity: 2026-05-10 -- Phase 15 execution started
+status: Awaiting next milestone
+last_updated: "2026-05-11T01:32:42.208Z"
+last_activity: 2026-05-11 — Milestone v1.2 completed and archived
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 18
-  completed_plans: 17
-  percent: 82
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-05-11
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-11 — Milestone v1.2 completed and archived
 
 ## Recently Completed
 
@@ -89,3 +89,24 @@ Key rule: production smoke defaults to read-only/guard-focused checks unless a f
 ## Session Continuity
 
 Working tree is on `phase-14-inventory-audit-trail`. Phase 14 plan 14-02 code and planning updates are committed locally. Do not push/open a PR without explicit user approval.
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.2 milestone close on 2026-05-11:
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical, never closed via /gsd:complete-milestone; functionally shipped 2026-04-11) |
+| verification_gap | 04-VERIFICATION.md | human_needed (v1.0 historical, same as above) |
+| verification_gap | 05-VERIFICATION.md | human_needed (v1.0 historical, same as above) |
+| verification_gap | 08-VERIFICATION.md | human_needed (v1.1 historical, never closed via /gsd:complete-milestone; functionally shipped 2026-04-27) |
+| verification_gap | 15-VERIFICATION.md | resolved during v1.2 audit — status updated human_needed → passed; 15-HUMAN-UAT.md records 3/3 passed |
+| process_artifact | 13-VERIFICATION.md | missing — phase verified via SUMMARY.md browser+DB proof + green test suites only |
+| process_artifact | 14-VERIFICATION.md | missing — same as 13 |
+| process_artifact | VALIDATION.md (Phases 13/14/15) | missing — Nyquist coverage absent across project; not v1.2-specific |
+| code_quality | src/app/admin/audit/page.tsx:112 raw console.error | bypasses src/lib/logger.ts; should be logError({ event: "admin.audit_page.failed", error }) |
+| security_followup | S-01, D-DOS-01, D-DOS-02, D-DOS-03, I-DISC-03 | acknowledged in 15-SECURITY-REVIEW.md with named owners |
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
