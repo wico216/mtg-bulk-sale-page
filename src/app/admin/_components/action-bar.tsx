@@ -6,9 +6,12 @@ interface ActionBarProps {
   onSearchChange: (value: string) => void;
   setFilter: string;
   onSetFilterChange: (value: string) => void;
+  binderFilter: string;
+  onBinderFilterChange: (value: string) => void;
   conditionFilter: string;
   onConditionFilterChange: (value: string) => void;
   availableSets: string[];
+  availableBinders: string[];
   exporting: boolean;
   onExport: () => void;
   deletingAll: boolean;
@@ -24,9 +27,12 @@ export function ActionBar({
   onSearchChange,
   setFilter,
   onSetFilterChange,
+  binderFilter,
+  onBinderFilterChange,
   conditionFilter,
   onConditionFilterChange,
   availableSets,
+  availableBinders,
   exporting,
   onExport,
   deletingAll,
@@ -84,6 +90,22 @@ export function ActionBar({
         {availableSets.map((s) => (
           <option key={s} value={s}>
             {s.toUpperCase()}
+          </option>
+        ))}
+      </select>
+
+      {/* Binder filter dropdown (Phase 21 D-02) — verbatim lowercase per
+          Phase 17 D-04 (binder names are NOT uppercased like set codes). */}
+      <select
+        value={binderFilter}
+        onChange={(e) => onBinderFilterChange(e.target.value)}
+        aria-label="Filter by binder"
+        className="rounded-md border border-zinc-300 bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:border-zinc-700"
+      >
+        <option value="">All binders</option>
+        {availableBinders.map((b) => (
+          <option key={b} value={b}>
+            {b}
           </option>
         ))}
       </select>
