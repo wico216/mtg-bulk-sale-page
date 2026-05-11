@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const search = url.searchParams.get("search") ?? "";
   const set = url.searchParams.get("set") ?? "";
   const condition = url.searchParams.get("condition") ?? "";
+  const binder = url.searchParams.get("binder") ?? "";
   const sortBy = (url.searchParams.get("sortBy") ?? "name") as
     | "name"
     | "price"
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
       search,
       set,
       condition,
+      binder,
       sortBy,
       sortDir,
     });
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
       route: ROUTE,
       actor: result.user.email,
       error: err,
-      metadata: { page, limit, search, set, condition, sortBy, sortDir },
+      metadata: { page, limit, search, set, condition, binder, sortBy, sortDir },
     });
     // WR-B: match the structured-JSON 5xx invariant. The admin UI consumes
     // this with fetch(...).json(); an HTML 500 from Next breaks the page.

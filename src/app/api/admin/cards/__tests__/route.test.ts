@@ -131,6 +131,7 @@ describe("GET /api/admin/cards", () => {
         search: "avacyn",
         set: "sld",
         condition: "near_mint",
+        binder: "a02",
         sortBy: "price",
         sortDir: "desc",
       }),
@@ -142,6 +143,7 @@ describe("GET /api/admin/cards", () => {
       search: "avacyn",
       set: "sld",
       condition: "near_mint",
+      binder: "a02",
       sortBy: "price",
       sortDir: "desc",
     });
