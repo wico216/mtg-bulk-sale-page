@@ -42,10 +42,26 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
     },
   });
 
+  // WR-06: validate SELLER_EMAIL at runtime rather than `sellerEmail!`. If a
+  // deploy ships without SELLER_EMAIL, the previous code passed `[undefined]`
+  // to Resend, which rejected, the seller branch reported failure, the buyer
+  // branch never ran, and the seller never learned about the order even
+  // though the order was already committed. Fail fast and log a clear
+  // operational signal so the admin health page surfaces the misconfiguration.
+  if (!sellerEmail) {
+    logError({
+      event: "notification.seller_email_unconfigured",
+      route: "lib/notifications",
+      error: new Error("SELLER_EMAIL is not set"),
+      metadata: { orderRef: order.orderRef, totalItems: order.totalItems },
+    });
+    return result; // Both false; checkout route already handles partial.
+  }
+
   // Send seller email FIRST (priority per D-17)
   const { error: sellerError } = await resend.emails.send({
     from: "Viki MTG Store <onboarding@resend.dev>",
-    to: [sellerEmail!],
+    to: [sellerEmail],
     subject: `New order from ${order.buyerName}`,
     html: buildSellerEmailHtml(order),
   });
@@ -72,7 +88,7 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
     const { error: buyerError } = await resend.emails.send({
       from: "Viki MTG Store <onboarding@resend.dev>",
       to: [order.buyerEmail],
-      replyTo: sellerEmail!, // D-16: buyer replies go to seller
+      replyTo: sellerEmail, // D-16: buyer replies go to seller (validated above)
       subject: "Your order is confirmed!",
       html: buildBuyerEmailHtml(order),
     });
