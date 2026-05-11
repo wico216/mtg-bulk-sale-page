@@ -12,7 +12,21 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 **Last shipped:** v1.2 Store Operations & Hardening (2026-05-11). Live at `wikos-spellbinder.vercel.app` with rate limits, structured logs, audit trail, and admin order workflow.
 
-**Next milestone:** TBD — start with `/gsd:new-milestone`.
+## Current Milestone: v1.3 Binder-Aware Inventory & Pick Workflow
+
+**Goal:** Every card in the storefront knows which physical binder it lives in, so the admin can pull orders without flipping through every binder.
+
+**Target features:**
+- Manabox CSV parser ingests `Binder Name` and `Binder Type` columns; skips non-binder rows
+- Cards composite ID gains a `binder` dimension; same card can live in multiple binders as separate stock rows
+- Import preview shows binder picker (every binder name + row count + checkbox); operator selects which binders to include; selection is remembered between imports
+- Replace semantics scoped to selected binders only; unselected binders untouched
+- Storefront unchanged for buyers — listings aggregate quantity across binders; binder hidden from public pages
+- Server-side binder allocator at checkout commit picks which binder(s) to decrement when a buyer's quantity is split across binders; one buyer line can produce multiple `order_items` rows
+- Admin order detail shows `[binder]` annotation on every line item
+- Admin inventory table gains "Binder" column + filter
+- Migration backfills existing rows with `binder = 'unsorted'` so checkout/cart don't break before first binder-aware import
+- New `Foil` value `etched` becomes a finish enum value
 
 ## Requirements
 
@@ -41,7 +55,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Active
 
-(None — define next milestone with `/gsd:new-milestone`)
+(Defined in `.planning/REQUIREMENTS.md` — v1.3 BIND-* category)
 
 ### Out of Scope
 
@@ -114,4 +128,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-11 after v1.2 milestone completion*
+*Last updated: 2026-05-11 — v1.3 milestone bootstrap*
