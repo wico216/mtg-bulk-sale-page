@@ -398,6 +398,22 @@ describe("PATCH /api/admin/orders/[id]", () => {
     expect(response.status).toBe(403);
     expect(mockUpdateOrderWorkflow).not.toHaveBeenCalled();
   });
+
+  it("returns 500 JSON when the workflow update throws", async () => {
+    // CR-04 regression: previously this re-threw, breaking the admin UI's
+    // fetch(...).json() consumer with Next's default HTML error page.
+    mockUpdateOrderWorkflow.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const response = await PATCH_DETAIL(
+      makeDetailRequest({ status: "confirmed" }),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Order update failed — order unchanged",
+    });
+  });
 });
 
 describe("POST /api/admin/orders/[id]/cancel", () => {
@@ -553,5 +569,21 @@ describe("POST /api/admin/orders/[id]/cancel", () => {
     expect(response.status).toBe(401);
     expect(mockEnforceRateLimit).not.toHaveBeenCalled();
     expect(mockCancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 JSON when cancelOrder throws", async () => {
+    // CR-04 regression: previously this re-threw, breaking the admin UI's
+    // fetch(...).json() consumer with Next's default HTML error page.
+    mockCancelOrder.mockRejectedValueOnce(new Error("simulated DB failure"));
+
+    const response = await POST_CANCEL(
+      makeCancelRequest({ restoreInventory: false }),
+      makeDetailContext("ORD-20260427-020304-ABC123"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "Order cancellation failed — order unchanged",
+    });
   });
 });

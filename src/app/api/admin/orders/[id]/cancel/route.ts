@@ -103,6 +103,12 @@ export async function POST(
       error: err,
       metadata: { orderId: id, restoreInventory },
     });
-    throw err;
+    // CR-04: match the "5xx -> JSON" invariant the rest of the admin routes
+    // uphold (bulk-delete, delete-all, import-commit). Re-throwing surfaces
+    // Next's default HTML error page and breaks any fetch(...).json() caller.
+    return Response.json(
+      { error: "Order cancellation failed — order unchanged" },
+      { status: 500 },
+    );
   }
 }

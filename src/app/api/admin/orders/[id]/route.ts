@@ -137,6 +137,13 @@ export async function PATCH(
       error: err,
       metadata: { orderId: id },
     });
-    throw err;
+    // CR-04: every other admin route returns a structured 500 JSON on failure
+    // (see bulk-delete, delete-all, import-commit). Re-throwing here made the
+    // admin UI explode parsing Next's default HTML error page. Match the
+    // "5xx -> JSON" invariant the rest of the codebase upholds.
+    return Response.json(
+      { error: "Order update failed — order unchanged" },
+      { status: 500 },
+    );
   }
 }
