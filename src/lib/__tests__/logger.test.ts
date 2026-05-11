@@ -208,4 +208,49 @@ describe("logError", () => {
       message: "raw string failure",
     });
   });
+
+  it("WR-08: scrubs Postgres unique-constraint PII from error.message", () => {
+    // Real-world shape produced by node-postgres / Neon for a unique
+    // violation on orders.buyer_email.
+    const pgErr = new Error(
+      'duplicate key value violates unique constraint "orders_buyer_email_key": Key (buyer_email)=(viki@example.com) already exists',
+    );
+
+    logError({
+      event: "checkout.db_failed",
+      error: pgErr,
+    });
+
+    const payload = capture.calls[0].payload as Record<string, unknown>;
+    const summary = payload.error as { name: string; message: string };
+    expect(summary.message).not.toContain("viki@example.com");
+    // Sanity: the constraint name is still useful for debugging.
+    expect(summary.message).toContain("orders_buyer_email_key");
+  });
+
+  it("WR-08: redacts free-floating emails in error.message even without Key clause", () => {
+    const err = new Error(
+      "Send failed: invalid recipient viki@example.com (rejected by relay)",
+    );
+    logError({ event: "notification.failed", error: err });
+
+    const summary = capture.calls[0].payload.error as {
+      name: string;
+      message: string;
+    };
+    expect(summary.message).not.toContain("viki@example.com");
+    expect(summary.message).toContain("[REDACTED_EMAIL]");
+  });
+
+  it("WR-08: truncates very large error messages", () => {
+    const huge = "ERR ".repeat(1000); // ~4000 chars
+    const err = new Error(huge);
+    logError({ event: "checkout.db_failed", error: err });
+    const summary = capture.calls[0].payload.error as {
+      name: string;
+      message: string;
+    };
+    expect(summary.message.length).toBeLessThanOrEqual(600);
+    expect(summary.message).toContain("[TRUNCATED]");
+  });
 });

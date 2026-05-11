@@ -108,22 +108,70 @@ function redact(value: unknown, depth = 0): unknown {
   return value;
 }
 
+/**
+ * WR-08: scrub Postgres-driver error messages of the bound-parameter values
+ * they helpfully (and dangerously) echo back. A unique-constraint violation
+ * on `orders.buyer_email` produces a driver message that includes
+ *   `Key (buyer_email)=(viki@example.com) already exists.`
+ * which copies the buyer's email — and therefore PII — verbatim into our
+ * logs unless we strip it. The redaction is intentionally conservative:
+ *
+ *   - `Key (col1, col2)=(v1, v2)` -> `Key (col1, col2)=[REDACTED]`
+ *     (covers the most common pg constraint-violation phrasing)
+ *   - Any remaining `email@host` substring -> `[REDACTED_EMAIL]`
+ *   - 7+ consecutive digits not adjacent to letters -> `[REDACTED_NUMBER]`
+ *     (catches phone numbers; deliberately lenient to avoid eating order
+ *      counters or similar operational integers we WANT in the log)
+ *
+ * If the resulting message is huge (some pg drivers append the full statement
+ * + parameter list), it is truncated to keep log lines bounded.
+ */
+const MAX_SAFE_ERROR_MESSAGE_LENGTH = 500;
+
+function scrubErrorMessage(raw: string): string {
+  let scrubbed = raw;
+  // Drop the `=(...)` value clause that pg drivers tack on to constraint
+  // violations. Non-greedy match against the closing paren handles nested
+  // commas in composite-key values.
+  scrubbed = scrubbed.replace(
+    /(Key\s*\([^)]*\))\s*=\s*\([^)]*\)/gi,
+    "$1=[REDACTED]",
+  );
+  // Email-shaped substrings anywhere in the remainder.
+  scrubbed = scrubbed.replace(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    "[REDACTED_EMAIL]",
+  );
+  // Phone-number-shaped digit runs (7+ digits not bordered by letters/digits).
+  scrubbed = scrubbed.replace(
+    /(?<![A-Za-z0-9])\d{7,}(?![A-Za-z0-9])/g,
+    "[REDACTED_NUMBER]",
+  );
+  if (scrubbed.length > MAX_SAFE_ERROR_MESSAGE_LENGTH) {
+    scrubbed = `${scrubbed.slice(0, MAX_SAFE_ERROR_MESSAGE_LENGTH)}…[TRUNCATED]`;
+  }
+  return scrubbed;
+}
+
 export function safeErrorSummary(error: unknown): SafeErrorSummary {
   if (error instanceof Error) {
-    return { name: error.name || "Error", message: error.message || "" };
+    return {
+      name: error.name || "Error",
+      message: scrubErrorMessage(error.message || ""),
+    };
   }
   if (typeof error === "string") {
-    return { name: "UnknownError", message: error };
+    return { name: "UnknownError", message: scrubErrorMessage(error) };
   }
   if (error && typeof error === "object" && "message" in (error as Record<string, unknown>)) {
-    const message = String((error as { message: unknown }).message);
+    const message = scrubErrorMessage(String((error as { message: unknown }).message));
     const name =
       typeof (error as { name?: unknown }).name === "string"
         ? ((error as { name: string }).name)
         : "UnknownError";
     return { name, message };
   }
-  return { name: "UnknownError", message: String(error) };
+  return { name: "UnknownError", message: scrubErrorMessage(String(error)) };
 }
 
 function emit(level: LogLevel, payload: Record<string, unknown>): void {
