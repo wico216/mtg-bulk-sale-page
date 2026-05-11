@@ -130,7 +130,7 @@ export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
         <BreakdownSection
           title="Breakdown by set"
           emptyLabel="No set breakdown yet."
@@ -156,6 +156,18 @@ export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
           emptyLabel="No rarity breakdown yet."
           rows={stats.breakdowns.byRarity.map((row) => ({
             label: formatRarityLabel(row.rarity),
+            quantity: row.quantity,
+            uniqueCards: row.uniqueCards,
+            value: row.value,
+          }))}
+        />
+        {/* Phase 21 D-12: Breakdown by binder. Lowercase verbatim per
+            Phase 17 D-04 (no toUpperCase like the set codes above). */}
+        <BreakdownSection
+          title="Breakdown by binder"
+          emptyLabel="No binder breakdown yet."
+          rows={stats.breakdowns.byBinder.map((row) => ({
+            label: row.binder,
             quantity: row.quantity,
             uniqueCards: row.uniqueCards,
             value: row.value,
