@@ -4,7 +4,12 @@ import { eq, count, max, asc, desc, ilike, and, inArray, sql, type SQL } from "d
 import { db } from "@/db/client";
 import { adminAuditLog, cards, importHistory } from "@/db/schema";
 import { cardToRow } from "@/db/seed";
-import type { Card, CardData } from "@/lib/types";
+import type {
+  AdminCard,
+  CardData,
+  Finish,
+  InventoryRow,
+} from "@/lib/types";
 import type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 
 export type { ScopedImportAuditMetadata } from "@/lib/import-contract";
@@ -20,14 +25,19 @@ export type { ScopedImportAuditMetadata } from "@/lib/import-contract";
  */
 
 /**
- * Convert a Drizzle row to the application Card interface.
+ * Convert a Drizzle row to the disaggregated per-binder InventoryRow shape.
  * Exported for testing.
  *
- * Maps a Drizzle cards row to the application Card shape. The DB columns
- * map 1:1 to the application fields after the v1.3 migration (binder +
- * finish enum). See `src/lib/types.ts` for the Card contract.
+ * Maps a Drizzle cards row to the application InventoryRow (formerly Card)
+ * shape. The DB columns map 1:1 to the application fields after the v1.3
+ * migration (binder + finish enum). See `src/lib/types.ts` for the
+ * InventoryRow contract.
+ *
+ * v1.3 Phase 20 D-03: this is the disaggregated (5-segment id) per-binder
+ * row. Aggregated public-facing rows go through `rowToAggregatedCard` and
+ * the AdminCard / PublicCard types.
  */
-export function rowToCard(row: typeof cards.$inferSelect): Card {
+export function rowToCard(row: typeof cards.$inferSelect): InventoryRow {
   return {
     id: row.id,
     name: row.name,
@@ -50,25 +60,133 @@ export function rowToCard(row: typeof cards.$inferSelect): Card {
 }
 
 /**
- * Fetch all cards from the database, ordered by name ASC.
- * Returns Card[] with prices in dollars.
+ * v1.3 Phase 20 D-01 — raw DB row shape returned by getCardsAggregated.
+ * Mirrors the AS-aliased columns produced by the SQL GROUP BY query so
+ * `db.execute<AggregatedCardRow>` types correctly.
  */
-export async function getCards(): Promise<Card[]> {
+interface AggregatedCardRow {
+  id: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  /** AVG(price)::int cents, or null when every binder price is NULL */
+  price: number | null;
+  condition: string;
+  quantity: number;
+  colorIdentity: string[];
+  imageUrl: string | null;
+  oracleText: string | null;
+  rarity: string;
+  finish: Finish;
+  binders: string[];
+  scryfallId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+/**
+ * v1.3 Phase 20 D-01 — convert an aggregated DB row (from getCardsAggregated
+ * SQL) to the AdminCard application shape. Cents → dollars, Date → ISO
+ * string. Exported for direct unit testing parallel to `rowToCard`.
+ */
+export function rowToAggregatedCard(row: AggregatedCardRow): AdminCard {
+  return {
+    id: row.id,
+    name: row.name,
+    setCode: row.setCode,
+    setName: row.setName,
+    collectorNumber: row.collectorNumber,
+    price: row.price !== null ? row.price / 100 : null,
+    condition: row.condition,
+    quantity: row.quantity,
+    colorIdentity: row.colorIdentity,
+    imageUrl: row.imageUrl,
+    oracleText: row.oracleText,
+    rarity: row.rarity,
+    finish: row.finish,
+    binders: row.binders,
+    scryfallId: row.scryfallId ?? null,
+    createdAt:
+      row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    updatedAt:
+      row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+  };
+}
+
+/**
+ * Fetch all cards from the database, ordered by name ASC.
+ * Returns InventoryRow[] (disaggregated per-binder rows) with prices in dollars.
+ *
+ * v1.3 Phase 20 D-03: per-binder rows. Storefront uses
+ * `getCardsAggregated()` instead; this function remains for admin/internal
+ * paths that need the disaggregated source rows.
+ */
+export async function getCards(): Promise<InventoryRow[]> {
   const rows = await db.select().from(cards).orderBy(asc(cards.name));
   return rows.map(rowToCard);
 }
 
 /**
  * Fetch a single card by its composite ID.
- * Returns Card or null if not found.
+ * Returns InventoryRow or null if not found.
  */
-export async function getCardById(id: string): Promise<Card | null> {
+export async function getCardById(id: string): Promise<InventoryRow | null> {
   const rows = await db
     .select()
     .from(cards)
     .where(eq(cards.id, id))
     .limit(1);
   return rows.length > 0 ? rowToCard(rows[0]) : null;
+}
+
+/**
+ * v1.3 Phase 20 D-01 — aggregated storefront-facing card list. GROUPs the
+ * per-binder cards table by (setCode, collectorNumber, finish, condition)
+ * so the buyer sees one row per logical card with SUM(quantity) and
+ * AVG(price). The `binders[]` array (sorted distinct ASC) is admin-only
+ * and MUST be stripped before this data crosses any public boundary
+ * (D-05/D-06 + AGG-02; enforced via the PublicCard type).
+ *
+ * Notes:
+ *   - `setName`, `name`, `imageUrl`, `oracleText`, `rarity`, `scryfallId`
+ *     use `MAX(...)` because they are identical across binder rows of the
+ *     same logical card (Scryfall enriches on (setCode, collectorNumber)).
+ *     MAX gives a deterministic representative.
+ *   - `colorIdentity` is `text[]`. `(ARRAY_AGG(color_identity ORDER BY
+ *     binder))[1]` picks the first binder's array — deterministic and
+ *     identical across rows for the same logical card.
+ *   - `AVG(price)::int` rounds toward zero per Postgres `::int` cast and
+ *     ignores NULL prices. If every binder price is NULL the result is
+ *     NULL and rowToAggregatedCard preserves null.
+ *   - `binders` is sorted distinct ASC — load-bearing input for the
+ *     operator-friendly admin display in Phase 21.
+ */
+export async function getCardsAggregated(): Promise<AdminCard[]> {
+  const result = await db.execute<AggregatedCardRow>(sql`
+    SELECT
+      set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
+      MAX(name)                                                                  AS "name",
+      set_code                                                                   AS "setCode",
+      MAX(set_name)                                                              AS "setName",
+      collector_number                                                           AS "collectorNumber",
+      AVG(price)::int                                                            AS "price",
+      condition                                                                  AS "condition",
+      SUM(quantity)::int                                                         AS "quantity",
+      (ARRAY_AGG(color_identity ORDER BY binder))[1]                             AS "colorIdentity",
+      MAX(image_url)                                                             AS "imageUrl",
+      MAX(oracle_text)                                                           AS "oracleText",
+      MAX(rarity)                                                                AS "rarity",
+      finish                                                                     AS "finish",
+      ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)                             AS "binders",
+      MAX(scryfall_id)                                                           AS "scryfallId",
+      MIN(created_at)                                                            AS "createdAt",
+      MAX(updated_at)                                                            AS "updatedAt"
+    FROM cards
+    GROUP BY set_code, collector_number, finish, condition
+    ORDER BY MAX(name) ASC
+  `);
+  return result.rows.map(rowToAggregatedCard);
 }
 
 /**
@@ -105,7 +223,7 @@ export interface AdminCardsParams {
 }
 
 export interface AdminCardsResult {
-  cards: Card[];
+  cards: InventoryRow[];
   total: number;
   page: number;
   limit: number;
@@ -696,13 +814,13 @@ export async function getAdminCards(
 /**
  * Update a card's editable fields.
  * Price is in dollars (converted to cents for storage).
- * Returns updated Card or null if not found.
+ * Returns updated InventoryRow or null if not found.
  */
 export async function updateCard(
   id: string,
   updates: { price?: number; quantity?: number; condition?: string },
   audit?: AdminMutationAuditContext,
-): Promise<Card | null> {
+): Promise<InventoryRow | null> {
   const dbUpdates: Record<string, unknown> = {};
   if (updates.price !== undefined)
     dbUpdates.price = Math.round(updates.price * 100);
@@ -826,7 +944,7 @@ export async function getAllCardsForExport() {
  * stays under MAX_AUDIT_METADATA_BYTES (4KB).
  */
 export async function replaceCardsForBinders(
-  newCards: Card[],
+  newCards: InventoryRow[],
   selectedBinders: string[],
   audit?: AdminMutationAuditContext & { knownBinders?: string[] },
 ): Promise<{ inserted: number; deleted: number }> {
