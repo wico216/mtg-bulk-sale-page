@@ -2,28 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
-status: planning
-last_updated: "2026-05-11T00:00:00.000Z"
-last_activity: 2026-05-11
+status: Awaiting next milestone
+last_updated: "2026-05-11T08:19:01.193Z"
+last_activity: 2026-05-11 — Milestone v1.3 completed and archived
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 7
   total_plans: 11
-  completed_plans: 0
-  percent: 0
-current_position:
-  phase: 16
-  phase_name: "Schema & Migration"
-  plan: null
-  status: not_started
-execution_order:
-  - 16
-  - 17
-  - 20
-  - 19
-  - 18
-  - 21
-  - 22
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -33,14 +20,35 @@ execution_order:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** Phase 16 — Schema & Migration (v1.3 foundation)
+**Current focus:** Planning next milestone (`/gsd:new-milestone`)
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
+
+| Category | Item | Status |
+|----------|------|--------|
+| operator_handoff | Phase 16 production migration cutover | `npm run migrate:v1.3:dry-run` then `npm run migrate:v1.3` against prod DATABASE_URL; runbook in 16-01-SUMMARY.md |
+| operator_handoff | Phase 18 multi-binder concurrent-proof 5x flake check | Requires TEST_DATABASE_URL via Neon test branch; runbook in 22-SECURITY-REVIEW.md |
+| operator_handoff | Phase 22 5-scenario live-deployment UAT | Operator-on-autopilot picker, v1.2→v1.3 cart hydration, CHECK trip detection, public-page binder leak grep, multi-binder concurrent checkout — runbook in 22-HUMAN-UAT.md |
+| process_artifact | Phase 22 missing canonical VERIFICATION.md aggregator | Work captured in 22-SECURITY-REVIEW.md + 22-HUMAN-UAT.md + per-plan SUMMARYs; aggregator file absent |
+| verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical, never closed via /gsd:complete-milestone) |
+| verification_gap | 04-VERIFICATION.md | human_needed (v1.0 historical) |
+| verification_gap | 05-VERIFICATION.md | human_needed (v1.0 historical) |
+| verification_gap | 08-VERIFICATION.md | human_needed (v1.1 historical) |
+| process_artifact | VALIDATION.md missing across all v1.3 phases (16-22) | Nyquist coverage absent project-wide; matches v1.0/v1.1/v1.2 baseline |
+| security_followup | S-01 (case-sensitive admin email) | acknowledged in 15-SECURITY-REVIEW.md |
+| security_followup | D-DOS-02 (rate-limit table maintenance) | acknowledged in 15-SECURITY-REVIEW.md |
+| security_followup | D-DOS-03 (header-trust IP source) | acknowledged in 15-SECURITY-REVIEW.md |
+| security_followup | I-DISC-03 (notification-failure queryability) | acknowledged in 15-SECURITY-REVIEW.md |
+| RESOLVED v1.3 | D-DOS-01 (import preview rate-limit) | RESOLVED in Phase 22 — ADMIN_BULK rate-limit applied AFTER requireAdmin() |
 
 ## Current Position
 
-Phase: 16 — Schema & Migration
-Plan: — (not yet planned; next step is `/gsd-plan-phase 16`)
-Status: Roadmap approved, ready to plan
-Last activity: 2026-05-11 — v1.3 roadmap created (7 phases, 29 requirements mapped, 100% coverage)
+Phase: Milestone v1.3 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-11 — Milestone v1.3 completed and archived
 
 ## v1.3 Phase Sequence
 
@@ -107,4 +115,4 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-- Plan Phase 16: `/gsd-plan-phase 16`
+- Start the next milestone with /gsd-new-milestone
