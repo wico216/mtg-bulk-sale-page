@@ -71,6 +71,13 @@ function shouldRedactKey(key: string): boolean {
  * Deep-clones `value`, redacting any field whose key matches a secret-shaped
  * substring. Calls `toJSON` first (if present) so callers can't smuggle secrets
  * through a custom serializer.
+ *
+ * WR-D: every operation that touches user-supplied values is guarded.
+ * Property getters may throw (Proxy traps, lazy fields backed by a closed
+ * connection, etc.); a single throwing getter must not propagate out of
+ * the logger and unwind a route's catch-block into a generic Next 500.
+ * `Object.entries` itself can throw on a Proxy whose `ownKeys` trap
+ * throws; that case falls through to "[UNREADABLE]" for the whole node.
  */
 function redact(value: unknown, depth = 0): unknown {
   if (depth > 8) return "[TRUNCATED]"; // defense against pathological nesting
@@ -89,19 +96,48 @@ function redact(value: unknown, depth = 0): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => redact(item, depth + 1));
+    return value.map((item) => {
+      try {
+        return redact(item, depth + 1);
+      } catch {
+        return "[UNREADABLE]";
+      }
+    });
   }
 
   if (typeof value === "object") {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    // Object.entries itself can throw on a Proxy whose ownKeys/getOwnPropertyDescriptor
+    // traps throw. Guard the entries() call separately from each per-key access.
+    let entries: [string, unknown][];
+    try {
+      entries = Object.entries(value as Record<string, unknown>);
+    } catch {
+      return "[UNREADABLE]";
+    }
+    for (const [k, v] of entries) {
       if (shouldRedactKey(k)) {
         out[k] = REDACTED;
-      } else {
+        continue;
+      }
+      // A throwing getter is invoked at the destructuring above (`v` already
+      // holds the getter result). Wrap the recursive redact() call so a
+      // descendant getter or stringifier throw is caught at the lowest
+      // possible scope -- replacing only the offending sub-value, not the
+      // whole metadata tree.
+      try {
         out[k] = redact(v, depth + 1);
+      } catch {
+        out[k] = "[UNREADABLE]";
       }
     }
     return out;
+  }
+
+  // BigInt is a primitive but JSON.stringify rejects it (TypeError). Convert
+  // to a tagged string so emit()'s stringify never trips on it.
+  if (typeof value === "bigint") {
+    return `[BIGINT:${(value as bigint).toString()}]`;
   }
 
   // Primitives pass through unchanged.
@@ -174,8 +210,34 @@ export function safeErrorSummary(error: unknown): SafeErrorSummary {
   return { name: "UnknownError", message: scrubErrorMessage(String(error)) };
 }
 
+/**
+ * WR-D: a JSON.stringify replacer that turns BigInt into a tagged string so
+ * a stray BigInt in metadata (or in a deeply nested non-redacted value that
+ * slipped through `redact`) cannot throw out of `emit()`. The `redact` walk
+ * already coerces BigInt at top level; this is a belt-and-suspenders guard
+ * for any value that bypassed redact (e.g. the top-level `error` summary).
+ */
+function safeStringifyReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return `[BIGINT:${value.toString()}]`;
+  }
+  return value;
+}
+
 function emit(level: LogLevel, payload: Record<string, unknown>): void {
-  const line = JSON.stringify(payload);
+  // WR-D: never throw out of emit(). A serialization failure (BigInt,
+  // circular reference, a getter that slipped past redact) must degrade
+  // to a minimal one-liner rather than unwind a route's catch block.
+  let line: string;
+  try {
+    line = JSON.stringify(payload, safeStringifyReplacer);
+  } catch {
+    line = JSON.stringify({
+      level,
+      event: "log.serialize_failed",
+      timestamp: new Date().toISOString(),
+    });
+  }
   if (level === "error") {
     console.error(line);
   } else if (level === "warn") {
