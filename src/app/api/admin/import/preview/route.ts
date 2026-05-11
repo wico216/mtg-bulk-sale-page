@@ -8,7 +8,17 @@ import {
   type ImportStreamMessage,
   type PreviewPayload,
 } from "@/lib/import-contract";
+import {
+  enforceRateLimit,
+  clientKeyFromRequest,
+  RATE_LIMIT_BUCKETS,
+} from "@/lib/rate-limit";
+import { logEvent } from "@/lib/logger";
 import type { InventoryRow } from "@/lib/types";
+
+// Phase 22-01 D-03 / D-DOS-01 resolution: stable route literal for structured
+// log emissions. Mirrors the convention used by import/commit/route.ts.
+const ROUTE = "/api/admin/import/preview";
 
 export const runtime = "nodejs";
 
@@ -56,6 +66,25 @@ function buildBindersFromParsed(
 export async function POST(request: Request): Promise<Response> {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
+
+  // Phase 22-01 D-03 / D-DOS-01 resolution: post-auth rate-limit gate.
+  // The expensive parse + Scryfall enrichment pass is gated by ADMIN_BULK
+  // (20/min). Mirrors import/commit/route.ts:121-138 verbatim, substituting
+  // the event name. The 429 short-circuits BEFORE request.formData(),
+  // BEFORE parseManaboxCsvContents, BEFORE enrichCards.
+  const rateLimited = await enforceRateLimit({
+    key: clientKeyFromRequest(request, auth.user.email),
+    config: RATE_LIMIT_BUCKETS.ADMIN_BULK,
+  });
+  if (rateLimited) {
+    logEvent({
+      level: "warn",
+      event: "admin.import_preview.rate_limited",
+      route: ROUTE,
+      actor: auth.user.email,
+    });
+    return rateLimited;
+  }
 
   let formData: FormData;
   try {

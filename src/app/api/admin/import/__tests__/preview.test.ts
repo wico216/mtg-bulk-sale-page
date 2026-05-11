@@ -7,12 +7,19 @@ vi.mock("server-only", () => ({}));
 // top of the file). Without it the mock factories would close over
 // uninitialized top-level consts -- see
 // https://vitest.dev/api/vi.html#vi-hoisted.
-const { requireAdminMock, parseManaboxCsvContentsMock, enrichCardsMock } =
-  vi.hoisted(() => ({
-    requireAdminMock: vi.fn(),
-    parseManaboxCsvContentsMock: vi.fn(),
-    enrichCardsMock: vi.fn(),
-  }));
+const {
+  requireAdminMock,
+  parseManaboxCsvContentsMock,
+  enrichCardsMock,
+  enforceRateLimitMock,
+  logEventMock,
+} = vi.hoisted(() => ({
+  requireAdminMock: vi.fn(),
+  parseManaboxCsvContentsMock: vi.fn(),
+  enrichCardsMock: vi.fn(),
+  enforceRateLimitMock: vi.fn(),
+  logEventMock: vi.fn(),
+}));
 
 vi.mock("@/lib/auth/admin-check", () => ({
   requireAdmin: requireAdminMock,
@@ -30,6 +37,23 @@ vi.mock("@/lib/enrichment", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/enrichment")>("@/lib/enrichment");
   return { ...actual, enrichCards: enrichCardsMock };
+});
+
+// Phase 22-01 Task 1: rate-limit + logger mocks for D-DOS-01 resolution.
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    enforceRateLimit: enforceRateLimitMock,
+  };
+});
+
+vi.mock("@/lib/logger", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/logger")>();
+  return {
+    ...actual,
+    logEvent: logEventMock,
+  };
 });
 
 import { POST } from "../preview/route";
@@ -97,6 +121,10 @@ describe("POST /api/admin/import/preview", () => {
     requireAdminMock.mockReset();
     parseManaboxCsvContentsMock.mockReset();
     enrichCardsMock.mockReset();
+    enforceRateLimitMock.mockReset();
+    logEventMock.mockReset();
+    // Default: rate-limit allows. Tests that exercise 429 override per-call.
+    enforceRateLimitMock.mockResolvedValue(null);
   });
 
   it("returns 401 when requireAdmin returns a 401 Response", async () => {
@@ -402,5 +430,97 @@ describe("POST /api/admin/import/preview", () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toMatch(/exceeds 200/);
     expect(enrichCardsMock).not.toHaveBeenCalled();
+  });
+
+  // ---- Phase 22-01 D-DOS-01 resolution: post-auth rate-limit pin ------------
+  // Mirrors the bulk-delete pattern (src/app/api/admin/cards/__tests__/
+  // bulk-delete-route.test.ts). Three contracts pinned:
+  //   1. unauth → 401 BEFORE any rate-limit decision (E-PRIV-02 ordering)
+  //   2. auth + over-limit → 429 with Retry-After AND no parser/stream call
+  //   3. auth + under-limit → 200 NDJSON (existing flow unchanged)
+
+  it("rate-limit runs AFTER auth so an unauthenticated caller still sees 401, not 429 (E-PRIV-02)", async () => {
+    requireAdminMock.mockResolvedValueOnce(unauthorized());
+    const fd = new FormData();
+    fd.append(
+      IMPORT_FILE_FIELD,
+      new File(["x"], "x.csv", { type: "text/csv" }),
+    );
+
+    const res = await POST(makeRequest(fd));
+
+    expect(res.status).toBe(401);
+    expect(enforceRateLimitMock).not.toHaveBeenCalled();
+    expect(parseManaboxCsvContentsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 with Retry-After when rate-limited and does NOT call parser or open stream (D-DOS-01)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    enforceRateLimitMock.mockResolvedValueOnce(
+      Response.json(
+        {
+          error: "Too many requests. Please try again shortly.",
+          code: "rate_limited",
+          retryAfterSeconds: 30,
+        },
+        { status: 429, headers: { "Retry-After": "30" } },
+      ),
+    );
+
+    const fd = new FormData();
+    fd.append(
+      IMPORT_FILE_FIELD,
+      new File(["x"], "x.csv", { type: "text/csv" }),
+    );
+
+    const res = await POST(makeRequest(fd));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    // The expensive parse + Scryfall pass are gated behind the 429.
+    expect(parseManaboxCsvContentsMock).not.toHaveBeenCalled();
+    expect(enrichCardsMock).not.toHaveBeenCalled();
+    // The 429 path emits a structured warn log per the commit-route convention.
+    expect(logEventMock).toHaveBeenCalled();
+    const callArgs = logEventMock.mock.calls.find(
+      (call) =>
+        (call[0] as { event?: string }).event ===
+        "admin.import_preview.rate_limited",
+    );
+    expect(callArgs).toBeDefined();
+    const event = callArgs![0] as { actor?: string; route?: string };
+    expect(event.actor).toBe("admin@example.com");
+    expect(event.route).toBe("/api/admin/import/preview");
+  });
+
+  it("auth + under-limit proceeds normally (200 + application/x-ndjson)", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    // enforceRateLimitMock default (null = allowed) is set in beforeEach.
+    parseManaboxCsvContentsMock.mockReturnValueOnce({
+      cards: [sampleCard()],
+      skippedRows: [],
+      sourceFiles: [{ name: "x.csv", parsedCards: 1, skippedRows: 0 }],
+    });
+    enrichCardsMock.mockResolvedValueOnce({
+      cards: [sampleCard()],
+      stats: { processed: 1, skipped: 0, missingPrices: 0 },
+      scryfallMisses: [],
+    });
+
+    const fd = new FormData();
+    fd.append(
+      IMPORT_FILE_FIELD,
+      new File(["x"], "x.csv", { type: "text/csv" }),
+    );
+
+    const res = await POST(makeRequest(fd));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("application/x-ndjson");
+    // Drain the stream to release the underlying ReadableStream.
+    await readStream(res);
+    // The under-limit path consults the rate-limit gate exactly once.
+    expect(enforceRateLimitMock).toHaveBeenCalledTimes(1);
+    expect(parseManaboxCsvContentsMock).toHaveBeenCalledTimes(1);
   });
 });
