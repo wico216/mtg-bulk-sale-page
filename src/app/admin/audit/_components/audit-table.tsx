@@ -5,6 +5,7 @@ import type {
   ImportHistoryEntry,
   ImportHistoryResult,
 } from "@/db/queries";
+import { ImportCommitDetails } from "./import-commit-details";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -182,8 +183,15 @@ export function AuditTable({
                 <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
                   {formatDate(entry.createdAt)}
                 </td>
+                {/* Phase 21 D-09/D-11: inventory.import_commit rows route
+                    to the ImportCommitDetails client expander; other action
+                    types keep the legacy metadataPreview render. */}
                 <td className="max-w-xl px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-300">
-                  {metadataPreview(entry.metadata)}
+                  {entry.action === "inventory.import_commit" ? (
+                    <ImportCommitDetails entry={entry} />
+                  ) : (
+                    metadataPreview(entry.metadata)
+                  )}
                 </td>
               </tr>
             ))}
