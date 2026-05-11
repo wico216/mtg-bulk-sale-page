@@ -1,12 +1,22 @@
 import Header from "@/components/header";
 import StorefrontShell from "@/components/storefront-shell";
-import { getCards, getCardsMeta } from "@/db/queries";
+import { getCardsAggregated, getCardsMeta } from "@/db/queries";
+import type { PublicCard } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   try {
-    const [cards, meta] = await Promise.all([getCards(), getCardsMeta()]);
+    const [aggregatedAdmin, meta] = await Promise.all([
+      getCardsAggregated(),
+      getCardsMeta(),
+    ]);
+    // v1.3 Phase 20 D-05/D-06 + AGG-02: strip the admin-only `binders`
+    // field BEFORE passing to the storefront. The PublicCard[] type guarantees
+    // the storefront cannot accidentally read or render binder names.
+    const cards: PublicCard[] = aggregatedAdmin.map(
+      ({ binders: _binders, ...rest }) => rest,
+    );
 
     return (
       <div
