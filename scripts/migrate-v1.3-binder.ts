@@ -76,7 +76,7 @@
  *   Neon retains PITR for ~24-72h depending on plan; act within that window.
  */
 
-import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 // --- Apply-path probe (Task 1 spike) -----------------------------------------
@@ -541,5 +541,3 @@ if (isDirectRun) {
     });
 }
 
-// Avoid 'unused' warnings on type imports referenced only in JSDoc.
-export type { SQL, SQLWrapper };
