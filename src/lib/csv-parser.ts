@@ -173,6 +173,10 @@ function rowToCardOrSkip(
     rarity: row.Rarity || "unknown",
     finish,
     binder,
+    // v1.3.1 — carry the Scryfall UUID from the Manabox CSV into the
+    // intermediate row so enrichment can batch-fetch via the
+    // /cards/collection endpoint instead of one-call-per-card.
+    scryfallId: row["Scryfall ID"] || null,
   };
   return { card };
 }
