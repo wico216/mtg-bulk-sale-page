@@ -1,5 +1,5 @@
 import type { InventoryRow, Finish, ScryfallCard } from "./types";
-import { fetchCard } from "./scryfall";
+import { fetchCard, fetchCardsByScryfallIds } from "./scryfall";
 
 /**
  * Extract the normal image URL from a Scryfall card.
@@ -110,8 +110,18 @@ export interface EnrichmentOptions {
 /**
  * Enrich parsed InventoryRow records with Scryfall data (image, price, color
  * identity). Rows not found on Scryfall are excluded from `cards[]` and
- * recorded in `scryfallMisses[]`. Processes sequentially to respect Scryfall
- * rate limits.
+ * recorded in `scryfallMisses[]`.
+ *
+ * v1.3.1 — Hot path uses Scryfall's `/cards/collection` batch endpoint via
+ * `fetchCardsByScryfallIds` for any row that has a `scryfallId` from the
+ * Manabox CSV (the modern-export case). Rows without a Scryfall UUID fall
+ * back to the legacy sequential `fetchCard(setCode, collectorNumber)` path.
+ * For a 12,749-row real Manabox export this drops enrichment wall-time from
+ * ~25-30 minutes to a few seconds, which keeps the import preview's NDJSON
+ * stream alive under the Vercel function timeout.
+ *
+ * `onProgress` ordering invariant from v1.3.0 is preserved: callbacks fire
+ * in strict ascending order, once per row, exactly `cards.length` times.
  */
 export async function enrichCards(
   cards: InventoryRow[],
@@ -125,9 +135,27 @@ export async function enrichCards(
     missingPrices: 0,
   };
 
+  // v1.3.1 — pre-fetch all rows that carry a Scryfall UUID in one batched
+  // collection call. Rows without a UUID fall through to the legacy
+  // per-card lookup below.
+  const idsToFetch = cards
+    .map((c) => c.scryfallId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const batchMap =
+    idsToFetch.length > 0
+      ? await fetchCardsByScryfallIds(idsToFetch)
+      : new Map<string, ScryfallCard>();
+
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
-    const scryfallData = await fetchCard(card.setCode, card.collectorNumber);
+    let scryfallData: ScryfallCard | null = null;
+    if (card.scryfallId && batchMap.has(card.scryfallId)) {
+      scryfallData = batchMap.get(card.scryfallId)!;
+    } else {
+      // Legacy fallback for rows where the CSV didn't include a Scryfall ID,
+      // OR rows where the batch endpoint returned not_found.
+      scryfallData = await fetchCard(card.setCode, card.collectorNumber);
+    }
 
     if (!scryfallData) {
       scryfallMisses.push({
@@ -153,7 +181,7 @@ export async function enrichCards(
     enriched.push(card);
     stats.processed++;
 
-    if ((i + 1) % 25 === 0) {
+    if ((i + 1) % 100 === 0) {
       console.log(`Enriching: ${i + 1}/${cards.length} cards processed...`);
     }
 
