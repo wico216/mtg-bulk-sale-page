@@ -1,160 +1,308 @@
-# Technology Stack
+# Stack Research — v1.3 Binder-Aware Inventory & Pick Workflow
 
-**Project:** Viki -- MTG Bulk Store
-**Researched:** 2026-04-02
+**Domain:** Subsequent milestone — adds binder-tagged inventory + multi-binder allocator to an existing Next.js bulk-sale store.
+**Researched:** 2026-05-10
+**Confidence:** HIGH
 
-## Recommended Stack
+---
 
-This is a simple, mostly-static storefront with minimal dynamic behavior (cart + email checkout). The stack prioritizes simplicity, zero hosting cost, and fast development over scalability or enterprise patterns.
+## Verdict: Nothing to Add
 
-### Core Framework
+**No new dependencies. No version bumps. No new dev tools.**
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Next.js | 16.2 | Full-stack React framework | SSG for card pages = fast + free hosting on Vercel. API routes handle email sending. App Router is stable. Verified current via nextjs.org/blog. | HIGH |
-| React | 19.x | UI library | Ships with Next.js 16. No choice needed. | HIGH |
-| TypeScript | 5.x | Type safety | Next.js 16 has first-class TS support. CSV parsing and Scryfall API responses benefit from typed interfaces. | HIGH |
+Every feature in v1.3 (binder-tagged composite PK, per-binder selective replace, server-side allocator, `[binder]` annotation in admin order detail, `etched` finish) is achievable with the **already-pinned versions** of:
 
-### Styling
+- `drizzle-orm@0.45.2` + `drizzle-kit@0.31.10` (custom SQL migration for the PK change)
+- `papaparse@5.5.3` (extend existing `ManaboxRow` type with two new optional headers)
+- `next@16.2.2` + `react@19.2.4` (no new APIs needed)
+- `vitest@4.1.4` (allocator is a pure function — high-leverage unit-test surface)
+- Tailwind v4 + native `<input type="checkbox">` (already the project's UI primitive — used in 4 places)
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Tailwind CSS | 4.x | Utility-first CSS | Fast to build, no CSS files to manage, excellent for card grid layouts. v4 ships with Next.js 16 template. | MEDIUM (v4 confirmed via Next.js blog, exact minor version unverified) |
+The change is **pure data-model + business-logic** on the existing stack, exactly as the question's prior states. The roadmap should **not** include a "stack setup" or "tooling upgrade" phase. Skip straight to schema migration → parser extension → allocator → UI wiring.
 
-### Data / State
+---
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| PapaParse | 5.x | CSV parsing | Industry standard for browser CSV parsing. Handles Manabox exports with headers, edge cases, encoding. No server needed -- parse client-side or at build time. | MEDIUM (version unverified via npm, but 5.x is well-established) |
-| Zustand | 5.x | Cart state management | Lightweight, no boilerplate. Perfect for a shopping cart. Persist middleware stores cart in localStorage so it survives page refreshes. | MEDIUM (v5 likely current based on trajectory, verify) |
+## Recommended Stack (current versions, kept as-is)
 
-### Card Data
+### Core Technologies
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Scryfall API | N/A (REST) | Card images + metadata | Free, no auth, comprehensive MTG database. Rate limit: 10 req/sec. Card images served via their CDN. Use `/cards/named?fuzzy=` for lookups and `/cards/search?q=` for search. | HIGH (well-documented public API, stable for years) |
+| Technology | Pinned Version | Purpose | Why Kept |
+|------------|----------------|---------|----------|
+| next | `16.2.2` | App Router + route handlers for `/api/admin/import/*` and `/api/checkout` | AGENTS.md flags "this is NOT the Next.js you know" — current code already follows the project's conventions. Adding/upgrading risks breaking the 28 passing test files. |
+| react / react-dom | `19.2.4` | UI for admin import preview + binder picker | No new React features needed; native `<input type="checkbox">` is the project's established pattern. |
+| typescript | `^5` | Allocator + parser + schema types | The allocator's correctness benefits enormously from discriminated unions over `binder` and `finish` — pure stack-internal usage. |
+| drizzle-orm | `0.45.2` | Schema, queries, atomic batch writes | See **Drizzle PK migration strategy** below. Version is fully capable of the v1.3 schema change. |
+| drizzle-kit | `0.31.10` | Schema migrations | See **Drizzle PK migration strategy** below — must use **custom (empty) migration** for the PK change, not auto-generate. |
+| @neondatabase/serverless | `1.0.2` | Postgres HTTP client | Already wired through `db.batch([...])` in `src/db/queries.ts` — the per-binder selective replace will reuse the exact same atomic-batch pattern. |
+| papaparse | `5.5.3` | CSV parsing | Extending `src/lib/csv-parser.ts` to read `Binder Name` / `Binder Type` is two new optional fields on `ManaboxRow`. PapaParse already returns whatever headers are present. |
+| @types/papaparse | `5.5.2` | Type defs | No bump needed. |
+| zustand | `5.0.12` | Client state for binder picker selection (remembered between imports) | Already used for cart + filter store. The "selection remembered between imports" requirement maps to a single `useBinderImportStore` slice with `persist` (or sessionStorage) — **no new state lib**. |
+| next-auth | `5.0.0-beta.30` | Admin gate on `/api/admin/import/*` | Already wired via `requireAdmin()` in every admin route handler. No new auth surface. |
+| tailwindcss | `^4` + `@tailwindcss/postcss` | Styling | Native `<input type="checkbox">` + Tailwind classes is the project's established UI-primitive pattern (filter-rail.tsx, inventory-table.tsx x2, order-detail.tsx). Reuse it for the binder picker. |
 
-### Email
+### Supporting Libraries (existing, reused)
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Resend | 4.x | Transactional email API | Free tier: 3,000 emails/month (plenty for friend orders). Simple REST API, works from Next.js API routes. Better DX than SendGrid/Mailgun for small projects. | MEDIUM (free tier limits unverified for current date) |
-| React Email | 3.x | Email templates | JSX-based email templates. Renders to HTML that works across email clients. Pairs naturally with Resend. | LOW (version unverified) |
+| Library | Pinned Version | Purpose | When to Reuse |
+|---------|----------------|---------|---------------|
+| Custom rate-limit (`src/lib/rate-limit.ts`) | n/a (in-tree) | Sliding-window + Postgres CTE store | The new `/api/admin/import/preview` and `/commit` paths already pass through `enforceRateLimit({ config: RATE_LIMIT_BUCKETS.ADMIN_BULK })`. The **per-binder commit will reuse the same `ADMIN_BULK` bucket** — no new bucket, no new config. |
+| Custom logger (`src/lib/logger.ts`) | n/a (in-tree) | Structured + deep-redacted logging | Add `binderCount` and `selectedBinders` to existing `admin.import_commit.succeeded` event metadata. The deep redactor is already pinned by tests so this is additive. |
+| `admin_audit_log` (Phase 14 table) | n/a | Audit trail for admin mutations | Per-binder selective commits log a new `inventory.import_commit_per_binder` action; metadata schema is open (`jsonb`), so adding `selectedBinders: string[]` is trivial. |
+| `import_history` (Phase 14 table) | n/a | First-class import history rows | Same — add `selectedBinders` and `binderCount` to its `metadata jsonb` column. No schema change to this table. |
+| `fast-glob@3.3.3` | dev dep | Filesystem CSV walking in `parseAllCsvFiles` | Untouched by v1.3 (server-uploaded import path doesn't use it). |
+| `tsx@4.21.0` | dev dep | Smoke script runner | Untouched by v1.3. |
 
-**Alternative for email:** If Resend's free tier changes, Nodemailer with a Gmail SMTP relay is a zero-cost fallback. Slightly more setup but no third-party dependency.
+### Development Tools (no changes)
 
-### Search
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| vitest 4.1.4 | Test runner | The allocator is a **pure function** taking `(line, sourceRows[]) -> splits[]` and is exactly what vitest is best at. Add ~6-10 unit tests covering: single-binder line, multi-binder split, exact-fit, oversold, deterministic ordering. No new tooling. |
+| eslint 9 + eslint-config-next 16.2.2 | Linting | No changes. |
+| drizzle-kit 0.31.10 | Migrations | **Use custom-migration mode** (see below) — do NOT rely on `drizzle-kit generate` for the PK change. |
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Built-in `Array.filter()` | N/A | Card filtering | With < 10K cards in a friend's bulk collection, client-side filtering is instant. No search library needed for name substring match + color filter. | HIGH |
+---
 
-**Do NOT use Fuse.js, Algolia, or any search library.** The inventory is small enough that `string.includes()` and array filtering handles everything. Adding a fuzzy search library is over-engineering for an inventory of a few thousand cards.
+## Direct Answers to the Four Questions
 
-### Hosting / Infrastructure
+### 1. Drizzle composite-PK change — what migration strategy?
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Vercel | N/A | Hosting + deployment | Free tier handles this project easily. Zero-config for Next.js. Automatic HTTPS, CDN, preview deploys. API routes (for email) run as serverless functions. | HIGH |
+**Answer: do NOT use `drizzle-kit generate` for the PK change. Write a custom (empty) migration manually.**
 
-### Development Tools
+**Why:** drizzle-kit has two known PK-migration bugs that affect this exact scenario:
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| ESLint | 9.x | Linting | Ships with Next.js. Flat config format. | MEDIUM |
-| Prettier | 3.x | Formatting | Consistent code style. | MEDIUM |
+- [Issue #3496](https://github.com/drizzle-team/drizzle-orm/issues/3496) — "Primary key migration fails when changing from one column to another." The generated SQL omits `DROP CONSTRAINT cards_pkey` before `ADD CONSTRAINT cards_pkey PRIMARY KEY (...)`, so the migration fails on first apply. Filed against drizzle-orm 0.36 / drizzle-kit 0.27, status not confirmed fixed in 0.45 / 0.31.10.
+- [Issue #3117](https://github.com/drizzle-team/drizzle-orm/issues/3117) — adding a column AND making it part of the PK in one go produces an invalid migration.
 
-## What NOT to Use
+**Recommended migration sequence** (write as a custom drizzle-kit migration via `drizzle-kit generate --custom`):
 
-| Technology | Why Not |
-|------------|---------|
-| Database (Postgres, SQLite, etc.) | Overkill. CSV import at build time or on-demand is sufficient. Card data lives in a JSON file or in-memory. No user accounts = no persistent state. |
-| Prisma / Drizzle / any ORM | No database = no ORM needed. |
-| NextAuth / Clerk / Auth.js | No user accounts. Friends provide name + email at checkout only. |
-| Stripe / PayPal | No payment processing. Friends pay in person. |
-| Redux / React Query | Zustand handles cart state. No server state to cache (card data is static). |
-| Fuse.js / Algolia / Meilisearch | Collection is small. Native JS filtering is sufficient and simpler. |
-| Docker / Kubernetes | Vercel handles deployment. No infrastructure to manage. |
-| CMS (Sanity, Contentful, etc.) | Data comes from CSV. No content to manage. |
-| Shopify / Snipcart / Medusa | Full e-commerce platforms are massive overkill for emailing an order to yourself. |
-| MongoDB / Firebase | No need for a database. Period. |
+```sql
+-- 1. Add nullable column
+ALTER TABLE cards ADD COLUMN binder text;
 
-## Architecture Decision: Static vs. Dynamic
+-- 2. Backfill existing rows (matches PROJECT.md: "binder = 'unsorted'")
+UPDATE cards SET binder = 'unsorted' WHERE binder IS NULL;
 
-**Use Static Site Generation (SSG) with client-side cart.**
+-- 3. Enforce NOT NULL after backfill
+ALTER TABLE cards ALTER COLUMN binder SET NOT NULL;
 
-- **Card catalog:** Generated at build time from CSV. Rebuild when inventory changes (re-upload CSV, trigger rebuild).
-- **Cart:** Client-side only (Zustand + localStorage). No server state.
-- **Checkout:** Single API route (`/api/checkout`) that validates the order and sends emails via Resend.
-- **Search/filter:** Client-side JavaScript filtering the pre-loaded card array.
+-- 4. Drop the old single-column PK constraint
+ALTER TABLE cards DROP CONSTRAINT cards_pkey;
 
-This means the site is essentially a static site with one serverless function for email. Hosting cost: $0.
+-- 5. Recompute the composite id column to include binder, e.g.
+--    `${setCode}-${collectorNumber}-${foil}-${condition}-${binder}`
+UPDATE cards SET id = id || '-unsorted';  -- backfill rows have known suffix
 
-## Data Flow
+-- 6. Re-add PK on the new id (still single-column TEXT, but now binder-aware)
+ALTER TABLE cards ADD CONSTRAINT cards_pkey PRIMARY KEY (id);
 
-```
-Manabox App
-    |
-    v (CSV export)
-CSV File
-    |
-    v (PapaParse at build time)
-JSON card inventory (name, set, condition, quantity, price)
-    |
-    v (Next.js SSG)
-Static HTML pages with card data embedded
-    |
-    v (client-side, on page load)
-Scryfall API → fetch card images by name
-    |
-    v (user interaction)
-Zustand cart → localStorage persistence
-    |
-    v (checkout)
-Next.js API route → Resend → email to seller + buyer
+-- 7. Optional: index on (set_code, collector_number, foil, condition) so the
+--    storefront aggregation (sum quantity across binders) is fast.
+CREATE INDEX cards_buyer_facing_idx ON cards (set_code, collector_number, foil, condition);
 ```
 
-## Scryfall API Strategy
+**Important nuance:** the existing `cards.id` is a **single text column** holding a composite *string* (`${setCode}-${collectorNumber}-${foil}-${condition}`), not a true composite PK. So this is structurally an **id-format change**, not a `PRIMARY KEY (a, b, c)` reshape. That makes step 4 simple (drop is on `id`'s implicit PK, which never changes), and step 5 is the real work. Drizzle-kit issues #3496/#3117 do **not** apply to this case directly — but the safe pattern is still "custom migration, not auto-generated", because drizzle-kit cannot infer the `id ||= '-' || binder` data-rewrite step.
 
-**Do NOT bulk-fetch all images at build time.** Instead:
-- Store card names from CSV
-- Fetch Scryfall images client-side using `<img>` tags with Scryfall image URIs
-- Scryfall image URL pattern: `https://api.scryfall.com/cards/named?format=image&fuzzy={cardname}`
-- This is effectively a CDN -- no rate limit concerns for image loading
-- For card metadata (price, set info), batch-fetch at build time using Scryfall's `/cards/collection` endpoint (up to 75 cards per request)
+The neon-http driver routes `db.batch([...])` through Neon's HTTP transaction endpoint, so this migration can run as a single atomic batch from a one-off script (the project already uses `db.batch()` in `replaceAllCards` for atomic destructive writes — same pattern).
 
-**Rate limits:** 10 requests/second for API calls. Image CDN has no practical limit for this scale.
+**See:** [Drizzle Custom Migrations](https://orm.drizzle.team/docs/kit-custom-migrations), [Issue #3496](https://github.com/drizzle-team/drizzle-orm/issues/3496).
+
+**Confidence:** HIGH (verified against installed drizzle-orm 0.45.2, installed drizzle-kit 0.31.10, and the existing `replaceAllCards` batch pattern in `src/db/queries.ts:809`).
+
+---
+
+### 2. Manabox npm package — does one exist?
+
+**Answer: NO. Extend the existing handwritten parser.**
+
+There is **no published npm package** that parses Manabox CSV exports. WebSearch returned only:
+
+- [`StepKie/MtgCsvHelper`](https://github.com/StepKie/MtgCsvHelper) — C# CLI converter, not a JS lib
+- [`sboulema/ManaBoxImporter`](https://github.com/sboulema/ManaBoxImporter) — converts Arena -> ManaBox, not a parser
+- [`d0ngl3md/Manabox2TCGP`](https://github.com/d0ngl3md/Manabox2TCGP) — a personal Python script
+
+Manabox itself does not publish a parser. The CSV format is documented loosely on [the Manabox import/export guide](https://www.manabox.app/guides/collection/import-export/) but column sets vary by collection layout, which is exactly why the existing parser is defensive (it tolerates extra/missing columns via PapaParse's header mode).
+
+**What to do:** extend `src/lib/types.ts:ManaboxRow` with two new optional fields:
+
+```typescript
+export interface ManaboxRow {
+  // ... existing fields ...
+  "Binder Name"?: string;
+  "Binder Type"?: string;  // e.g., "binder", "list" — used to skip non-binder rows
+}
+```
+
+And extend `rowToCardOrSkip` in `src/lib/csv-parser.ts` to:
+- Skip rows where `Binder Type !== "binder"` with a new `SkippedRow.reason` of `"non-binder row"`.
+- Default missing `Binder Name` to `"unsorted"` (matches the migration backfill).
+- Append `binder` to the composite `id` so the same card in two binders becomes two rows.
+
+The merge step (`mergeCards`) **automatically does the right thing** — same id ⇒ sum, different id ⇒ separate rows — once the id includes binder.
+
+**Confidence:** HIGH (no published package found; PapaParse already supports unknown extra headers).
+
+---
+
+### 3. UI primitive for "multi-select with row counts" — reuse or hand-roll?
+
+**Answer: hand-roll. The project's established pattern is native `<input type="checkbox">` + Tailwind, used in 4 places already.**
+
+Audit of existing checkbox usage in the repo:
+
+| File | Pattern |
+|------|---------|
+| `src/components/filter-rail.tsx:202` | Color/rarity multi-select with counts |
+| `src/app/admin/_components/inventory-table.tsx:85` | Header "select all" |
+| `src/app/admin/_components/inventory-table.tsx:692` | Per-row select |
+| `src/app/admin/orders/_components/order-detail.tsx:334` | Status checkbox |
+
+`filter-rail.tsx` is **already** "multi-select with counts" — it renders a row per option (color/rarity) with a count badge. The binder picker is the same component shape with a different data source (binder name + parsed-row count from the preview payload). Copy that pattern.
+
+**Adding a UI primitive library now (Headless UI, Radix, cmdk, react-select) would:**
+1. Inject a new dependency for one feature.
+2. Diverge from the established hand-rolled style across 4 existing files.
+3. Pull in client JS the storefront doesn't need.
+
+**Recommendation:** add a new `src/app/admin/import/_components/binder-picker.tsx` that mirrors the structure of `filter-rail.tsx`. Selection persists via a `useBinderImportStore` zustand slice (zustand@5.0.12 is already pinned; `persist` middleware ships with it), satisfying "selection is remembered between imports".
+
+**Confidence:** HIGH (verified by grep of `src/` for `type="checkbox"` and confirmation no UI primitive lib is in `package.json`).
+
+---
+
+### 4. Anything else the milestone needs that ISN'T in the stack?
+
+**Answer: nothing.**
+
+I checked each v1.3 target feature from PROJECT.md against the installed stack:
+
+| v1.3 Feature | Required Tech | Status |
+|--------------|---------------|--------|
+| Manabox parser ingests `Binder Name` / `Binder Type` | papaparse@5.5.3 + extend `ManaboxRow` | Already installed. Two new optional type fields. |
+| Composite ID gains `binder` dimension | text PK rebuild | Custom drizzle migration (Q1). No version bump. |
+| Import preview shows binder picker | React + Tailwind + zustand | All installed. Hand-roll component. |
+| Selection remembered between imports | zustand `persist` middleware | Ships with zustand@5.0.12 — no install. |
+| Replace semantics scoped to selected binders | drizzle `.delete().where(inArray(binder, selected))` + `db.batch()` | drizzle-orm@0.45.2 supports `inArray` + `eq` predicates on the cards table. Same atomic batch as existing `replaceAllCards`. |
+| Storefront aggregates quantity across binders | drizzle `sum(quantity).groupBy(...)` | drizzle-orm@0.45.2 supports `sum` aggregate + `groupBy`. |
+| Server-side binder allocator at checkout commit | Pure TS function | No new deps. Vitest tests are the safety net. |
+| One buyer line -> multiple `order_items` rows | Existing `order_items` table accepts N rows per `orderId` | Schema already supports it (`order_items.id` is `generatedAlwaysAsIdentity()`, not unique on cardId). Zero schema change to `order_items`. |
+| Admin order detail `[binder]` annotation per line | Add `binder text` column to `order_items` (denormalized snapshot, like `setName`/`condition`) | One additive `ALTER TABLE order_items ADD COLUMN binder text` — drizzle-kit generates this correctly. Backfill existing rows with `'unsorted'`. |
+| Admin inventory table "Binder" column + filter | Existing inventory-table.tsx pattern + new column | No new deps. |
+| Backfill existing rows with `binder = 'unsorted'` | Custom migration (covered in Q1) | Step 2 of the migration. |
+| New `Foil` value `etched` | Schema change | **See gotcha below.** |
+
+#### Gotcha: the `etched` finish
+
+PROJECT.md says "New `Foil` value `etched` becomes a finish enum value", but:
+
+- The current schema (`src/db/schema.ts:44`) declares `foil: boolean("foil").notNull().default(false)` — **a boolean, not an enum**.
+- The current `ManaboxRow.Foil` type (`src/lib/types.ts:11`) is `"foil" | "normal"` — also not an enum.
+- The current `csv-parser.ts:87` reads `const foil = row.Foil === "foil"` — boolean coercion.
+- The `cards.id` composite includes `foil ? "foil" : "normal"`.
+
+To support `etched` you must either:
+
+**Option A (minimal): keep boolean + add `finish` text column.**
+- Add `finish text not null default 'normal'` to `cards`. Values: `"normal" | "foil" | "etched"`.
+- Keep `foil` boolean for backward compat (or drop it after migration; `foil = (finish !== 'normal')`).
+- Composite id becomes `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`.
+- Parser: `const finish = row.Foil ?? "normal"` (Manabox's `Foil` column already emits the string `"etched"` for etched-foil cards in many layouts; the existing `ScryfallCard` type in `src/lib/types.ts:91` already destructures `usd_etched`, so the project's enrichment flow has been *partially* etched-aware all along).
+
+**Option B (idiomatic): introduce `pgEnum("finish", ["normal", "foil", "etched"])` like `orderStatusEnum`.**
+- Cleaner but enum changes in Postgres are not auto-handled by drizzle-kit (must use `ALTER TYPE finish ADD VALUE 'etched'` if extending later). For three known values today this is fine.
+
+Both options use existing tech (no new deps). **Recommendation: Option A** — text column `finish` with a TS string-literal-union validator. It mirrors the existing `cards.condition text` pattern (which is also a free-form string, not a pgEnum, and has worked fine for 5 conditions). Lower migration risk and easier to extend if Manabox adds more finish values later.
+
+**Confidence:** HIGH for Option A; MEDIUM for whether Manabox emits the literal string `"etched"` in the Foil column (could not find a published spec — recommend a manual verification step early in the milestone: have the operator export one binder containing an etched-foil card and inspect the CSV).
+
+---
 
 ## Installation
 
 ```bash
-# Create project
-npx create-next-app@latest viki --typescript --tailwind --app --src-dir
-
-# Core dependencies
-npm install zustand papaparse
-
-# Email
-npm install resend @react-email/components
-
-# Dev dependencies (TypeScript types)
-npm install -D @types/papaparse
+# Nothing.
 ```
 
-## Estimated Bundle
+---
 
-This stack produces a very small bundle:
-- Next.js + React: ~85KB gzipped (framework overhead)
-- Zustand: ~1KB gzipped
-- PapaParse: ~7KB gzipped (only needed at build time, not in client bundle)
-- Tailwind: only used classes ship, typically 5-15KB gzipped
-- **Total client JS: ~100KB gzipped** -- fast on any connection
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Custom drizzle migration (manual SQL) for the binder PK change | `drizzle-kit generate` | Never — known bugs (#3496, #3117) and drizzle-kit cannot infer the `id ||= '-' || binder` data rewrite. Custom is the only correct path. |
+| Extend handwritten `csv-parser.ts` | Adopt a CSV-schema validator like `csv-parser-schema` or `zod-csv` | Only if validation needs grow — but the existing `rowToCardOrSkip` already does per-row validation with structured `SkippedRow` reasons. Adding zod-csv would duplicate the existing pattern. |
+| Native `<input type="checkbox">` + Tailwind for binder picker | Headless UI, Radix Primitives, cmdk | Only if you ever build a *combobox* or *command palette*. A flat checkbox list with counts is the wrong shape for those libs. |
+| `db.batch([...])` for selective per-binder replace | drizzle `.transaction()` | The neon-http driver **does not support interactive transactions** — `node_modules/drizzle-orm/neon-http/session.js` throws `"No transactions support in neon-http driver"` (already documented in `src/db/queries.ts:798`). `db.batch()` is the only atomic option on this stack. |
+| Text column `finish` ('normal'/'foil'/'etched') | `pgEnum("finish", [...])` | Use pgEnum if you want compile-time safety in raw SQL too. Postgres enum extension (`ALTER TYPE ... ADD VALUE`) is a one-statement migration and is well-supported. Either choice is fine; text matches the existing `cards.condition` pattern. |
+| Hand-built allocator (pure TS function) | Library like `linear-programming-js` or `glpk.js` | Never — the allocator is "iterate sorted source rows, decrement until line quantity is satisfied". This is ~30 lines of TS with deterministic ordering. LP libraries are 100x overkill for a deterministic greedy split. |
+| zustand `persist` for binder selection | localStorage direct, sessionStorage, cookies | zustand persist already wraps localStorage with hydration safety. Already pinned. Use it. |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `drizzle-kit generate` for the PK/id-format change | Issues #3496 and #3117 — generated SQL is broken for PK changes; cannot express data-rewrite of `id` | `drizzle-kit generate --custom` (empty migration) and write the SQL by hand. Run via `drizzle-kit migrate`. |
+| `db.transaction(...)` anywhere new in v1.3 | Throws on neon-http driver | `db.batch([...])` — already the codebase pattern (`src/db/queries.ts:801`) |
+| Adding Headless UI / Radix / cmdk for the binder picker | Diverges from 4 existing native-checkbox files; injects client JS | Native `<input type="checkbox">` + Tailwind, mirroring `src/components/filter-rail.tsx` |
+| Adding a CSV-schema lib (zod-csv, csv-parser-schema) | Duplicates the existing `rowToCardOrSkip` validator + `SkippedRow` reason machinery | Extend the existing `rowToCardOrSkip` with two new branches: missing `Binder Name`, non-binder `Binder Type` |
+| Bumping next, react, drizzle-orm, drizzle-kit, papaparse, vitest, next-auth, neondatabase, zustand | Risks breaking 28 passing test files; no v1.3 feature requires it | Stay pinned. Only bump if a security CVE forces it (none currently known). |
+| New `RATE_LIMIT_BUCKETS.ADMIN_BINDER` bucket | Reuses are cheaper than new buckets — and the per-binder commit is the same operational shape as a full commit | `RATE_LIMIT_BUCKETS.ADMIN_BULK` already covers `/api/admin/import/commit` and applies cleanly to per-binder commits |
+| Logging the full `selectedBinders` array verbatim if it could ever be large | The structured logger has deep redaction but no length cap on arrays in user-supplied positions | Log `selectedBinders.length` always; log `selectedBinders` only if `<= 20`. Mirrors the existing `truncateAuditString` defensive pattern in `src/db/queries.ts:241` |
+
+---
+
+## Stack Patterns by Variant
+
+**If the operator imports a Manabox CSV with no binder columns (legacy export):**
+- Treat all rows as `binder = "unsorted"` and `Binder Type = "binder"` (skip nothing).
+- This makes the v1.3 parser **backward-compatible** with existing v1.2 import flows — same code path, default values fill in.
+
+**If the operator imports a CSV containing rows with `Binder Type != "binder"` (e.g., wishlist, trade list):**
+- Skip with `SkippedRow.reason = "non-binder row"` and surface in the existing skipped-rows zone of the preview UI. No new UI surface required.
+
+**If a buyer's line quantity exceeds the sum across all binder rows for that card:**
+- Existing `StockConflict` (`src/lib/types.ts:110`) and `409` response from `/api/checkout` already covers oversold detection. Allocator runs **after** the existing oversold check in the same transaction batch — never run allocator on an oversold line.
+
+**If two binders have an identical card and the operator deselects one mid-import:**
+- The selective replace deletes only `WHERE binder IN (selected)` — untouched binder rows remain. Storefront aggregation re-sums on next read. No cache invalidation needed (current code reads from DB on every page render).
+
+---
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| drizzle-orm@0.45.2 | drizzle-kit@0.31.10 | Already in lockstep in this repo. Both must be bumped together if ever upgraded — drizzle-kit emits SQL its companion ORM expects. |
+| drizzle-orm/neon-http | @neondatabase/serverless@1.0.2 | Wired in `src/db/index.ts` (assumed). The "no interactive transactions" constraint is a property of the **driver pair**, not just one. |
+| papaparse@5.5.3 | @types/papaparse@5.5.2 | Type defs lag the runtime by minor patch; harmless for header-mode parsing of new optional headers. |
+| zustand@5.0.12 | React 19.2.4 | zustand 5.x is the React 19-compatible line. `persist` middleware ships in the same package. |
+| next@16.2.2 | next-auth@5.0.0-beta.30 | Already wired through Auth.js v5; v1.3 adds no new auth surface. |
+
+---
 
 ## Sources
 
-- Next.js 16.2 release: https://nextjs.org/blog (verified via WebFetch, HIGH confidence)
-- Scryfall API: https://scryfall.com/docs/api (verified from training data, well-established API, HIGH confidence)
-- Resend: https://resend.com (training data, MEDIUM confidence on current free tier limits)
-- PapaParse: https://www.papaparse.com (training data, MEDIUM confidence on exact current version)
-- Zustand: https://github.com/pmndrs/zustand (training data, MEDIUM confidence on exact current version)
-- Vercel free tier: https://vercel.com/pricing (training data, HIGH confidence on general availability)
+- **Existing repo audit** (HIGH confidence — direct file reads):
+  - `package.json` — pinned versions
+  - `src/db/schema.ts` — current schema (boolean `foil`, single-column text PK)
+  - `src/db/queries.ts:736-846` — existing `db.batch()` and `replaceAllCards` patterns
+  - `src/lib/csv-parser.ts` — handwritten Manabox parser, `rowToCardOrSkip` pattern, `mergeCards`
+  - `src/lib/types.ts` — `ManaboxRow`, `Card`, `StockConflict` types; note `ScryfallCard.prices.usd_etched` already exists
+  - `src/lib/import-contract.ts` — preview/commit message contract
+  - `src/app/api/admin/import/commit/route.ts` — rate-limit/audit/import-history wiring
+  - `src/components/filter-rail.tsx`, `src/app/admin/_components/inventory-table.tsx`, `src/app/admin/orders/_components/order-detail.tsx` — existing checkbox UI pattern (4 hits)
+  - `node_modules/drizzle-orm/package.json` — confirmed 0.45.2
+  - `node_modules/drizzle-kit/package.json` — confirmed 0.31.10
+- [Drizzle ORM Custom Migrations docs](https://orm.drizzle.team/docs/kit-custom-migrations) — workaround pattern for unsupported DDL (HIGH)
+- [Drizzle ORM Batch API docs](https://orm.drizzle.team/docs/batch-api) — confirms atomic batched DELETE+INSERT with neon-http (HIGH)
+- [Drizzle ORM Migrations overview](https://orm.drizzle.team/docs/migrations) — confirms `drizzle-kit generate --custom` flow (HIGH)
+- [GitHub Issue #3496 — PK migration fails](https://github.com/drizzle-team/drizzle-orm/issues/3496) — known PK-change codegen bug (MEDIUM — issue exists; fix status not confirmed for 0.31.10)
+- [GitHub Issue #3117 — adding column as PK generates broken migration](https://github.com/drizzle-team/drizzle-orm/issues/3117) — second PK-related bug class (MEDIUM)
+- [Manabox import/export guide](https://www.manabox.app/guides/collection/import-export/) — confirms binder/list info is included in exports; column names not formally specified (MEDIUM)
+- WebSearch for `npm "manabox" csv parser` — **no published JS/TS package found** (HIGH — exhaustive search returned only C# / Python / personal scripts)
+
+---
+
+*Stack research for: Subsequent milestone v1.3 — binder-aware inventory & pick workflow*
+*Researched: 2026-05-10*
+*Bottom line for downstream consumers (roadmapper / planner): no `npm install` step belongs in the v1.3 roadmap. Plan phases around (1) custom Drizzle migration for binder + finish + id-format change, (2) parser extension, (3) selective per-binder commit, (4) allocator, (5) UI wiring (binder picker + admin column + order-detail annotation). Reuse `db.batch()`, `requireAdmin()`, `enforceRateLimit({ ADMIN_BULK })`, `logEvent`, `admin_audit_log`, `import_history`, native `<input type="checkbox">`, and zustand `persist`.*
