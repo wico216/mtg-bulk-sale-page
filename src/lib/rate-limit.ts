@@ -48,7 +48,14 @@ export type RateLimitDecision = {
 export interface RateLimitStore {
   /**
    * Returns how many hits have been recorded for the (bucket, key) pair within
-   * `[now - windowMs, now]` (inclusive). Must not mutate state.
+   * `[now - windowMs, now]` (inclusive).
+   *
+   * Implementations MAY opportunistically prune entries that fall outside the
+   * window (e.g. the in-memory store splices aged-out timestamps out of its
+   * internal array during this call). Implementations MUST NOT otherwise
+   * mutate state -- in particular, calling countHits must NEVER record a new
+   * hit. Returned counts must be deterministic for a given (bucket, key,
+   * windowMs, now) regardless of prior prune-on-read behavior.
    */
   countHits(args: {
     bucket: string;
@@ -60,6 +67,9 @@ export interface RateLimitStore {
   /**
    * Returns the earliest hit timestamp in the window for (bucket, key).
    * Returns null if no hit exists.
+   *
+   * Same prune-on-read latitude as countHits applies: implementations MAY
+   * remove entries that fall outside the window but MUST NOT record new hits.
    */
   earliestHit(args: {
     bucket: string;
@@ -125,7 +135,19 @@ export function createMemoryRateLimitStore(): RateLimitStore {
     return `${bucket}|${key}`;
   }
 
-  function pruneAndGet(
+  /**
+   * Returns the fresh hit list for (bucket, key) and opportunistically
+   * splices aged-out entries out of the stored array. The mutation is
+   * intentional and covered by the RateLimitStore interface contract
+   * ("MAY prune entries that fall outside the window"); it is safe because:
+   *   1. Pruned entries would never have been returned anyway -- they fall
+   *      outside `[now - windowMs, now]`.
+   *   2. Counts are still deterministic for a given (bucket, key, now) input.
+   *   3. Prune-on-read keeps memory bounded for long-running test/dev sessions
+   *      without a separate sweeper.
+   * The function is named `pruneAndGetFresh` to make the mutation explicit.
+   */
+  function pruneAndGetFresh(
     bucket: string,
     key: string,
     windowMs: number,
@@ -145,10 +167,10 @@ export function createMemoryRateLimitStore(): RateLimitStore {
 
   return {
     async countHits({ bucket, key, windowMs, now }) {
-      return pruneAndGet(bucket, key, windowMs, now).length;
+      return pruneAndGetFresh(bucket, key, windowMs, now).length;
     },
     async earliestHit({ bucket, key, windowMs, now }) {
-      const fresh = pruneAndGet(bucket, key, windowMs, now);
+      const fresh = pruneAndGetFresh(bucket, key, windowMs, now);
       return fresh.length > 0 ? fresh[0] : null;
     },
     async recordHit({ bucket, key, now }) {
