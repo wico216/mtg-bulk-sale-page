@@ -99,10 +99,17 @@ describe("POST /api/checkout", () => {
     const data = await response.json();
 
     expect(response.status).toBe(201);
+    // v1.3 Phase 20 D-07/AGG-02: response.order is PublicOrderData with
+    // `binder` stripped from each item. Build the expected shape from
+    // sampleOrder by destructuring out `binder` per item.
+    const expectedPublicOrder = {
+      ...sampleOrder,
+      items: sampleOrder.items.map(({ binder: _binder, ...item }) => item),
+    };
     expect(data).toEqual({
       success: true,
       orderRef: sampleOrder.orderRef,
-      order: sampleOrder,
+      order: expectedPublicOrder,
       notification: { sellerEmailSent: true, buyerEmailSent: true },
     });
     expect(mockPlaceCheckoutOrder).toHaveBeenCalledWith(
@@ -113,6 +120,9 @@ describe("POST /api/checkout", () => {
         items: [{ cardId: "lea-232-normal-near_mint", quantity: 2 }],
       }),
     );
+    // notifyOrder STILL receives the full internal OrderData with binder
+    // (seller email needs the snapshot for operator pull info per Phase
+    // 18 D-15). Only the public response is stripped.
     expect(mockNotifyOrder).toHaveBeenCalledWith(sampleOrder);
     expect(mockGetCards).not.toHaveBeenCalled();
   });
@@ -401,5 +411,69 @@ describe("POST /api/checkout", () => {
     } finally {
       logSpy.mockRestore();
     }
+  });
+
+  // ---- Phase 20 AGG-02 invariants — public response carries no binder ------
+  describe("AGG-02 invariant — public response contains no binder/binders trace", () => {
+    beforeEach(() => {
+      process.env.RESEND_API_KEY = "test-resend";
+      mockEnforceRateLimit.mockReturnValue(null);
+      mockNotifyOrder.mockResolvedValue({
+        sellerEmailSent: true,
+        buyerEmailSent: true,
+      });
+    });
+
+    it("success response excludes binder/binders field-name trace", async () => {
+      // sampleOrder includes an OrderItem with binder: 'a02'. Per AGG-02
+      // (CONTEXT D-07/D-18) the public CheckoutResponse must strip the
+      // binder snapshot. Plan 20-01 Task 10 ships a server-side projection
+      // in src/app/api/checkout/route.ts that does the strip + a
+      // PublicOrderItem type that makes the leak a compile error.
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: true,
+        order: sampleOrder,
+      });
+      const res = await POST(makeCheckoutRequest(validBody()));
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      const serialized = JSON.stringify(body).toLowerCase();
+      // AGG-02 invariant per CONTEXT: the literal field-name "binder"
+      // (and the plural "binders" from AdminCard) must not appear in any
+      // public response. The substring check is case-insensitive so the
+      // lowercased serialized form is the test surface.
+      expect(serialized.includes("binder")).toBe(false);
+      expect(serialized.includes("binders")).toBe(false);
+      // NOTE: per Phase 18 the order_items snapshot still carries the
+      // 5-segment per-binder cardId (e.g., "lea-232-normal-near_mint-a02").
+      // Stripping that down to the aggregated 4-segment id is outside
+      // Phase 20 scope (would require reformulating allocator output).
+      // AGG-02 is the strict spec — substring "binder"/"binders" only.
+      // Sanity: the order shape is otherwise preserved end-to-end.
+      expect(body.order.orderRef).toBe(sampleOrder.orderRef);
+      expect(body.order.items).toHaveLength(1);
+      expect(body.order.items[0].cardId).toBe(sampleOrder.items[0].cardId);
+    });
+
+    it("stock_conflict response excludes binder/binders trace", async () => {
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: false,
+        code: "stock_conflict",
+        conflicts: [
+          {
+            cardId: "sld-123-normal-near_mint",
+            name: "Lightning Bolt",
+            requested: 5,
+            available: 2,
+          },
+        ],
+      });
+      const res = await POST(makeCheckoutRequest(validBody()));
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      const serialized = JSON.stringify(body).toLowerCase();
+      expect(serialized.includes("binder")).toBe(false);
+      expect(serialized.includes("binders")).toBe(false);
+    });
   });
 });

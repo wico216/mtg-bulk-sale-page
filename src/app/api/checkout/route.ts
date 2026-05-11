@@ -211,10 +211,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // v1.3 Phase 20 D-07 / AGG-02: strip the per-binder source from the
+    // public CheckoutResponse. The binder snapshot lives on order_items in
+    // the DB (Phase 18 ADM-01) and is consumed by the seller email +
+    // future admin order detail (Phase 21), but MUST NOT cross the public
+    // response boundary. The PublicOrderItem type guarantees this is a
+    // compile-time error if a future caller forgets the strip.
+    const publicOrder = {
+      ...checkoutResult.order,
+      items: checkoutResult.order.items.map(
+        ({ binder: _binder, ...item }) => item,
+      ),
+    };
     const response: CheckoutResponse = {
       success: true,
       orderRef: checkoutResult.order.orderRef,
-      order: checkoutResult.order,
+      order: publicOrder,
       notification,
     };
     return Response.json(response, { status: 201 });
