@@ -96,11 +96,11 @@ Requirements for Admin Panel & Inventory Management milestone. Each maps to road
 
 ### Operations & Hardening
 
-- [ ] **OPS-01**: Checkout and admin mutation APIs have production-compatible rate limits
-- [ ] **OPS-02**: Critical checkout/admin workflows emit safe structured logs for success and failure states
-- [ ] **OPS-03**: Admin can inspect operational health without exposing secrets
-- [ ] **OPS-04**: A repeatable production smoke script is checked into the repo
-- [ ] **OPS-05**: Admin/API surfaces have a documented security review with concrete follow-ups
+- [x] **OPS-01**: Checkout and admin mutation APIs have production-compatible rate limits
+- [x] **OPS-02**: Critical checkout/admin workflows emit safe structured logs for success and failure states
+- [x] **OPS-03**: Admin can inspect operational health without exposing secrets
+- [x] **OPS-04**: A repeatable production smoke script is checked into the repo
+- [x] **OPS-05**: Admin/API surfaces have a documented security review with concrete follow-ups
 
 ## Future Requirements
 
