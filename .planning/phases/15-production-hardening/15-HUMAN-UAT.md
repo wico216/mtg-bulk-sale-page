@@ -3,7 +3,8 @@ status: partial
 phase: 15-production-hardening
 source: [15-VERIFICATION.md]
 started: 2026-05-10T20:45:00Z
-updated: 2026-05-10T20:45:00Z
+updated: 2026-05-10T21:30:00Z
+deployment_url: https://wikos-spellbinder.vercel.app
 ---
 
 ## Current Test
@@ -39,7 +40,15 @@ npm run smoke:production -- --deployment https://<your-deployment>.vercel.app
 echo "exit: $?"
 ```
 
-result: [pending]
+result: passed (2026-05-10)
+evidence: |
+  Ran against https://wikos-spellbinder.vercel.app
+  [PASS] GET /                          -- 200 + HTML markers
+  [PASS] GET /admin/login                -- Google sign-in visible, no password field
+  [PASS] GET /admin (unauth)             -- redirected to /admin/login
+  [PASS] DELETE /api/admin/cards (unauth) -- 401 from requireAdmin guard
+  [PASS] GET /api/admin/health (unauth)   -- 401 from requireAdmin guard
+  5 / 5 checks passed, exit 0
 
 ### 3. Manual rate-limit hammer against deployed `/api/checkout`
 
@@ -64,9 +73,9 @@ result: [pending]
 ## Summary
 
 total: 3
-passed: 0
+passed: 1
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
