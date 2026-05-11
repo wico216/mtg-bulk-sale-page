@@ -10,12 +10,13 @@ import type { Card, ScryfallCard } from "@/lib/types";
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
-    id: "lea-232-normal-near_mint",
+    id: "lea-232-normal-near_mint-unsorted",
     name: "Lightning Bolt",
     setCode: "lea",
     setName: "",
     collectorNumber: "232",
-    foil: false,
+    finish: "normal",
+    binder: "unsorted",
     condition: "near_mint",
     quantity: 1,
     price: null,
@@ -59,9 +60,9 @@ describe("enrichCards onProgress + scryfallMisses", () => {
       .mockResolvedValueOnce(makeScryfallCard())
       .mockResolvedValueOnce(makeScryfallCard());
 
-    const c1 = makeCard({ id: "lea-1-normal-near_mint", collectorNumber: "1" });
-    const c2 = makeCard({ id: "lea-2-normal-near_mint", collectorNumber: "2" });
-    const c3 = makeCard({ id: "lea-3-normal-near_mint", collectorNumber: "3" });
+    const c1 = makeCard({ id: "lea-1-normal-near_mint-unsorted", collectorNumber: "1" });
+    const c2 = makeCard({ id: "lea-2-normal-near_mint-unsorted", collectorNumber: "2" });
+    const c3 = makeCard({ id: "lea-3-normal-near_mint-unsorted", collectorNumber: "3" });
 
     const onProgress = vi.fn();
     await enrichCards([c1, c2, c3], { onProgress });
@@ -88,14 +89,14 @@ describe("enrichCards onProgress + scryfallMisses", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(makeScryfallCard());
 
-    const c1 = makeCard({ id: "lea-1-normal-near_mint", collectorNumber: "1" });
+    const c1 = makeCard({ id: "lea-1-normal-near_mint-unsorted", collectorNumber: "1" });
     const c2 = makeCard({
-      id: "lea-2-normal-near_mint",
+      id: "lea-2-normal-near_mint-unsorted",
       collectorNumber: "2",
       name: "Missing Card",
       setCode: "lea",
     });
-    const c3 = makeCard({ id: "lea-3-normal-near_mint", collectorNumber: "3" });
+    const c3 = makeCard({ id: "lea-3-normal-near_mint-unsorted", collectorNumber: "3" });
 
     const result = await enrichCards([c1, c2, c3]);
 
@@ -121,10 +122,10 @@ describe("enrichCards onProgress + scryfallMisses", () => {
       .mockResolvedValueOnce(null);
 
     const cards = [
-      makeCard({ id: "lea-1-normal-near_mint", collectorNumber: "1" }),
-      makeCard({ id: "lea-2-normal-near_mint", collectorNumber: "2" }),
-      makeCard({ id: "lea-3-normal-near_mint", collectorNumber: "3" }),
-      makeCard({ id: "lea-4-normal-near_mint", collectorNumber: "4" }),
+      makeCard({ id: "lea-1-normal-near_mint-unsorted", collectorNumber: "1" }),
+      makeCard({ id: "lea-2-normal-near_mint-unsorted", collectorNumber: "2" }),
+      makeCard({ id: "lea-3-normal-near_mint-unsorted", collectorNumber: "3" }),
+      makeCard({ id: "lea-4-normal-near_mint-unsorted", collectorNumber: "4" }),
     ];
 
     const result = await enrichCards(cards);
@@ -135,7 +136,7 @@ describe("enrichCards onProgress + scryfallMisses", () => {
     expect(result.stats.skipped).toBe(2);
   });
 
-  it("foil cards prefer usd_foil over usd (Test E.foil)", async () => {
+  it("foil finish prefers usd_foil over usd (Test E.foil)", async () => {
     vi.mocked(fetchCard).mockResolvedValueOnce(
       makeScryfallCard({
         prices: { usd: "1.00", usd_foil: "5.00", usd_etched: "8.00" },
@@ -143,15 +144,15 @@ describe("enrichCards onProgress + scryfallMisses", () => {
     );
 
     const foilCard = makeCard({
-      id: "lea-232-foil-near_mint",
-      foil: true,
+      id: "lea-232-foil-near_mint-unsorted",
+      finish: "foil",
     });
 
     const result = await enrichCards([foilCard]);
     expect(result.cards[0].price).toBe(5.0);
   });
 
-  it("foil cards fall back to usd_etched then usd when usd_foil missing (Test E.foil-fallback)", async () => {
+  it("foil finish falls back to usd_etched then usd when usd_foil missing (Test E.foil-fallback)", async () => {
     vi.mocked(fetchCard)
       .mockResolvedValueOnce(
         makeScryfallCard({
@@ -164,24 +165,74 @@ describe("enrichCards onProgress + scryfallMisses", () => {
         }),
       );
 
-    const c1 = makeCard({ id: "lea-1-foil-near_mint", foil: true });
-    const c2 = makeCard({ id: "lea-2-foil-near_mint", foil: true });
+    const c1 = makeCard({ id: "lea-1-foil-near_mint-unsorted", finish: "foil" });
+    const c2 = makeCard({ id: "lea-2-foil-near_mint-unsorted", finish: "foil" });
 
     const result = await enrichCards([c1, c2]);
     expect(result.cards[0].price).toBe(8.0);
     expect(result.cards[1].price).toBe(1.0);
   });
 
-  it("non-foil cards still prefer usd over usd_foil (Test E.normal)", async () => {
+  it("normal finish prefers usd over usd_foil and usd_etched (Test E.normal)", async () => {
     vi.mocked(fetchCard).mockResolvedValueOnce(
       makeScryfallCard({
         prices: { usd: "1.00", usd_foil: "5.00", usd_etched: "8.00" },
       }),
     );
 
-    const normalCard = makeCard({ foil: false });
+    const normalCard = makeCard({ finish: "normal" });
     const result = await enrichCards([normalCard]);
     expect(result.cards[0].price).toBe(1.0);
+  });
+
+  it(
+    "etched finish prefers usd_etched over usd_foil and usd " +
+      "(Phase 17 D-08 — fixes the v1.2 latent etched mispricing)",
+    async () => {
+      vi.mocked(fetchCard).mockResolvedValueOnce(
+        makeScryfallCard({
+          prices: { usd: "1.00", usd_foil: "5.00", usd_etched: "8.00" },
+        }),
+      );
+
+      const etchedCard = makeCard({
+        id: "2x2-10-etched-near_mint-unsorted",
+        finish: "etched",
+        name: "Wrath of God",
+        setCode: "2x2",
+      });
+
+      const result = await enrichCards([etchedCard]);
+      expect(result.cards[0].price).toBe(8.0);
+    },
+  );
+
+  it("etched finish falls back to usd_foil then usd when usd_etched missing (Phase 17 D-08)", async () => {
+    vi.mocked(fetchCard)
+      .mockResolvedValueOnce(
+        makeScryfallCard({
+          prices: { usd: "1.00", usd_foil: "5.00", usd_etched: null },
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeScryfallCard({
+          prices: { usd: "1.00", usd_foil: null, usd_etched: null },
+        }),
+      );
+
+    const c1 = makeCard({
+      id: "2x2-10-etched-near_mint-unsorted",
+      finish: "etched",
+    });
+    const c2 = makeCard({
+      id: "2x2-11-etched-near_mint-unsorted",
+      collectorNumber: "11",
+      finish: "etched",
+    });
+
+    const result = await enrichCards([c1, c2]);
+    expect(result.cards[0].price).toBe(5.0);
+    expect(result.cards[1].price).toBe(1.0);
   });
 
   it("applies USD price fallback chain and increments missingPrices when all null (Test E)", async () => {
@@ -199,8 +250,8 @@ describe("enrichCards onProgress + scryfallMisses", () => {
         }),
       );
 
-    const c1 = makeCard({ id: "lea-1-normal-near_mint", collectorNumber: "1" });
-    const c2 = makeCard({ id: "lea-2-normal-near_mint", collectorNumber: "2" });
+    const c1 = makeCard({ id: "lea-1-normal-near_mint-unsorted", collectorNumber: "1" });
+    const c2 = makeCard({ id: "lea-2-normal-near_mint-unsorted", collectorNumber: "2" });
 
     const result = await enrichCards([c1, c2]);
 
@@ -217,9 +268,9 @@ describe("enrichCards onProgress + scryfallMisses", () => {
       .mockResolvedValueOnce(makeScryfallCard());
 
     const cards = [
-      makeCard({ id: "lea-1-normal-near_mint", collectorNumber: "1" }),
-      makeCard({ id: "lea-2-normal-near_mint", collectorNumber: "2" }),
-      makeCard({ id: "lea-3-normal-near_mint", collectorNumber: "3" }),
+      makeCard({ id: "lea-1-normal-near_mint-unsorted", collectorNumber: "1" }),
+      makeCard({ id: "lea-2-normal-near_mint-unsorted", collectorNumber: "2" }),
+      makeCard({ id: "lea-3-normal-near_mint-unsorted", collectorNumber: "3" }),
     ];
 
     const onProgress = vi.fn();

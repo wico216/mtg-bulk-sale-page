@@ -1,4 +1,4 @@
-import type { Card, ScryfallCard } from "./types";
+import type { Card, Finish, ScryfallCard } from "./types";
 import { fetchCard } from "./scryfall";
 
 /**
@@ -41,18 +41,32 @@ function getOracleText(card: ScryfallCard): string | null {
 
 /**
  * Extract USD price preferring the printing finish that matches the listing.
- * Foil rows pull usd_foil first (then usd_etched, then usd as a last resort);
- * non-foil rows pull usd first. Without this, foil listings displayed the
- * non-foil price for any card that had both finishes in Scryfall's payload.
+ *
+ * Phase 17 D-08 — three-branch ladder per finish enum value:
+ *   - 'etched' rows prefer `usd_etched`, then fall back to `usd_foil`
+ *     (etched is structurally a foil treatment), then to `usd` as a last
+ *     resort. **This is the v1.2 latent bug fix:** before Phase 17 every
+ *     etched card was treated as `foil: false` and silently took the
+ *     non-foil `usd` price, mispricing the 11 etched cards in the
+ *     operator's collection (Wrath of God, Cultist of the Absolute,
+ *     Master Chef, Tor Wauki the Younger, Jasmine Boreal of the Seven, …).
+ *   - 'foil' rows prefer `usd_foil`, then `usd_etched`, then `usd`
+ *     (preserves the existing v1.2 foil-first fallback ladder verbatim).
+ *   - 'normal' rows prefer `usd`, then `usd_foil`, then `usd_etched`
+ *     (preserves the existing v1.2 normal-first fallback ladder verbatim).
+ *
  * Scryfall returns prices as strings like "16.05".
  */
 function getPrice(
   prices: ScryfallCard["prices"],
-  foil: boolean,
+  finish: Finish,
 ): number | null {
-  const raw = foil
-    ? prices.usd_foil ?? prices.usd_etched ?? prices.usd
-    : prices.usd ?? prices.usd_foil ?? prices.usd_etched;
+  const raw =
+    finish === "etched"
+      ? prices.usd_etched ?? prices.usd_foil ?? prices.usd
+      : finish === "foil"
+        ? prices.usd_foil ?? prices.usd_etched ?? prices.usd
+        : prices.usd ?? prices.usd_foil ?? prices.usd_etched;
 
   if (raw == null) return null;
   const parsed = parseFloat(raw);
@@ -127,7 +141,7 @@ export async function enrichCards(
     }
 
     card.imageUrl = getImageUrl(scryfallData);
-    card.price = getPrice(scryfallData.prices, card.foil);
+    card.price = getPrice(scryfallData.prices, card.finish);
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);
 
