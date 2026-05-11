@@ -2,6 +2,66 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.3 — Binder-Aware Inventory & Pick Workflow
+
+**Shipped:** 2026-05-11
+**Phases:** 7 (16-22) | **Plans:** 11 | **Commits:** 73 | **Code:** +36,666 / −1,344 across 136 files | **Tests:** 300 → 464 passing + 2 env-gated
+**Timeline:** ~5 hours autonomous run from milestone bootstrap to merge-ready (single session)
+
+### What Was Built
+
+- **Schema migration with safety net** (Phase 16) — 5-segment composite id `{setCode}-{collectorNumber}-{finish}-{condition}-{binder}`, finish enum (normal/foil/etched), CHECK (quantity >= 0), one-shot `db.batch` atomic apply, three idempotency pre-flights, structured terminal summary, Neon PITR rollback recipe
+- **Etched bug fix** (Phase 17) — 11 known etched cards in operator's collection (Wrath of God, Cultist of the Absolute, Master Chef, Tor Wauki the Younger, Jasmine Boreal of the Seven, +6) were silently mispriced as `normal` in v1.2; now correctly priced via Scryfall `usd_etched`
+- **Multi-binder allocator** (Phase 18) — single 11-CTE SQL chain inside placeCheckoutOrder; smallest-first + lex tiebreaker; FOR UPDATE OF cards on aggregated key; one order_items row per binder source with binder snapshotted; multi-binder concurrent-proof harness
+- **Two-stage NDJSON binder picker** (Phase 19) — parse → emit binders → operator selects → enrichment runs only on selected; hand-rolled checkbox list mirroring filter-rail; remembered selection via zustand persist; will-delete panel default-checked; inline destructive confirm with typed REPLACE
+- **Storefront aggregation + privacy type split** (Phase 20) — getCardsAggregated GROUP BY returns AdminCard[]; PublicCard/AdminCard/PublicOrderItem/PublicOrderData split makes binder leak a compile error; per-route invariant tests; cart reconciliation extends Phase 10-03 useEffect (NOT zustand migrate); one-time informational toast
+- **Admin binder visibility** (Phase 21) — inventory binder column + filter dropdown + URL persistence; "Breakdown by binder" dashboard tile; order detail [binder] pill from order_items snapshot; audit page expander for ScopedImportAuditMetadata
+- **Hardening** (Phase 22) — D-DOS-01 resolved via ADMIN_BULK rate-limit on /api/admin/import/preview; STRIDE delta records I-DISC-05 binder-leak (Low, resolved); perf pin (12,749 rows in 38ms; 50x under 2s); 5-scenario UAT runbook
+
+### What Worked
+
+- **Discuss-all-phases-first batched the design work into one coherent thinking session** — pipeline parallelism per the workflow; CONTEXT.md for all 7 phases committed before any code execution; kept the design space in working memory throughout planning
+- **Auto-mode after the user toggle** — Claude made calls on routine gray areas (e.g., "rip out card.foil cleanly", "lowercase canonical normalized binder names"); user only needed to confirm milestone-level direction
+- **Background-agent dispatching for plan + execute** — main context stayed lean enough to drive 7 phases × 11 plans in a single conversation; each agent returned a 300-500 word summary that fit cleanly into the orchestrator's working memory
+- **Type-split caught a real bug** — the Phase 20 PublicCard/AdminCard discipline FORCED the executor to spot a CheckoutResponse.order.items[].binder leak that was sitting in the Phase 18 output. PublicOrderItem strip shipped in the same commit. Compile-time privacy guarantee paid off immediately.
+- **Planner caught a CONTEXT math error** — Phase 18 D-07 had an arithmetic impossibility (seed total=4 can't produce SUM=0 after one winner takes 3); the planner implemented BOTH variants (as-written + corrected) for full coverage. Better than silent wrongness.
+- **Research-recommended phase ordering refined the build** — STATE.md execution_order (16 → 17 → 20 → 19 → 18 → 21 → 22) shipped lower-risk read-side before write-side; integration checker's eventual numeric-order verdict still came out clean
+
+### What Was Inefficient
+
+- **The Skill tool was denied in subagents.** Every spawned agent fell back to manual execution of the corresponding workflow ("read CONTEXT, follow plan, commit"). Output quality was equivalent but the indirection added one layer of "agent interpreting workflow text" that direct skill invocation would skip
+- **CONTEXT-time gray areas leaked into plan-time discoveries** — Phase 17's plan grew to cover filter-rail/filter-store extension (3-value finish facet) that the CONTEXT didn't enumerate; happened in 2-3 phases. CONTEXT writers should grep for affected files more aggressively
+- **`gsd-sdk query milestone.complete` extracts wrong fields for "accomplishments"** (same as v1.2) — pulls `Status:` / `Plan:` / `Wave:` from random SUMMARY headings. Manual rewrite of MILESTONES.md needed every time
+- **`roadmap.analyze` doesn't recurse into `<details>` blocks** — discovered v1.3 phase listing wasn't being parsed; had to surface the in-progress milestone outside `<details>` for the autonomous workflow to find phases. Re-collapsed it after milestone close.
+- **5x flake check requires real DB credentials** — the multi-binder concurrent-proof tests are env-gated on TEST_DATABASE_URL; the executor can't provision a Neon test branch from inside the autonomous run; permanent operator handoff
+- **Auto-mode skipped per-phase code-review** — context budget vs thoroughness tradeoff; the audit + integration check at milestone end caught the missing pieces, but a per-phase review pass would have surfaced things sooner
+
+### Patterns Established
+
+- **`PublicCard` / `AdminCard` / `PublicOrderItem` type split for compile-time leak prevention** — any future privacy-sensitive field gets its own type-split. Cheaper than runtime stripping; impossible to silently bypass.
+- **Single SQL CTE chain for atomic multi-row decisions on neon-http** — Phase 18 allocator pattern; lock by aggregated key with FOR UPDATE; window functions for running supply; LEAST/GREATEST for take-quantity. Reusable for any "pick rows, decrement, write history" flow.
+- **Two-stage NDJSON contract** — parse → emit summary → operator selects → operate on subset. Saves expensive operations on un-selected data; reusable for any heavy admin workflow with selection
+- **Per-route invariant tests assert serialized response shape** — `JSON.stringify(response).includes('private_field') === false`. Compile-time + runtime defense in depth.
+- **CONTEXT.md as de-facto UI-SPEC for small UI phases** — when the picker UI is well-specified in CONTEXT (D-03..D-08), the plan/execute chain doesn't need a separate UI-SPEC step. Saves a workflow round-trip.
+- **`gsd-sdk query commit` doesn't recognize `--dry-run`** — treats it as part of the message; the Phase 17 executor caught a self-introduced surprise commit and soft-reset cleanly. Skill should validate flags.
+
+### Key Lessons
+
+1. **Privacy guarantees that live in TypeScript are stronger than runtime tests.** The PublicCard/AdminCard type split caught a Phase 18 leak the runtime invariant tests would have caught later. Compile errors are immediate; test failures are after-the-fact.
+2. **Math-check the spec before relying on it.** D-07's seed totals didn't add up; the planner caught it. CONTEXT writers should hand-trace at least one fixture per requirement.
+3. **Background-agent dispatching is the right pattern for long autonomous runs.** Plan + execute as Agent calls keeps the orchestrator's context for design decisions only; the heavy implementation context lives in isolation.
+4. **Don't trust the CLI's accomplishments extraction.** `milestone.complete` produces garbage for the MILESTONES.md key accomplishments; always rewrite by hand from SUMMARY one-liners.
+5. **Operator-only verification items (Neon dry-run, TEST_DATABASE_URL provisioning, live UAT) are normal.** Document them in deferred items + audit; don't try to fake them inside the autonomous run.
+
+### Cost Observations
+
+- Model mix: opus on planning + research + audit; opus on execute (per user's max-effort toggle); opus on synthesizer (override of sonnet default)
+- 73 commits / 11 plans = ~6.6 commits per plan including review/fix work
+- Heaviest phases: Phase 19 (15 tasks across 2 plans, full client+server stack), Phase 20 (16 tasks, type split + cart migration)
+- Notable: 7 phase plans + 7 phase executes ran as background agents in ~5 hours wall time. Pipeline parallelism (discuss next phase while current builds) saved real time
+
+---
+
 ## Milestone: v1.2 — Store Operations & Hardening
 
 **Shipped:** 2026-05-11
