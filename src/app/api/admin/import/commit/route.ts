@@ -1,12 +1,17 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
-import { replaceAllCards } from "@/db/queries";
+import { normalizeBinderName } from "@/lib/binder-name";
+import { replaceCardsForBinders } from "@/db/queries";
 import {
   enforceRateLimit,
   clientKeyFromRequest,
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
 import { logEvent, logError } from "@/lib/logger";
-import type { CommitRequest, CommitResponse, CommitSummary } from "@/lib/import-contract";
+import type {
+  CommitRequest,
+  CommitResponse,
+  CommitSummary,
+} from "@/lib/import-contract";
 
 const ROUTE = "/api/admin/import/commit";
 
@@ -14,6 +19,9 @@ export const runtime = "nodejs";
 // Commit is fast -- only DB round trips (one batched delete+insert). 30s is
 // generous headroom for Neon cold starts; the work itself takes well under a second.
 export const maxDuration = 30;
+
+const MAX_SELECTED_BINDERS = 200;
+const MAX_KNOWN_BINDERS = 200;
 
 function toNonNegativeInteger(value: unknown): number {
   return Number.isFinite(value)
@@ -47,6 +55,69 @@ function buildImportAuditMetadata(
   };
 }
 
+/**
+ * Phase 19: validate body.selectedBinders strictly. Returns either the
+ * validated string[] OR a Response (400) the caller should return immediately.
+ */
+function validateSelectedBinders(
+  raw: unknown,
+  cards: Array<{ binder: string }>,
+): string[] | Response {
+  if (!Array.isArray(raw)) {
+    return Response.json(
+      { error: "selectedBinders must be an array" },
+      { status: 400 },
+    );
+  }
+  if (raw.length > MAX_SELECTED_BINDERS) {
+    return Response.json(
+      { error: `selectedBinders length exceeds ${MAX_SELECTED_BINDERS}` },
+      { status: 400 },
+    );
+  }
+  if (!raw.every((s): s is string => typeof s === "string")) {
+    return Response.json(
+      { error: "selectedBinders entries must be strings" },
+      { status: 400 },
+    );
+  }
+  for (const s of raw) {
+    if (s !== normalizeBinderName(s)) {
+      return Response.json(
+        { error: `selectedBinders entry "${s}" is not normalized` },
+        { status: 400 },
+      );
+    }
+  }
+  // Every entry must appear in body.cards (commit-time source of truth).
+  const cardBinderSet = new Set(cards.map((c) => c.binder));
+  for (const s of raw) {
+    if (!cardBinderSet.has(s)) {
+      return Response.json(
+        {
+          error: `selectedBinders entry "${s}" not present in body.cards`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+  // Conversely, every card.binder MUST be in selectedBinders (the typed
+  // deletedFromUnselected: 0 invariant — Plan 19-01 D-18). The helper would
+  // throw on this too, but a 400 here yields a cleaner error than a 500.
+  const selectedSet = new Set(raw);
+  for (const c of cards) {
+    if (!selectedSet.has(c.binder)) {
+      return Response.json(
+        {
+          error: `card.binder "${c.binder}" not in selectedBinders`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+  return raw;
+}
+
 export async function POST(request: Request): Promise<Response> {
   const auth = await requireAdmin();
   if (auth instanceof Response) return auth;
@@ -77,25 +148,51 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "Missing cards array" }, { status: 400 });
   }
 
+  // ---- selectedBinders default-resolution + strict validation (D-15/D-16) --
+  let selectedBinders: string[];
+  if (body.selectedBinders === undefined) {
+    // Legacy single-button-import flow: replace every binder mentioned in
+    // this upload (correctness-equivalent to the prior wholesale path).
+    selectedBinders = Array.from(new Set(body.cards.map((c) => c.binder)));
+  } else {
+    const validated = validateSelectedBinders(body.selectedBinders, body.cards);
+    if (validated instanceof Response) return validated;
+    selectedBinders = validated;
+  }
+
+  // ---- knownBinders (loose; never 400s) ------------------------------------
+  let knownBinders: string[] = [];
+  if (Array.isArray(body.knownBinders)) {
+    knownBinders = body.knownBinders
+      .filter((s): s is string => typeof s === "string")
+      .slice(0, MAX_KNOWN_BINDERS)
+      .map(normalizeBinderName);
+  }
+
   try {
     const importMetadata = buildImportAuditMetadata(body.summary, body.cards.length);
-    const { inserted } = await replaceAllCards(body.cards, {
-      actorEmail: auth.user.email,
-      metadata: importMetadata,
-      importHistory: {
+    const { inserted } = await replaceCardsForBinders(
+      body.cards,
+      selectedBinders,
+      {
         actorEmail: auth.user.email,
-        fileNames: importMetadata.fileNames as string[],
-        fileCount: importMetadata.fileCount as number,
-        parsedRows: importMetadata.parsedRows as number,
-        skippedRows: importMetadata.skippedRows as number,
-        insertedCards: body.cards.length,
-        metadata: {
-          parseSkipped: importMetadata.parseSkipped,
-          scryfallSkipped: importMetadata.scryfallSkipped,
-          missingPrices: importMetadata.missingPrices,
+        metadata: importMetadata,
+        knownBinders,
+        importHistory: {
+          actorEmail: auth.user.email,
+          fileNames: importMetadata.fileNames as string[],
+          fileCount: importMetadata.fileCount as number,
+          parsedRows: importMetadata.parsedRows as number,
+          skippedRows: importMetadata.skippedRows as number,
+          insertedCards: body.cards.length,
+          metadata: {
+            parseSkipped: importMetadata.parseSkipped,
+            scryfallSkipped: importMetadata.scryfallSkipped,
+            missingPrices: importMetadata.missingPrices,
+          },
         },
       },
-    });
+    );
     logEvent({
       level: "info",
       event: "admin.import_commit.succeeded",
@@ -106,6 +203,7 @@ export async function POST(request: Request): Promise<Response> {
         parsedRows: importMetadata.parsedRows,
         skippedRows: importMetadata.skippedRows,
         insertedCards: inserted,
+        selectedBindersCount: selectedBinders.length,
       },
     });
     const response: CommitResponse = { success: true, inserted };
