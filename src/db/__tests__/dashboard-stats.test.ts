@@ -29,6 +29,7 @@ describe("getAdminDashboardStats", () => {
         quantity: 3,
         colorIdentity: ["R"],
         rarity: "common",
+        binder: "a02",
       },
       {
         id: "mh2-45-normal-lightly_played",
@@ -37,6 +38,7 @@ describe("getAdminDashboardStats", () => {
         quantity: 1,
         colorIdentity: [],
         rarity: "uncommon",
+        binder: "unsorted",
       },
       {
         id: "sld-1-normal-near_mint",
@@ -45,6 +47,7 @@ describe("getAdminDashboardStats", () => {
         quantity: 2,
         colorIdentity: ["U", "W"],
         rarity: "rare",
+        binder: "a05",
       },
     ]);
 
@@ -72,6 +75,14 @@ describe("getAdminDashboardStats", () => {
           { rarity: "rare", quantity: 2, uniqueCards: 1, value: 5 },
           { rarity: "uncommon", quantity: 1, uniqueCards: 1, value: 0 },
         ],
+        // Phase 21 Task 2: byBinder mirrors mapBreakdown sort
+        // (quantity desc, label asc). a02 leads with quantity 3, then a05
+        // with quantity 2, then unsorted with quantity 1.
+        byBinder: [
+          { binder: "a02", quantity: 3, uniqueCards: 1, value: 3.75 },
+          { binder: "a05", quantity: 2, uniqueCards: 1, value: 5 },
+          { binder: "unsorted", quantity: 1, uniqueCards: 1, value: 0 },
+        ],
       },
     });
   });
@@ -91,6 +102,7 @@ describe("getAdminDashboardStats", () => {
         bySet: [],
         byColor: [],
         byRarity: [],
+        byBinder: [],
       },
     });
   });
