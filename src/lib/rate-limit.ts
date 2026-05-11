@@ -307,6 +307,35 @@ export function __resetDefaultRateLimitStoreForTests(): void {
  *
  * `extra` lets the caller add an identity suffix (admin email) so two admins
  * on the same NAT don't share a bucket. Pass `null`/`undefined` to skip.
+ *
+ * WR-01 deployment assumption (IMPORTANT):
+ * -----------------------------------------
+ * This implementation trusts the LEFTMOST `x-forwarded-for` token. That is
+ * the correct token to trust on Vercel and on most reverse-proxy stacks
+ * that sanitize / rewrite `x-forwarded-for` at the edge (Vercel, Cloudflare
+ * with `cf-connecting-ip`, AWS ALB with strict XFF mode, etc.). On those
+ * platforms the leftmost value is the real client IP that the edge
+ * appended, and any client-supplied prefix is overwritten.
+ *
+ * On a non-sanitizing proxy stack (e.g. raw nginx without `real_ip_recursive`,
+ * a local Docker dev with no proxy, an on-prem deploy without a trusted
+ * edge), the leftmost XFF token is CLIENT-SUPPLIED and trivially spoofable:
+ * a malicious caller sets `x-forwarded-for: 1.1.1.1, 2.2.2.2, ...` and
+ * rotates the leading value per-request to bypass per-IP buckets.
+ *
+ * If you ever deploy this app to a host other than Vercel:
+ *   1. Replace the leftmost-trust logic with a rightmost-trusted-hop pattern
+ *      that walks XFF from the right and stops at the first IP outside the
+ *      known proxy list.
+ *   2. Or normalize XFF at the edge (terminate proxy chain, set a single
+ *      trusted header like `x-real-ip`).
+ *
+ * The `x-real-ip` fallback below is preferred when present because Vercel
+ * sets BOTH XFF and x-real-ip, and `x-real-ip` is harder to spoof in the
+ * leftmost-trust model. The "unknown" terminal fallback collapses all
+ * proxy-stripped requests into one shared bucket -- per WR-01 this is
+ * acceptable for the friend-store threat model but is documented here so
+ * future operators know to tighten it if they widen the audience.
  */
 export function clientKeyFromRequest(
   request: Request,
