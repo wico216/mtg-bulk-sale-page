@@ -13,15 +13,34 @@ export interface NotifyResult {
  * Sends order notification emails via Resend.
  * Seller email is sent first (priority per D-17).
  * Buyer email is best-effort -- failure does not affect order success.
- * Order data is logged to console as backup record (D-18).
+ *
+ * Phase 15 review CR-03: the previous `console.log("[ORDER]", JSON.stringify(order))`
+ * dumped buyer PII (email, name, free-form message, full item list with prices)
+ * to Vercel function logs in plaintext, bypassing the redacting logger. The
+ * "backup record" intent (D-18) is satisfied by the `orders` table itself; the
+ * log line below preserves the operational signal that a notification was
+ * dispatched without echoing PII.
  */
 export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const sellerEmail = process.env.SELLER_EMAIL;
   const result: NotifyResult = { sellerEmailSent: false, buyerEmailSent: false };
 
-  // Log order data to Vercel function logs (D-18: backup record)
-  console.log("[ORDER]", JSON.stringify(order));
+  // Operational record: order received for notification dispatch. PII
+  // (buyerEmail, buyerName, message, item names/prices) is intentionally omitted.
+  // The orders table is the canonical record of the placed order; this log line
+  // is just a "notification pipeline saw it" breadcrumb.
+  logEvent({
+    level: "info",
+    event: "notification.order_received",
+    route: "lib/notifications",
+    metadata: {
+      orderRef: order.orderRef,
+      totalItems: order.totalItems,
+      totalPrice: order.totalPrice,
+      itemCount: order.items.length,
+    },
+  });
 
   // Send seller email FIRST (priority per D-17)
   const { error: sellerError } = await resend.emails.send({
