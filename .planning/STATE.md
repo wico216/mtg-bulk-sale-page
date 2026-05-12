@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-11T08:19:01.193Z"
-last_activity: 2026-05-11 — Milestone v1.3 completed and archived
+last_updated: "2026-05-11T14:55:00.000Z"
+last_activity: 2026-05-11 — v1.3.1 patch pushed to origin/main (Vercel auto-deploy)
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 22
+  completed_phases: 21
+  total_plans: 44
+  completed_plans: 45
+  percent: 95
 ---
 
 # Project State
@@ -89,9 +89,11 @@ These constraints apply across multiple v1.3 phases and MUST be honored during p
 
 ## Session Continuity
 
-Working tree is on `main`. v1.3 planning artifacts (PROJECT.md, REQUIREMENTS.md, research/, ROADMAP.md, STATE.md) are uncommitted. The previous v1.2 milestone is shipped; the previous milestone files have been archived.
+Last session: 2026-05-11 — Resumed v1.3.1-patch paused at task 5/6. Unwound WIP bookkeeping commit `534677f`, pushed 4 patch commits (`2331068..555ddbc`) + annotated tag `v1.3.1` to `origin/main`. Vercel auto-deploy triggered.
 
-Next action: `/gsd-plan-phase 16` to decompose Phase 16 into executable plan files.
+v1.3.1 (Faster CSV-Import Pricing Enrichment) shipped: batched Scryfall `/cards/collection` fetcher resolves the Axx-binder import timeout reported in v1.3.0. Tests 464/2 skipped/0 failed; tsc + build clean.
+
+Next action: Operator verifies Vercel deployment ` Ready` and re-attempts Axx-binder import. Then start the next milestone with `/gsd:new-milestone`.
 
 ## Deferred Items
 
