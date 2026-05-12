@@ -34,7 +34,26 @@ export type LogErrorInput = Omit<LogEventInput, "level"> & {
   error: unknown;
 };
 
-export type SafeErrorSummary = { name: string; message: string };
+export type SafeErrorSummary = {
+  name: string;
+  message: string;
+  // PostgreSQL fields (present on NeonDbError / node-postgres DatabaseError).
+  // Short identifier-like fields are passed through unchanged; the longer
+  // free-text fields (`detail`, `hint`) are scrubbed for PII like message.
+  code?: string;
+  severity?: string;
+  routine?: string;
+  detail?: string;
+  hint?: string;
+  constraint?: string;
+  table?: string;
+  column?: string;
+  // Nested cause chain (typically wraps a NeonDbError under a Drizzle Error).
+  // Capped at SAFE_ERROR_CAUSE_DEPTH to prevent runaway chains.
+  cause?: SafeErrorSummary;
+};
+
+const SAFE_ERROR_CAUSE_DEPTH = 3;
 
 // Substrings (case-insensitive) that mark a field as secret-shaped. Anything
 // matching is replaced with "[REDACTED]" before serialization.
@@ -189,12 +208,78 @@ function scrubErrorMessage(raw: string): string {
   return scrubbed;
 }
 
-export function safeErrorSummary(error: unknown): SafeErrorSummary {
+// Identifier-like Postgres fields (short, no embedded PII). Passed through
+// unchanged. `code` is e.g. "2202E"; `severity` is e.g. "ERROR".
+const PG_IDENTIFIER_FIELDS = [
+  "code",
+  "severity",
+  "routine",
+  "constraint",
+  "table",
+  "column",
+] as const;
+
+// Free-text Postgres fields. Run through scrubErrorMessage to redact emails /
+// long digit runs in case the value-bearing fields (`detail`) carry PII.
+const PG_FREETEXT_FIELDS = ["detail", "hint"] as const;
+
+function attachPgFields(
+  source: Record<string, unknown>,
+  target: SafeErrorSummary,
+): void {
+  for (const field of PG_IDENTIFIER_FIELDS) {
+    try {
+      const value = source[field];
+      if (typeof value === "string" && value.length > 0) {
+        // Cap length defensively; identifiers should be short but a malformed
+        // error object could carry an arbitrary string here.
+        target[field] = value.length > 200 ? `${value.slice(0, 200)}…` : value;
+      }
+    } catch {
+      // Throwing getter — skip this field, never propagate.
+    }
+  }
+  for (const field of PG_FREETEXT_FIELDS) {
+    try {
+      const value = source[field];
+      if (typeof value === "string" && value.length > 0) {
+        target[field] = scrubErrorMessage(value);
+      }
+    } catch {
+      // Throwing getter — skip.
+    }
+  }
+}
+
+export function safeErrorSummary(
+  error: unknown,
+  depth = 0,
+): SafeErrorSummary {
+  const summary = safeErrorSummaryShallow(error);
+  // Recurse into `error.cause` (Drizzle wraps NeonDbError under a generic
+  // Error). Cap depth so a self-referential cause chain can't blow the stack.
+  if (depth < SAFE_ERROR_CAUSE_DEPTH && error && typeof error === "object") {
+    let cause: unknown;
+    try {
+      cause = (error as { cause?: unknown }).cause;
+    } catch {
+      cause = undefined;
+    }
+    if (cause !== undefined && cause !== null && cause !== error) {
+      summary.cause = safeErrorSummary(cause, depth + 1);
+    }
+  }
+  return summary;
+}
+
+function safeErrorSummaryShallow(error: unknown): SafeErrorSummary {
   if (error instanceof Error) {
-    return {
+    const summary: SafeErrorSummary = {
       name: error.name || "Error",
       message: scrubErrorMessage(error.message || ""),
     };
+    attachPgFields(error as unknown as Record<string, unknown>, summary);
+    return summary;
   }
   if (typeof error === "string") {
     return { name: "UnknownError", message: scrubErrorMessage(error) };
@@ -205,7 +290,9 @@ export function safeErrorSummary(error: unknown): SafeErrorSummary {
       typeof (error as { name?: unknown }).name === "string"
         ? ((error as { name: string }).name)
         : "UnknownError";
-    return { name, message };
+    const summary: SafeErrorSummary = { name, message };
+    attachPgFields(error as Record<string, unknown>, summary);
+    return summary;
   }
   return { name: "UnknownError", message: scrubErrorMessage(String(error)) };
 }

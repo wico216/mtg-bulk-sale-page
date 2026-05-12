@@ -253,6 +253,82 @@ describe("logError", () => {
     expect(summary.message.length).toBeLessThanOrEqual(600);
     expect(summary.message).toContain("[TRUNCATED]");
   });
+
+  // v1.3.4 — Drizzle wraps NeonDbError under a generic Error. The cause carries
+  // the Postgres error code / routine / severity that is critical for prod
+  // diagnosis. Older logger summarised only {name, message} and dropped the
+  // cause; this test pins the new behaviour.
+  it("captures error.cause chain with PG identifier fields (code/routine/severity)", () => {
+    const pgErr = new Error("cannot accumulate empty arrays") as Error &
+      Record<string, unknown>;
+    pgErr.name = "NeonDbError";
+    pgErr.code = "2202E";
+    pgErr.severity = "ERROR";
+    pgErr.routine = "accumArrayResultArr";
+
+    const drizzleErr = new Error("Failed query: SELECT ...");
+    (drizzleErr as Error & { cause?: unknown }).cause = pgErr;
+
+    logError({ event: "home.db_failed", error: drizzleErr });
+
+    const summary = capture.calls[0].payload.error as {
+      name: string;
+      message: string;
+      cause?: {
+        name: string;
+        message: string;
+        code?: string;
+        severity?: string;
+        routine?: string;
+      };
+    };
+
+    expect(summary.name).toBe("Error");
+    expect(summary.message).toContain("Failed query");
+    expect(summary.cause).toBeDefined();
+    expect(summary.cause?.name).toBe("NeonDbError");
+    expect(summary.cause?.message).toBe("cannot accumulate empty arrays");
+    expect(summary.cause?.code).toBe("2202E");
+    expect(summary.cause?.severity).toBe("ERROR");
+    expect(summary.cause?.routine).toBe("accumArrayResultArr");
+  });
+
+  it("scrubs PG free-text fields (detail) and passes constraint identifier through", () => {
+    const pgErr = new Error(
+      'duplicate key value violates unique constraint "orders_buyer_email_key"',
+    ) as Error & Record<string, unknown>;
+    pgErr.name = "NeonDbError";
+    pgErr.code = "23505";
+    pgErr.detail = "Key (buyer_email)=(viki@example.com) already exists.";
+    pgErr.constraint = "orders_buyer_email_key";
+
+    logError({ event: "checkout.db_failed", error: pgErr });
+
+    const summary = capture.calls[0].payload.error as {
+      detail?: string;
+      constraint?: string;
+      code?: string;
+    };
+    expect(summary.code).toBe("23505");
+    expect(summary.constraint).toBe("orders_buyer_email_key");
+    expect(summary.detail).toBeDefined();
+    expect(summary.detail).not.toContain("viki@example.com");
+    // scrubErrorMessage replaces the `Key (col)=(value)` clause with
+    // [REDACTED] (not [REDACTED_EMAIL]) — the load-bearing assertion is
+    // simply that no raw PII survives.
+    expect(summary.detail).toContain("[REDACTED]");
+  });
+
+  it("caps cause-chain depth so a self-referential cause cannot blow the stack", () => {
+    const a = new Error("A") as Error & { cause?: unknown };
+    const b = new Error("B") as Error & { cause?: unknown };
+    a.cause = b;
+    b.cause = a; // cycle
+
+    expect(() =>
+      logError({ event: "loop_check", error: a }),
+    ).not.toThrow();
+  });
 });
 
 describe("redact + emit defensive guards (WR-D)", () => {
