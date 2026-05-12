@@ -100,11 +100,27 @@ export interface EnrichmentResult {
 /** Optional knobs for enrichCards -- backward compatible via default `{}`. */
 export interface EnrichmentOptions {
   /**
-   * Invoked once per card (processed OR skipped) in strict ascending order.
-   * The first argument is the number of cards processed so far (1-based) and
-   * the second is the total. Use this to drive a progress bar in the UI.
+   * Invoked once per card (processed OR skipped) in strict ascending order
+   * during the post-batch per-card loop, AND additionally once per batch
+   * during the upstream `/cards/collection` fetch phase (v1.3.2). The
+   * batch-phase callbacks fire with `done` increasing in 75-card increments
+   * (the Scryfall batch size) so the UI never sees a >2s silent prefix.
+   *
+   * The final per-card loop preserves the v1.3.0 strict-ascending invariant:
+   * exactly `cards.length` calls, monotone non-decreasing, ending at
+   * `(cards.length, cards.length)`.
    */
   onProgress?: (done: number, total: number) => void;
+  /**
+   * v1.3.2 — optional abort signal. When the route handler's request is
+   * aborted (client disconnects, page navigation, etc.), the per-card loop
+   * polls this signal and bails out cleanly without making more Scryfall
+   * calls. The batch-fetch phase already started before any abort can land,
+   * but the per-card fallback (rows without a Scryfall UUID) and any future
+   * sequential phase will respect it. This stops wasted compute and
+   * Scryfall rate-limit consumption on stage-1 stream halts.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -116,12 +132,27 @@ export interface EnrichmentOptions {
  * `fetchCardsByScryfallIds` for any row that has a `scryfallId` from the
  * Manabox CSV (the modern-export case). Rows without a Scryfall UUID fall
  * back to the legacy sequential `fetchCard(setCode, collectorNumber)` path.
- * For a 12,749-row real Manabox export this drops enrichment wall-time from
- * ~25-30 minutes to a few seconds, which keeps the import preview's NDJSON
- * stream alive under the Vercel function timeout.
  *
- * `onProgress` ordering invariant from v1.3.0 is preserved: callbacks fire
- * in strict ascending order, once per row, exactly `cards.length` times.
+ * v1.3.2 — Bug fixes on top of v1.3.1:
+ *   1. Batch fetch now drives `onProgress` as each /cards/collection batch
+ *      resolves (every ~120-1000ms) instead of being silent until the
+ *      entire batch fetch completes. The route handler's NDJSON stream
+ *      therefore emits a progress line every ~1s during the batch phase,
+ *      which prevents the operator UI from appearing stuck at 0%.
+ *   2. Concurrent batches are now serialized through a true critical-section
+ *      gate (the v1.3.1 module-level `lastRequestTime` check was a no-op
+ *      under concurrency — all 8 wave-mates read the same value and burst
+ *      together, triggering Scryfall 429s with Retry-After:60 every 3-4
+ *      waves). See `acquireGate` in `src/lib/scryfall.ts`.
+ *   3. Per-card fallback loop polls `opts.signal` so client disconnects
+ *      stop wasting compute + Scryfall budget.
+ *
+ * `onProgress` ordering invariant from v1.3.0 is preserved for the per-card
+ * phase: callbacks fire in strict ascending order from `(0+1, cards.length)`
+ * through `(cards.length, cards.length)`, exactly `cards.length` times. The
+ * batch-phase callbacks fire BEFORE the per-card phase and may report any
+ * `done` value in `[0, cards.length]`; the per-card phase then re-asserts
+ * monotonicity from the start of its own loop.
  */
 export async function enrichCards(
   cards: InventoryRow[],
@@ -138,15 +169,32 @@ export async function enrichCards(
   // v1.3.1 — pre-fetch all rows that carry a Scryfall UUID in one batched
   // collection call. Rows without a UUID fall through to the legacy
   // per-card lookup below.
+  //
+  // v1.3.2 — drive onProgress as batches resolve so the UI never sees a
+  // multi-minute silent prefix. We cap the reported `done` value at
+  // cards.length - 1 because the per-card loop below will fire the final
+  // `(cards.length, cards.length)` callback.
   const idsToFetch = cards
     .map((c) => c.scryfallId)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
+  let batchDoneEstimate = 0;
   const batchMap =
     idsToFetch.length > 0
-      ? await fetchCardsByScryfallIds(idsToFetch)
+      ? await fetchCardsByScryfallIds(idsToFetch, {
+          onBatchComplete: (batchCardCount) => {
+            batchDoneEstimate = Math.min(
+              batchDoneEstimate + batchCardCount,
+              Math.max(0, cards.length - 1),
+            );
+            opts.onProgress?.(batchDoneEstimate, cards.length);
+          },
+        })
       : new Map<string, ScryfallCard>();
 
   for (let i = 0; i < cards.length; i++) {
+    // v1.3.2 — bail out if the client disconnected mid-loop.
+    if (opts.signal?.aborted) break;
+
     const card = cards[i];
     let scryfallData: ScryfallCard | null = null;
     if (card.scryfallId && batchMap.has(card.scryfallId)) {

@@ -186,6 +186,9 @@ describe("POST /api/admin/import/preview", () => {
       IMPORT_FILE_FIELD,
       new File(["name,set_code\nA,lea"], "x.csv", { type: "text/csv" }),
     );
+    // v1.3.2 — stage-2 invocation: route handler only enriches when
+    // selectedBinders is present. sampleCard() defaults binder to 'unsorted'.
+    fd.append("selectedBinders", JSON.stringify(["unsorted"]));
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(200);
     expect(parseManaboxCsvContentsMock).toHaveBeenCalledWith([
@@ -261,6 +264,8 @@ describe("POST /api/admin/import/preview", () => {
       IMPORT_FILE_FIELD,
       new File(["x"], "x.csv", { type: "text/csv" }),
     );
+    // v1.3.2 — stage-2 invocation so the route actually calls enrichCards.
+    fd.append("selectedBinders", JSON.stringify(["unsorted"]));
     const res = await POST(makeRequest(fd));
     const msgs = await readStream(res);
     const errors = msgs.filter((m) => m.type === "error");
@@ -371,22 +376,26 @@ describe("POST /api/admin/import/preview", () => {
     expect(result.preview.cards.length).toBe(2);
   });
 
-  it("selectedBinders === undefined preserves legacy behavior (full enrichment)", async () => {
+  it("selectedBinders === undefined short-circuits after binders message (v1.3.2)", async () => {
+    // v1.3.2 — When the client omits selectedBinders, the route emits ONLY
+    // the binders message and closes the stream. This is the stage-1 flow
+    // from import-client.tsx (the client aborts after binders anyway). The
+    // pre-v1.3.2 behavior of running enrichCards over ALL parsed cards was
+    // wasteful: it burned Vercel function compute AND Scryfall rate-limit
+    // budget for the operator's IP, which then caused the subsequent
+    // stage-2 call to 429-stall and surface as a silent stuck-at-0% hang.
     requireAdminMock.mockResolvedValueOnce(adminOk());
     parseManaboxCsvContentsMock.mockReturnValueOnce(multiBinderFixture());
-    enrichCardsMock.mockImplementationOnce(async (cards) => ({
-      cards,
-      stats: { processed: cards.length, skipped: 0, missingPrices: 0 },
-      scryfallMisses: [],
-    }));
+
     const fd = new FormData();
     fd.append(IMPORT_FILE_FIELD, new File(["x"], "x.csv", { type: "text/csv" }));
-    // NO selectedBinders field — legacy single-stage flow.
+    // NO selectedBinders field — stage-1 flow.
 
     const res = await POST(makeRequest(fd));
     expect(res.status).toBe(200);
-    const cardsArg = enrichCardsMock.mock.calls[0][0] as InventoryRow[];
-    expect(cardsArg.length).toBe(6); // all 6 cards
+    const msgs = await readStream(res);
+    expect(msgs.map((m) => m.type)).toEqual(["binders"]);
+    expect(enrichCardsMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 for selectedBinders entry that is not normalized (Phase 19 D-16)", async () => {

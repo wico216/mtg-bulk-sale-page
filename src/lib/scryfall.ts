@@ -91,16 +91,41 @@ export async function fetchCard(
 }
 
 // v1.3.1 — Scryfall /cards/collection batch endpoint.
-// Up to 75 identifiers per POST; we fire up to 8 batches in parallel.
-// For the operator's 12,749-row real export this is roughly 170 batches in
-// 22 concurrent waves -> ~3-5 seconds wall time vs ~25-30 minutes sequentially.
+// Up to 75 identifiers per POST. v1.3.2 reduces concurrency from 8 to 4 and
+// serializes concurrent batches through a true critical-section gate (a chained
+// promise) so we never burst above Scryfall's documented ~10 req/sec ceiling.
 // Manabox CSV exports already carry the Scryfall UUID per row, so this skips
 // the (setCode, collectorNumber) name-lookup layer entirely.
 const COLLECTION_BATCH_SIZE = 75;
-const COLLECTION_CONCURRENCY = 8;
+const COLLECTION_CONCURRENCY = 4;
+// v1.3.2 — empirically, sustained ≥6 req/sec to /cards/collection earns a 429
+// with Retry-After:60 from Scryfall every 25-30 successful requests. 250ms
+// minimum spacing → ~4 req/sec sustained, which is well under the trigger
+// threshold AND amortizes nicely: 75 cards/batch × 4 batches/sec = 300
+// cards/sec, so a 7,700-unique-id cold-cache enrichment finishes in ~26s.
+// The per-card endpoint keeps RATE_LIMIT_MS=120 because it's only used as a
+// fallback for legacy CSVs (≤200 rows in practice) and the single-card load
+// pattern is well under any burst threshold.
+const COLLECTION_RATE_LIMIT_MS = 250;
 
 interface ScryfallCardWithId extends ScryfallCard {
   id?: string;
+}
+
+// v1.3.2 — true critical-section gate. Each call to `acquireGate` chains onto
+// the previous gate's resolution, then sleeps COLLECTION_RATE_LIMIT_MS before
+// resolving the next caller. Under N concurrent callers this guarantees the
+// i-th request fires no earlier than `i * COLLECTION_RATE_LIMIT_MS` after the
+// first — exactly the serialization the broken `lastRequestTime` check in
+// v1.3.1 was supposed to provide (it was a no-op because 8 concurrent callers
+// all read the same `lastRequestTime`, all passed the elapsed-check, and all
+// fired their requests in parallel).
+let gateChain: Promise<void> = Promise.resolve();
+function acquireGate(): Promise<void> {
+  const next = gateChain.then(() => sleep(COLLECTION_RATE_LIMIT_MS));
+  // Swallow rejections so a single failing waiter doesn't poison the chain.
+  gateChain = next.catch(() => undefined);
+  return next;
 }
 
 async function fetchCollectionBatch(
@@ -113,13 +138,11 @@ async function fetchCollectionBatch(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      // Same 120ms minimum gate as the per-card path so concurrent batches
-      // serialize through the rate limiter and we never burst.
-      const elapsed = Date.now() - lastRequestTime;
-      if (elapsed < RATE_LIMIT_MS) {
-        await sleep(RATE_LIMIT_MS - elapsed);
-      }
-      lastRequestTime = Date.now();
+      // v1.3.2 — serialize this batch behind every prior in-flight batch via
+      // the gate chain. Replaces the v1.3.1 read-then-write `lastRequestTime`
+      // check which was a no-op under concurrency (8 callers read the same
+      // value, all passed the elapsed check, all fired in parallel).
+      await acquireGate();
 
       const response = await fetch(url, {
         method: "POST",
@@ -174,6 +197,17 @@ async function fetchCollectionBatch(
 }
 
 /**
+ * Optional callback invoked after each batch resolves. `batchCardCount` is
+ * the number of Scryfall IDs in the batch that just completed (whether the
+ * Scryfall API returned them or not — it represents PROGRESS not RESOLUTION).
+ * Used by `enrichCards` to drive the import-preview NDJSON progress stream
+ * during the batch-fetch phase, so the UI is never silent for >2s.
+ */
+export interface FetchCollectionOptions {
+  onBatchComplete?: (batchCardCount: number) => void;
+}
+
+/**
  * Batch-fetch Scryfall cards by their Scryfall UUIDs.
  *
  * Returns a Map keyed by Scryfall ID; ids that Scryfall returns as `not_found`
@@ -183,9 +217,15 @@ async function fetchCollectionBatch(
  * Cache key is `id-${scryfallId}` (separate namespace from the per-card
  * `${setCode}-${collectorNumber}` cache used by `fetchCard`, so the two paths
  * do not collide).
+ *
+ * v1.3.2 — accepts `opts.onBatchComplete` so callers can render incremental
+ * progress as batches resolve (the v1.3.1 implementation was silent until the
+ * entire batch fetch resolved, which is up to 30s wall-time even on the happy
+ * path for a 12,471-row Manabox export).
  */
 export async function fetchCardsByScryfallIds(
   ids: string[],
+  opts: FetchCollectionOptions = {},
 ): Promise<Map<string, ScryfallCard>> {
   const result = new Map<string, ScryfallCard>();
   if (ids.length === 0) return result;
@@ -210,11 +250,20 @@ export async function fetchCardsByScryfallIds(
     batches.push(uncached.slice(i, i + COLLECTION_BATCH_SIZE));
   }
 
-  // Process batches in concurrent waves (up to 8 in flight at once).
+  // Process batches in concurrent waves (COLLECTION_CONCURRENCY=4). Within a
+  // wave, batches still serialize through `acquireGate()` so we get a steady
+  // ~8 req/sec instead of bursting 4 in <100ms. The Promise.all join is
+  // primarily useful for amortizing network latency variance.
   for (let i = 0; i < batches.length; i += COLLECTION_CONCURRENCY) {
     const wave = batches.slice(i, i + COLLECTION_CONCURRENCY);
     const responses = await Promise.all(
-      wave.map((batch) => fetchCollectionBatch(batch)),
+      wave.map(async (batch) => {
+        const cards = await fetchCollectionBatch(batch);
+        // Fire batch-complete progress callback as each batch resolves, so the
+        // route handler can emit a progress NDJSON line for the operator UI.
+        opts.onBatchComplete?.(batch.length);
+        return cards;
+      }),
     );
     for (const cards of responses) {
       for (const card of cards) {

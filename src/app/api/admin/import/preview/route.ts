@@ -186,17 +186,57 @@ export async function POST(request: Request): Promise<Response> {
     ? parsed.cards.filter((c) => selectedBinders!.includes(c.binder))
     : parsed.cards;
 
+  // v1.3.2 — On stage-1 calls (selectedBinders === undefined), the client
+  // aborts the stream right after receiving the `binders` message. The v1.3.1
+  // route handler did NOT check request.signal, so the server kept
+  // wastefully enriching all 12k+ cards in the background, burned through
+  // Scryfall's rate limit budget for the source IP, and then the stage-2
+  // call (with selectedBinders set) also got 429-blackholed and never
+  // produced a `result` message — exactly the silent-stuck-at-0% symptom.
+  //
+  // We now check request.signal between every batch step. The send() helper
+  // also returns false when the stream is already closed so we can break
+  // out of the enrichment loop cleanly.
+  const isStageOne = selectedBinders === undefined;
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (msg: ImportStreamMessage) => {
-        controller.enqueue(encoder.encode(JSON.stringify(msg) + "\n"));
+      let streamClosed = false;
+      const send = (msg: ImportStreamMessage): boolean => {
+        if (streamClosed || request.signal.aborted) return false;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(msg) + "\n"));
+          return true;
+        } catch {
+          streamClosed = true;
+          return false;
+        }
       };
+
+      // Propagate client aborts: as soon as the client disconnects we mark
+      // the stream as closed so the enrichment loop sees the signal on its
+      // next poll and bails out without making more Scryfall calls.
+      const onAbort = () => {
+        streamClosed = true;
+      };
+      request.signal.addEventListener("abort", onAbort);
 
       try {
         // FIRST: binders message (D-01 — fires after parse, BEFORE
         // any progress/enrichment). Always sent.
         send({ type: "binders", binders: bindersSummary });
+
+        // v1.3.2 — On stage-1 calls, the client only wants the binders
+        // message. The previous implementation kept enriching, which (a)
+        // wasted compute and (b) burned through Scryfall's rate limit
+        // budget for the operator's IP, breaking the subsequent stage-2
+        // call. Now we close the stream after the binders message on
+        // stage-1 calls. The client already aborts; this just makes the
+        // server explicit about it.
+        if (isStageOne) {
+          return;
+        }
 
         const total = cardsToEnrich.length;
         send({ type: "progress", done: 0, total, stage: "enrich" });
@@ -209,7 +249,16 @@ export async function POST(request: Request): Promise<Response> {
           onProgress: (done, totalCount) => {
             send({ type: "progress", done, total: totalCount, stage: "enrich" });
           },
+          // v1.3.2 — abort signal propagation: enrichCards polls this before
+          // every Scryfall round-trip so an aborted client stops costing us
+          // compute and rate-limit budget.
+          signal: request.signal,
         });
+
+        // If the client aborted mid-enrichment, do not emit a `result` —
+        // there's nothing to receive it and we'd just be queuing into a
+        // dead stream.
+        if (request.signal.aborted || streamClosed) return;
 
         const preview: PreviewPayload = {
           toImport: enriched.length,
@@ -247,8 +296,17 @@ export async function POST(request: Request): Promise<Response> {
             err instanceof Error ? err.message : "Unknown enrichment error",
         });
       } finally {
-        controller.close();
+        request.signal.removeEventListener("abort", onAbort);
+        try {
+          controller.close();
+        } catch {
+          // Already closed (likely by the abort path). Safe to ignore.
+        }
       }
+    },
+    cancel() {
+      // The reader was cancelled (client disconnected). Nothing extra to do
+      // — the abort signal handler above already marks the stream closed.
     },
   });
 
