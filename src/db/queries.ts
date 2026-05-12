@@ -156,9 +156,17 @@ export async function getCardById(id: string): Promise<InventoryRow | null> {
  *     use `MAX(...)` because they are identical across binder rows of the
  *     same logical card (Scryfall enriches on (setCode, collectorNumber)).
  *     MAX gives a deterministic representative.
- *   - `colorIdentity` is `text[]`. `(ARRAY_AGG(color_identity ORDER BY
- *     binder))[1]` picks the first binder's array — deterministic and
- *     identical across rows for the same logical card.
+ *   - `colorIdentity` is `text[]`. `MAX(color_identity)` is deterministic
+ *     because every row in a `(setCode, collectorNumber, finish, condition)`
+ *     group is the same Oracle card, so all `color_identity` values match.
+ *     v1.3.3 hotfix: we previously used
+ *     `(ARRAY_AGG(color_identity ORDER BY binder))[1]` but Postgres errors
+ *     `cannot accumulate empty arrays` (SQLSTATE 2202E) whenever ANY row in
+ *     the group has `color_identity = '{}'` (artifacts, Wastes, devoid /
+ *     eldrazi, etc.). `MAX` on `text[]` uses element-wise lexicographic
+ *     comparison and tolerates empty arrays; if a group is mixed empty/
+ *     non-empty the non-empty array wins, which is also defensively safer
+ *     than returning `{}` when real color data exists.
  *   - `AVG(price)::int` rounds toward zero per Postgres `::int` cast and
  *     ignores NULL prices. If every binder price is NULL the result is
  *     NULL and rowToAggregatedCard preserves null.
@@ -176,7 +184,7 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
       AVG(price)::int                                                            AS "price",
       condition                                                                  AS "condition",
       SUM(quantity)::int                                                         AS "quantity",
-      (ARRAY_AGG(color_identity ORDER BY binder))[1]                             AS "colorIdentity",
+      MAX(color_identity)                                                        AS "colorIdentity",
       MAX(image_url)                                                             AS "imageUrl",
       MAX(oracle_text)                                                           AS "oracleText",
       MAX(rarity)                                                                AS "rarity",
