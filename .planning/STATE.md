@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T10:15:00.000Z"
-last_activity: 2026-05-14 — buyer_phone slice shipped + prod migration applied (orders.buyer_phone column live, 1 existing order row preserved with NULL phone)
+last_updated: "2026-05-14T10:37:56.000Z"
+last_activity: 2026-05-14 — Quick task 260514-95g completed: storefront Set filter search is now the first set-list row and clears after selection
 progress:
   total_phases: 22
   completed_phases: 21
@@ -124,3 +124,10 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 ## Recently Completed
 
 - 2026-05-14 — Quick task 260514-7z2 (buyer_phone end-to-end): code shipped via b17ec52..d101581; prod migration applied (`orders.buyer_phone` column live, 1 existing row preserved with NULL phone, idempotent re-run verified).
+- 2026-05-14 — Quick task 260514-95g: storefront Set filter search moved into the set list and clears after selecting a set; code commit `8038d84`.
+
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260514-95g | Add a searchable first row to the storefront set filter and clear the set search after selecting a set | 2026-05-14 | 8038d84 | [260514-95g-add-a-searchable-first-row-to-the-storef](./quick/260514-95g-add-a-searchable-first-row-to-the-storef/) |
