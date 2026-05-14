@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getAdminOrders, type OrderStatus } from "@/db/orders";
+import {
+  getAdminOrders,
+  getAdminOrderStatusCounts,
+  type OrderStatus,
+} from "@/db/orders";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { OrdersTable } from "./_components/orders-table";
 
 export const metadata: Metadata = {
-  title: "Orders -- Viki MTG Bulk Store",
+  title: "Orders · Viki MTG Bulk Store",
 };
 
 export const dynamic = "force-dynamic";
@@ -61,63 +65,98 @@ export default async function AdminOrdersPage({
   const status = parseStatus(firstParam(resolvedSearchParams.status));
 
   try {
-    const result = await getAdminOrders({
-      page,
-      limit: 25,
-      ...(q ? { q } : {}),
-      ...(status !== "all" ? { status } : {}),
-    });
+    const [result, counts] = await Promise.all([
+      getAdminOrders({
+        page,
+        limit: 25,
+        ...(q ? { q } : {}),
+        ...(status !== "all" ? { status } : {}),
+      }),
+      getAdminOrderStatusCounts({ ...(q ? { q } : {}) }),
+    ]);
 
     return (
-      <div>
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Orders</h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Review checkout history, find buyers, and manage order workflow.
+            <h1
+              className="text-2xl font-semibold tracking-tight"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "var(--ink)",
+              }}
+            >
+              Orders
+            </h1>
+            <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+              Review checkout history, find buyers, and manage workflow.
             </p>
           </div>
 
-          <form action="/admin/orders" className="flex flex-col gap-2 sm:flex-row">
+          <form
+            action="/admin/orders"
+            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+          >
             <label className="sr-only" htmlFor="q">
               Search orders
             </label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q ?? ""}
-              placeholder="Search ref, buyer, or email..."
-              className="min-w-[260px] rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            />
-
-            <label className="sr-only" htmlFor="status">
-              Filter by status
-            </label>
-            <select
-              id="status"
-              name="status"
-              defaultValue={status}
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-
+            <div className="relative">
+              <svg
+                aria-hidden="true"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                style={{ color: "var(--muted)" }}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"
+                />
+              </svg>
+              <input
+                id="q"
+                name="q"
+                type="search"
+                defaultValue={q ?? ""}
+                placeholder="Search ref, buyer, or email…"
+                className="w-full min-w-[240px] rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none"
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--ink)",
+                }}
+              />
+            </div>
+            {/* Hidden field preserves the active status when re-submitting the
+                search form. Status itself is changed via the OrdersTable
+                StatusTabs (links, not form submission). */}
+            {status !== "all" && (
+              <input type="hidden" name="status" value={status} />
+            )}
             <button
               type="submit"
-              className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-hover"
+              className="rounded-md px-4 py-2 text-sm font-semibold transition-colors"
+              style={{
+                background: "var(--accent)",
+                color: "var(--accent-fg)",
+              }}
             >
-              Filter
+              Search
             </button>
-
-            {(q || status !== "all") && (
+            {q && (
               <a
-                href="/admin/orders"
-                className="rounded-md border border-zinc-300 px-4 py-2 text-center text-sm font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                href={
+                  status === "all" ? "/admin/orders" : `/admin/orders?status=${status}`
+                }
+                className="rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  color: "var(--muted)",
+                }}
               >
                 Clear
               </a>
@@ -125,15 +164,30 @@ export default async function AdminOrdersPage({
           </form>
         </div>
 
-        <OrdersTable result={result} q={q} status={status} />
+        <OrdersTable result={result} counts={counts} q={q} status={status} />
       </div>
     );
   } catch (error) {
     console.error("[ADMIN ORDERS] Failed to load orders:", error);
     return (
       <div>
-        <h1 className="mb-6 text-xl font-semibold">Orders</h1>
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
+        <h1
+          className="text-2xl font-semibold tracking-tight mb-4"
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "var(--ink)",
+          }}
+        >
+          Orders
+        </h1>
+        <div
+          className="rounded-md p-4 text-sm"
+          style={{
+            background: "rgb(220 38 38 / 0.08)",
+            borderLeft: "3px solid rgb(220 38 38)",
+            color: "var(--ink)",
+          }}
+        >
           Failed to load orders. Try refreshing the page.
         </div>
       </div>

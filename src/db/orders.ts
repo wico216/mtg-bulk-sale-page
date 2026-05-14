@@ -680,6 +680,44 @@ export async function getAdminOrders(
   };
 }
 
+export type AdminOrderStatusCounts = Record<OrderStatus, number> & {
+  all: number;
+};
+
+/**
+ * Aggregate count of orders per status. Honours an optional `q` search filter
+ * (same buyer_name / buyer_email / id search as getAdminOrders) so the tab
+ * counts in the admin orders UI reflect the active text-search context.
+ *
+ * Returns 0 for any status with no matching orders. `all` is the SUM across
+ * statuses.
+ */
+export async function getAdminOrderStatusCounts(
+  params: Pick<AdminOrdersParams, "q"> = {},
+): Promise<AdminOrderStatusCounts> {
+  const whereClause = buildOrderFilters({ q: params.q });
+  const result = await db.execute<{ status: OrderStatus; n: number | string }>(sql`
+    SELECT status, COUNT(*)::integer AS n
+    FROM orders
+    ${whereClause}
+    GROUP BY status
+  `);
+
+  const counts: AdminOrderStatusCounts = {
+    all: 0,
+    pending: 0,
+    confirmed: 0,
+    completed: 0,
+    cancelled: 0,
+  };
+  for (const row of result.rows) {
+    const n = numberFromDb(row.n);
+    counts[row.status] = n;
+    counts.all += n;
+  }
+  return counts;
+}
+
 export async function getOrderById(
   id: string,
 ): Promise<AdminOrderDetail | null> {
