@@ -389,64 +389,13 @@ function SetFilter({
     if (!needle) return sets;
     return sets.filter((s) => s.toLowerCase().includes(needle));
   }, [sets, q]);
+  const handleSetToggle = (setName: string) => {
+    onToggle(setName);
+    setQ("");
+  };
 
   return (
     <div>
-      <div style={{ position: "relative", marginBottom: 8 }}>
-        <span
-          style={{
-            position: "absolute",
-            left: 8,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: "var(--muted)",
-            lineHeight: 0,
-          }}
-        >
-          <IconSearch size={12} />
-        </span>
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search sets"
-          style={{
-            width: "100%",
-            padding: "6px 8px 6px 26px",
-            fontSize: 12,
-            border: "1px solid var(--border)",
-            borderRadius: 3,
-            background: "var(--surface-2)",
-            color: "var(--ink)",
-            outline: "none",
-            fontFamily: "inherit",
-            boxSizing: "border-box",
-          }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-        />
-        {q && (
-          <button
-            type="button"
-            onClick={() => setQ("")}
-            aria-label="Clear set search"
-            style={{
-              position: "absolute",
-              right: 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              background: "none",
-              border: "none",
-              color: "var(--muted)",
-              cursor: "pointer",
-              padding: 4,
-              lineHeight: 0,
-            }}
-          >
-            <IconX size={12} />
-          </button>
-        )}
-      </div>
       <div
         style={{
           display: "flex",
@@ -456,6 +405,71 @@ function SetFilter({
           paddingRight: 4,
         }}
       >
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 1,
+            paddingBottom: 8,
+            background: "var(--bg)",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <span
+              style={{
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--muted)",
+                lineHeight: 0,
+              }}
+            >
+              <IconSearch size={12} />
+            </span>
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search sets"
+              style={{
+                width: "100%",
+                padding: "6px 26px 6px 26px",
+                fontSize: 12,
+                border: "1px solid var(--border)",
+                borderRadius: 3,
+                background: "var(--surface-2)",
+                color: "var(--ink)",
+                outline: "none",
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                aria-label="Clear set search"
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "var(--muted)",
+                  cursor: "pointer",
+                  padding: 4,
+                  lineHeight: 0,
+                }}
+              >
+                <IconX size={12} />
+              </button>
+            )}
+          </div>
+        </div>
         {filtered.length === 0 ? (
           <p style={{ margin: "8px 0", fontSize: 11, color: "var(--muted)" }}>No sets match.</p>
         ) : (
@@ -465,7 +479,7 @@ function SetFilter({
               label={s}
               count={counts[s]}
               checked={selected.has(s)}
-              onToggle={() => onToggle(s)}
+              onToggle={() => handleSetToggle(s)}
             />
           ))
         )}
