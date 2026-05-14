@@ -100,6 +100,24 @@ describe("enrichCards onProgress + scryfallMisses", () => {
     expect(result.cards[0].manaValue).toBe(2);
   });
 
+  it("derives mana value from face mana costs when Scryfall omits top-level cmc", async () => {
+    vi.mocked(fetchCard).mockResolvedValueOnce(
+      makeScryfallCard({
+        cmc: undefined,
+        type_line: undefined,
+        card_faces: [
+          { name: "Front", type_line: "Creature — Dragon", mana_cost: "{3}{G}{G}" },
+          { name: "Back", type_line: "Sorcery — Omen", mana_cost: "{2}{G}" },
+        ],
+      }),
+    );
+
+    const result = await enrichCards([makeCard()]);
+
+    expect(result.cards[0].typeLine).toBe("Creature — Dragon // Sorcery — Omen");
+    expect(result.cards[0].manaValue).toBe(5);
+  });
+
   it("populates scryfallMisses for cards fetchCard returns null for; those cards are excluded from cards[] (Test C)", async () => {
     vi.mocked(fetchCard)
       .mockResolvedValueOnce(makeScryfallCard())

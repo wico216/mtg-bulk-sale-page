@@ -59,6 +59,36 @@ function getTypeLine(card: ScryfallCard): string | null {
   return null;
 }
 
+function parseManaCostValue(manaCost: string): number {
+  const symbols = manaCost.match(/\{([^}]+)\}/g) ?? [];
+  return symbols.reduce((total, symbol) => {
+    const raw = symbol.slice(1, -1);
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) return total + numeric;
+    if (raw === "X" || raw === "Y" || raw === "Z") return total;
+    const hybridNumeric = Number(raw.split("/")[0]);
+    if (Number.isFinite(hybridNumeric)) return total + hybridNumeric;
+    return total + 1;
+  }, 0);
+}
+
+function getManaValue(card: ScryfallCard): number | null {
+  if (typeof card.cmc === "number") {
+    return card.cmc;
+  }
+
+  const faceValues =
+    card.card_faces
+      ?.map((face) =>
+        typeof face.mana_cost === "string"
+          ? parseManaCostValue(face.mana_cost)
+          : null,
+      )
+      .filter((value): value is number => value != null) ?? [];
+
+  return faceValues.length > 0 ? Math.max(...faceValues) : null;
+}
+
 /**
  * Extract USD price preferring the printing finish that matches the listing.
  *
@@ -242,7 +272,7 @@ export async function enrichCards(
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);
     card.typeLine = getTypeLine(scryfallData);
-    card.manaValue = typeof scryfallData.cmc === "number" ? scryfallData.cmc : null;
+    card.manaValue = getManaValue(scryfallData);
 
     if (card.price === null) {
       stats.missingPrices++;
