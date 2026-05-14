@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/lib/store/cart-store";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
@@ -107,12 +107,11 @@ function IconMoon({ size = 16 }: { size?: number }) {
 function useMode(): [Mode, () => void] {
   // Dark is the SSR-stamped default; the flash-guard in layout.tsx swaps to
   // the stored mode before hydration.
-  const [mode, setMode] = useState<Mode>("dark");
-
-  useEffect(() => {
+  const [mode, setMode] = useState<Mode>(() => {
+    if (typeof document === "undefined") return "dark";
     const current = document.documentElement.getAttribute("data-mode");
-    if (current === "light" || current === "dark") setMode(current);
-  }, []);
+    return current === "light" || current === "dark" ? current : "dark";
+  });
 
   const toggle = () => {
     setMode((m) => {
@@ -132,7 +131,9 @@ function useMode(): [Mode, () => void] {
 
 export default function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
-  const [cartHydrated, setCartHydrated] = useState(false);
+  const [cartHydrated, setCartHydrated] = useState(
+    () => typeof window !== "undefined" && useCartStore.persist.hasHydrated(),
+  );
   const [showLogin, setShowLogin] = useState(false);
   const [mode, toggleMode] = useMode();
 
@@ -140,9 +141,15 @@ export default function Header() {
     const unsub = useCartStore.persist.onFinishHydration(() =>
       setCartHydrated(true),
     );
-    if (useCartStore.persist.hasHydrated()) setCartHydrated(true);
     return unsub;
   }, []);
+
+  const handleBrandClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (window.location.pathname === "/") {
+      event.preventDefault();
+      window.location.reload();
+    }
+  };
 
   return (
     <>
@@ -168,6 +175,7 @@ export default function Header() {
           href="/"
           aria-label="Wiko's Spellbook home"
           className="wiko-header-brand"
+          onClick={handleBrandClick}
           style={{
             display: "flex",
             alignItems: "center",
