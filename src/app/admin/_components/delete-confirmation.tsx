@@ -23,32 +23,43 @@ export function DeleteConfirmation({
     <div
       role="alertdialog"
       aria-label={`Confirm deletion of ${cardName}`}
-      className="flex items-center justify-between px-4 py-2"
+      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+      style={{
+        background: "rgb(220 38 38 / 0.08)",
+        borderLeft: "2px solid rgb(248 113 113)",
+      }}
     >
       <div>
-        <span className="text-sm font-semibold">
+        <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
           Delete {cardName}?
         </span>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-0.5 text-xs" style={{ color: "var(--muted)" }}>
           Export first if you need a backup. A successful delete is recorded in Audit.
         </p>
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className={`px-3 py-1 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors ${
-            deleting ? "opacity-70 cursor-not-allowed" : ""
-          }`}
-        >
-          {deleting ? "Deleting..." : "Delete Card"}
-        </button>
-        <button
           onClick={onCancel}
           disabled={deleting}
-          className="px-3 py-1 text-sm font-semibold rounded-md border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="px-3 py-1 text-xs font-semibold rounded-md transition-colors disabled:opacity-50"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            color: "var(--ink)",
+          }}
         >
-          Keep Card
+          Keep
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="px-3 py-1 text-xs font-semibold rounded-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          style={{
+            background: "rgb(220 38 38)",
+            color: "white",
+          }}
+        >
+          {deleting ? "Deleting…" : "Delete"}
         </button>
       </div>
     </div>

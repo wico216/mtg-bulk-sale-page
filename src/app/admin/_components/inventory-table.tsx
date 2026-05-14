@@ -411,14 +411,19 @@ export function InventoryTable() {
   const deleteSelectedConfirmation = confirmingDeleteSelected ? (
     <div
       role="alert"
-      className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300"
+      className="mb-4 rounded-md p-4 text-sm"
+      style={{
+        background: "rgb(220 38 38 / 0.08)",
+        borderLeft: "3px solid rgb(248 113 113)",
+        color: "var(--ink)",
+      }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">
             Delete {selectedCardIds.length} selected {selectedCardIds.length === 1 ? "card" : "cards"}?
           </p>
-          <p className="mt-1 text-red-600 dark:text-red-400">
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
             This removes only the selected rows. Export first if you need a backup; successful deletion is recorded in Audit.
           </p>
         </div>
@@ -427,7 +432,12 @@ export function InventoryTable() {
             type="button"
             onClick={() => setConfirmingDeleteSelected(false)}
             disabled={deletingSelected}
-            className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              color: "var(--ink)",
+            }}
           >
             Cancel
           </button>
@@ -435,9 +445,10 @@ export function InventoryTable() {
             type="button"
             onClick={handleDeleteSelected}
             disabled={deletingSelected}
-            className="rounded-md bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "rgb(220 38 38)", color: "white" }}
           >
-            {deletingSelected ? "Deleting selected..." : `Delete ${selectedCardIds.length} selected`}
+            {deletingSelected ? "Deleting…" : `Delete ${selectedCardIds.length}`}
           </button>
         </div>
       </div>
@@ -447,12 +458,19 @@ export function InventoryTable() {
   const deleteAllConfirmation = confirmingDeleteAll ? (
     <div
       role="alert"
-      className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300"
+      className="mb-4 rounded-md p-4 text-sm"
+      style={{
+        background: "rgb(220 38 38 / 0.1)",
+        borderLeft: "3px solid rgb(220 38 38)",
+        color: "var(--ink)",
+      }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-semibold">Delete all {inventoryTotal} cards from inventory?</p>
-          <p className="mt-1 text-red-600 dark:text-red-400">
+          <p className="font-semibold">
+            Delete all {inventoryTotal.toLocaleString()} cards from inventory?
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
             This empties the storefront until you import a new CSV. Export first if you need a backup; successful deletion is recorded in Audit.
           </p>
         </div>
@@ -461,7 +479,12 @@ export function InventoryTable() {
             type="button"
             onClick={() => setConfirmingDeleteAll(false)}
             disabled={deletingAll}
-            className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              color: "var(--ink)",
+            }}
           >
             Cancel
           </button>
@@ -469,9 +492,12 @@ export function InventoryTable() {
             type="button"
             onClick={handleDeleteAll}
             disabled={deletingAll}
-            className="rounded-md bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "rgb(220 38 38)", color: "white" }}
           >
-            {deletingAll ? "Deleting..." : `Delete ${inventoryTotal} cards`}
+            {deletingAll
+              ? "Deleting…"
+              : `Delete ${inventoryTotal.toLocaleString()}`}
           </button>
         </div>
       </div>
@@ -496,7 +522,8 @@ export function InventoryTable() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded h-10 w-full"
+            className="animate-pulse rounded h-12 w-full"
+            style={{ background: "var(--surface)" }}
           />
         ))}
       </div>
@@ -506,7 +533,14 @@ export function InventoryTable() {
   // Error state
   if (error && cards.length === 0) {
     return (
-      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-4 text-sm text-red-600 dark:text-red-400">
+      <div
+        className="rounded-md p-4 text-sm"
+        style={{
+          background: "rgb(220 38 38 / 0.08)",
+          borderLeft: "3px solid rgb(220 38 38)",
+          color: "var(--ink)",
+        }}
+      >
         Failed to load inventory. Try refreshing the page.
       </div>
     );
@@ -537,12 +571,27 @@ export function InventoryTable() {
             selectedCount={selectedCardIds.length}
             deletingSelected={deletingSelected}
             onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
+            inventoryTotal={inventoryTotal}
           />
           {deleteSelectedConfirmation}
           {deleteAllConfirmation}
-          <div className="text-center py-12">
-            <h2 className="text-lg font-semibold">No cards found</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          <div
+            className="text-center py-16 rounded-lg"
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--ink)" }}
+            >
+              No cards match your filters
+            </h2>
+            <p
+              className="text-sm mt-2"
+              style={{ color: "var(--muted)" }}
+            >
               Try a different search term or clear your filters.
             </p>
             <button
@@ -552,7 +601,8 @@ export function InventoryTable() {
                 setConditionFilter("");
                 setBinderFilter("");
               }}
-              className="mt-3 text-sm text-accent hover:text-accent-hover font-semibold"
+              className="mt-4 inline-block text-sm font-semibold underline-offset-2 hover:underline"
+              style={{ color: "var(--accent)" }}
             >
               Clear filters
             </button>
@@ -582,14 +632,42 @@ export function InventoryTable() {
           selectedCount={selectedCardIds.length}
           deletingSelected={deletingSelected}
           onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
+          inventoryTotal={inventoryTotal}
         />
         {deleteSelectedConfirmation}
         {deleteAllConfirmation}
-        <div className="text-center py-12">
-          <h2 className="text-lg font-semibold">No cards in inventory</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+        <div
+          className="text-center py-20 rounded-lg"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div
+            className="text-4xl mb-2"
+            style={{ color: "var(--accent)", opacity: 0.6 }}
+          >
+            ✦
+          </div>
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--ink)" }}
+          >
+            No cards in inventory
+          </h2>
+          <p className="text-sm mt-2" style={{ color: "var(--muted)" }}>
             Import a CSV file to add cards to your store.
           </p>
+          <a
+            href="/admin/import"
+            className="mt-4 inline-block rounded-md px-4 py-2 text-sm font-semibold transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--accent-fg)",
+            }}
+          >
+            Import CSV
+          </a>
         </div>
         {toastElement}
       </>
@@ -617,15 +695,28 @@ export function InventoryTable() {
         selectedCount={selectedCardIds.length}
         deletingSelected={deletingSelected}
         onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
+        inventoryTotal={inventoryTotal}
       />
       {deleteSelectedConfirmation}
       {deleteAllConfirmation}
 
-      <div className="w-full overflow-x-auto">
+      <div
+        className="w-full overflow-x-auto rounded-lg"
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+        }}
+      >
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-zinc-50 dark:bg-zinc-800 text-left">
-              <th className="w-10 px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+            <tr
+              className="text-left"
+              style={{
+                background: "var(--surface-2)",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <th className="w-10 px-4 py-3">
                 <SelectAllCheckbox
                   checked={allCurrentPageSelected}
                   indeterminate={someCurrentPageSelected}
@@ -633,58 +724,81 @@ export function InventoryTable() {
                   onChange={toggleCurrentPageSelection}
                 />
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-12">
-                Img
+              <th
+                className="px-2 py-3 text-[11px] font-semibold uppercase tracking-wider w-12"
+                style={{ color: "var(--muted)" }}
+              >
+                <span className="sr-only">Image</span>
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 min-w-[160px]">
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider min-w-[160px]"
+                style={{ color: "var(--muted)" }}
+              >
                 <button
                   onClick={() => handleSort("name")}
                   aria-sort={getSortState("name")}
-                  className={`cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-200 ${
-                    sortBy === "name" ? "text-accent" : ""
-                  }`}
+                  className="transition-colors"
+                  style={{
+                    color: sortBy === "name" ? "var(--accent)" : "var(--muted)",
+                  }}
                 >
                   Name
                   {sortBy === "name" && <SortArrow direction={sortDir} />}
                 </button>
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-20">
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-20"
+                style={{ color: "var(--muted)" }}
+              >
                 Set
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-20">
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-24"
+                style={{ color: "var(--muted)" }}
+              >
                 <button
                   onClick={() => handleSort("price")}
                   aria-sort={getSortState("price")}
-                  className={`cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-200 ${
-                    sortBy === "price" ? "text-accent" : ""
-                  }`}
+                  className="transition-colors"
+                  style={{
+                    color: sortBy === "price" ? "var(--accent)" : "var(--muted)",
+                  }}
                 >
                   Price
                   {sortBy === "price" && <SortArrow direction={sortDir} />}
                 </button>
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-16">
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-16"
+                style={{ color: "var(--muted)" }}
+              >
                 Cond
               </th>
-              {/* Phase 21 D-01: Binder column placement after Cond before Qty.
-                  w-24 chosen as compact-but-readable middle ground (the Set
-                  column uses w-20 but binder names like 'unsorted' are longer). */}
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-24">
+              {/* Phase 21 D-01: Binder column placement after Cond before Qty. */}
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-28"
+                style={{ color: "var(--muted)" }}
+              >
                 Binder
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-14">
+              <th
+                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-20"
+                style={{ color: "var(--muted)" }}
+              >
                 <button
                   onClick={() => handleSort("quantity")}
                   aria-sort={getSortState("quantity")}
-                  className={`cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-200 ${
-                    sortBy === "quantity" ? "text-accent" : ""
-                  }`}
+                  className="transition-colors"
+                  style={{
+                    color:
+                      sortBy === "quantity" ? "var(--accent)" : "var(--muted)",
+                  }}
                 >
                   Qty
                   {sortBy === "quantity" && <SortArrow direction={sortDir} />}
                 </button>
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400 w-12">
+              <th className="px-3 py-3 w-12">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -695,7 +809,9 @@ export function InventoryTable() {
                 return (
                   <tr
                     key={card.id}
-                    className="bg-red-50 dark:bg-red-950/20 border-b border-zinc-100 dark:border-zinc-800"
+                    style={{
+                      borderBottom: "1px solid var(--border)",
+                    }}
                   >
                     {/* Phase 21 D-01: 9 columns (was 8) after Binder col added */}
                     <td colSpan={9}>
@@ -710,89 +826,170 @@ export function InventoryTable() {
               }
 
               const isLowStock = card.quantity === 1;
+              const isZeroStock = card.quantity === 0;
 
               return (
                 <tr
                   key={card.id}
-                  className={`border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 ${
-                    isLowStock ? "border-l-2 border-amber-500" : ""
-                  }`}
+                  className="transition-colors"
+                  style={{
+                    borderBottom: "1px solid var(--border)",
+                    background: isZeroStock
+                      ? "color-mix(in oklab, rgb(220 38 38) 6%, transparent)"
+                      : "transparent",
+                    borderLeft: isLowStock
+                      ? "2px solid var(--accent)"
+                      : isZeroStock
+                      ? "2px solid rgb(220 38 38)"
+                      : "2px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isZeroStock) {
+                      e.currentTarget.style.background =
+                        "color-mix(in oklab, var(--ink) 4%, transparent)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isZeroStock
+                      ? "color-mix(in oklab, rgb(220 38 38) 6%, transparent)"
+                      : "transparent";
+                  }}
                 >
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2.5">
                     <input
                       type="checkbox"
                       aria-label={`Select ${card.name}`}
                       checked={selectedCardIdSet.has(card.id)}
-                      onChange={(event) => toggleCardSelection(card.id, event.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent"
+                      onChange={(event) =>
+                        toggleCardSelection(card.id, event.target.checked)
+                      }
+                      className="h-4 w-4 accent-[var(--accent)]"
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-2 py-2">
                     {card.imageUrl ? (
                       <img
                         src={card.imageUrl}
-                        alt={card.name}
-                        className="w-8 h-[45px] rounded object-cover"
+                        alt=""
+                        aria-hidden="true"
+                        className="w-9 h-[50px] rounded object-cover"
+                        style={{ border: "1px solid var(--border)" }}
                         loading="lazy"
                       />
                     ) : (
-                      <div className="w-8 h-[45px] rounded bg-zinc-200 dark:bg-zinc-700" />
+                      <div
+                        className="w-9 h-[50px] rounded"
+                        style={{
+                          background: "var(--surface-2)",
+                          border: "1px solid var(--border)",
+                        }}
+                      />
                     )}
                   </td>
-                  <td className="px-4 py-2 truncate max-w-[200px]">
+                  <td
+                    className="px-3 py-2 truncate max-w-[260px]"
+                    style={{ color: "var(--ink)" }}
+                  >
                     {card.name}
                   </td>
-                  <td className="px-4 py-2 text-zinc-500 dark:text-zinc-400">
+                  <td
+                    className="px-3 py-2 text-xs font-mono"
+                    style={{ color: "var(--muted)" }}
+                  >
                     {card.setCode.toUpperCase()}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2">
                     <EditableCell
                       value={card.price ?? ""}
                       cardId={card.id}
                       field="price"
                       cardName={card.name}
                       onSave={handleSave}
-                      onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
+                      onError={(msg) => {
+                        setToastVariant("error");
+                        setToastMessage(msg);
+                      }}
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2">
                     <EditableCell
                       value={card.condition}
                       cardId={card.id}
                       field="condition"
                       cardName={card.name}
                       onSave={handleSave}
-                      onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
+                      onError={(msg) => {
+                        setToastVariant("error");
+                        setToastMessage(msg);
+                      }}
                     />
                   </td>
                   {/* Phase 21 D-01: render binder verbatim (lowercase
-                      normalized per Phase 17 D-04). Mirrors the set-cell
-                      muted-zinc style. */}
-                  <td className="px-4 py-2 text-zinc-500 dark:text-zinc-400">
-                    {card.binder}
+                      normalized per Phase 17 D-04). */}
+                  <td className="px-3 py-2">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-md"
+                      style={{
+                        background: "var(--surface-2)",
+                        color: "var(--muted)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      {card.binder}
+                    </span>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-1.5">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
                       <EditableCell
                         value={card.quantity}
                         cardId={card.id}
                         field="quantity"
                         cardName={card.name}
                         onSave={handleSave}
-                        onError={(msg) => { setToastVariant("error"); setToastMessage(msg); }}
+                        onError={(msg) => {
+                          setToastVariant("error");
+                          setToastMessage(msg);
+                        }}
                       />
                       {isLowStock && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
+                          style={{
+                            background:
+                              "color-mix(in oklab, var(--accent) 20%, transparent)",
+                            color: "var(--accent)",
+                          }}
+                          title="Only 1 copy remaining"
+                        >
                           Low
+                        </span>
+                      )}
+                      {isZeroStock && (
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
+                          style={{
+                            background: "rgb(220 38 38 / 0.2)",
+                            color: "rgb(248 113 113)",
+                          }}
+                          title="Out of stock"
+                        >
+                          0
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2 text-right">
                     <button
                       onClick={() => setDeletingId(card.id)}
                       aria-label={`Delete ${card.name}`}
-                      className="text-zinc-400 hover:text-red-500 transition-colors"
+                      className="transition-colors p-1 rounded"
+                      style={{ color: "var(--muted)" }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "rgb(248 113 113)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "var(--muted)")
+                      }
                     >
                       <TrashIcon />
                     </button>

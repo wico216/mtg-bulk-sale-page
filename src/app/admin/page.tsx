@@ -7,7 +7,7 @@ import { DashboardSummary } from "./_components/dashboard-summary";
 import { InventoryTable } from "./_components/inventory-table";
 
 export const metadata: Metadata = {
-  title: "Inventory -- Viki MTG Bulk Store",
+  title: "Inventory · Viki MTG Bulk Store",
 };
 
 export const dynamic = "force-dynamic";
@@ -26,10 +26,21 @@ export default async function AdminPage() {
   const stats = await getAdminDashboardStats();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-xl font-semibold">Inventory</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <h1
+          className="text-2xl font-semibold tracking-tight"
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "var(--ink)",
+          }}
+        >
+          Inventory
+        </h1>
+        <p
+          className="mt-1 text-sm"
+          style={{ color: "var(--muted)" }}
+        >
           Manage inventory, pricing, stock, and bulk operations.
         </p>
       </div>

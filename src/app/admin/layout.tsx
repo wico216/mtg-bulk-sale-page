@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
+import { AdminNav } from "./_components/admin-nav";
 
 export default async function AdminLayout({
   children,
@@ -11,51 +12,57 @@ export default async function AdminLayout({
   const isAdmin = isAdminEmail(session?.user?.email);
 
   // For non-admin or unauthenticated users, render children only
-  // (login and access-denied pages have their own standalone layout)
-  // proxy.ts handles the redirects; layout just wraps content
+  // (login and access-denied pages have their own standalone layout).
+  // proxy.ts handles the redirects; layout just wraps content.
   if (!session || !isAdmin) {
     return <>{children}</>;
   }
 
-  // Admin header shown only for authenticated admin users
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <header className="border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <span className="text-xl font-bold text-accent">Viki</span>
-            <span className="ml-2 text-xs font-bold px-2 py-1 rounded-full bg-accent-light text-accent">
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--bg)", color: "var(--ink)" }}
+    >
+      <header
+        className="sticky top-0 z-30 backdrop-blur"
+        style={{
+          background: "color-mix(in oklab, var(--bg) 85%, transparent)",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 shrink-0"
+            aria-label="Admin home"
+          >
+            <span
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "var(--ink)",
+              }}
+            >
+              Viki
+            </span>
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{
+                background: "var(--accent)",
+                color: "var(--accent-fg)",
+              }}
+            >
               Admin
             </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
-            >
-              Inventory
-            </Link>
-            <Link
-              href="/admin/orders"
-              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
-            >
-              Orders
-            </Link>
-            <Link
-              href="/admin/audit"
-              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
-            >
-              Audit
-            </Link>
-            <Link
-              href="/admin/health"
-              className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
-            >
-              Health
-            </Link>
+          </Link>
+
+          <AdminNav />
+
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/"
-              className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              className="hidden sm:inline text-sm transition-colors hover:underline"
+              style={{ color: "var(--muted)" }}
             >
               View store
             </Link>
@@ -67,7 +74,8 @@ export default async function AdminLayout({
             >
               <button
                 type="submit"
-                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                className="text-sm transition-colors hover:underline"
+                style={{ color: "var(--muted)" }}
               >
                 Sign out
               </button>
@@ -75,7 +83,10 @@ export default async function AdminLayout({
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 pt-6">{children}</main>
+
+      <main className="max-w-7xl mx-auto px-4 pt-6 pb-12 relative z-10">
+        {children}
+      </main>
     </div>
   );
 }

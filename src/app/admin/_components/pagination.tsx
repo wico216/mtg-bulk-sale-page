@@ -6,6 +6,7 @@ interface PaginationProps {
   total: number;
   limit: number;
   onPageChange: (page: number) => void;
+  unit?: string;
 }
 
 function getPageNumbers(page: number, totalPages: number): (number | "...")[] {
@@ -35,38 +36,43 @@ export function Pagination({
   total,
   limit,
   onPageChange,
+  unit = "cards",
 }: PaginationProps) {
   const start = (page - 1) * limit + 1;
   const end = Math.min(page * limit, total);
   const pages = getPageNumbers(page, totalPages);
 
   return (
-    <div className="flex items-center justify-between mt-4 py-3">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-        Showing {start}-{end} of {total} cards
+    <div className="flex flex-wrap items-center justify-between gap-3 mt-4 py-3">
+      <span className="text-xs tabular-nums" style={{ color: "var(--muted)" }}>
+        Showing {start.toLocaleString()}-{end.toLocaleString()} of{" "}
+        {total.toLocaleString()} {unit}
       </span>
 
       <div className="flex items-center gap-1">
-        {/* Previous Page button */}
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
-          className={`px-3 h-8 rounded-md border border-zinc-300 dark:border-zinc-600 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-            page === 1 ? "opacity-30 cursor-not-allowed" : ""
-          }`}
+          aria-label="Previous page"
+          className="px-2.5 h-8 rounded-md text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--ink)",
+          }}
         >
-          Previous Page
+          ←
         </button>
 
-        {/* Page number buttons */}
         {pages.map((p, i) => {
           if (p === "...") {
             return (
               <span
                 key={`ellipsis-${i}`}
-                className="min-w-[32px] h-8 flex items-center justify-center text-sm text-zinc-400"
+                className="min-w-[32px] h-8 flex items-center justify-center text-sm"
+                style={{ color: "var(--muted)" }}
               >
-                ...
+                …
               </span>
             );
           }
@@ -77,26 +83,29 @@ export function Pagination({
               onClick={() => onPageChange(p)}
               aria-label={`Go to page ${p}`}
               aria-current={isActive ? "page" : undefined}
-              className={`min-w-[32px] h-8 flex items-center justify-center rounded-md text-sm ${
-                isActive
-                  ? "bg-accent text-white font-semibold"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              }`}
+              className="min-w-[32px] h-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors tabular-nums"
+              style={{
+                background: isActive ? "var(--accent)" : "transparent",
+                color: isActive ? "var(--accent-fg)" : "var(--muted)",
+              }}
             >
               {p}
             </button>
           );
         })}
 
-        {/* Next Page button */}
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
-          className={`px-3 h-8 rounded-md border border-zinc-300 dark:border-zinc-600 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-            page === totalPages ? "opacity-30 cursor-not-allowed" : ""
-          }`}
+          aria-label="Next page"
+          className="px-2.5 h-8 rounded-md text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--ink)",
+          }}
         >
-          Next Page
+          →
         </button>
       </div>
     </div>

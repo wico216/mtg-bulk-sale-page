@@ -142,7 +142,12 @@ export function EditableCell({
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           aria-label={ariaLabel}
-          className="rounded border border-accent bg-white dark:bg-zinc-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="rounded px-2 py-1 text-sm focus:outline-none"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--accent)",
+            color: "var(--ink)",
+          }}
         >
           {CONDITION_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>
@@ -156,7 +161,9 @@ export function EditableCell({
     return (
       <div className="flex items-center gap-1">
         {field === "price" && (
-          <span className="text-sm text-zinc-500">$</span>
+          <span className="text-sm" style={{ color: "var(--muted)" }}>
+            $
+          </span>
         )}
         <input
           ref={inputRef as React.RefObject<HTMLInputElement>}
@@ -168,7 +175,12 @@ export function EditableCell({
           step={field === "price" ? "0.01" : "1"}
           min="0"
           aria-label={ariaLabel}
-          className={`${field === "price" ? "w-20" : "w-16"} rounded border border-accent bg-white dark:bg-zinc-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-accent`}
+          className={`${field === "price" ? "w-20" : "w-16"} rounded px-2 py-1 text-sm focus:outline-none tabular-nums`}
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--accent)",
+            color: "var(--ink)",
+          }}
         />
       </div>
     );
@@ -208,14 +220,35 @@ export function EditableCell({
         }
       }}
       aria-label={ariaLabel}
-      className={`inline-flex items-center gap-1 cursor-pointer rounded px-1 -mx-1 transition-colors duration-300 ${
-        saving ? "opacity-70" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
-      } ${showSuccess ? "bg-accent-light" : ""} ${showError ? "border border-red-500" : ""}`}
+      className={`inline-flex items-center gap-1 cursor-pointer rounded px-1.5 -mx-1.5 py-0.5 transition-colors duration-300 ${
+        saving ? "opacity-70" : ""
+      }`}
+      style={{
+        background: showSuccess
+          ? "color-mix(in oklab, var(--accent) 18%, transparent)"
+          : showError
+          ? "rgb(220 38 38 / 0.15)"
+          : "transparent",
+        border: showError
+          ? "1px solid rgb(220 38 38)"
+          : "1px solid transparent",
+      }}
+      onMouseEnter={(e) => {
+        if (!saving && !showSuccess && !showError) {
+          e.currentTarget.style.background = "color-mix(in oklab, var(--ink) 6%, transparent)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!showSuccess && !showError) {
+          e.currentTarget.style.background = "transparent";
+        }
+      }}
     >
-      <span>{formattedValue}</span>
+      <span className="tabular-nums">{formattedValue}</span>
       {showSuccess && (
         <svg
-          className="w-4 h-4 text-green-500 transition-opacity duration-300"
+          className="w-3.5 h-3.5 transition-opacity duration-300"
+          style={{ color: "var(--accent)" }}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
