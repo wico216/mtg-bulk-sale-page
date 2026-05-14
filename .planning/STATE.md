@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T15:42:31.000Z"
-last_activity: 2026-05-14 — Quick task 260514-g5e completed: sold-out purchased cards disappear from storefront
+last_updated: "2026-05-14T16:18:46.000Z"
+last_activity: 2026-05-14 — Quick task 260514-gxr completed: verified-domain order emails and accurate confirmation copy
 progress:
   total_phases: 22
   completed_phases: 21
@@ -48,7 +48,7 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
 Phase: Milestone v1.3 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-05-14 — Quick task 260514-g5e completed: sold-out purchased cards disappear from storefront
+Last activity: 2026-05-14 — Quick task 260514-gxr completed: verified-domain order emails and accurate confirmation copy
 
 ## v1.3 Phase Sequence
 
@@ -133,6 +133,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 - 2026-05-14 — Quick task 260514-fvh: storefront `Card Type` and `Set` filter sections now open by default; code commit `c771512`.
 - 2026-05-14 — Quick task 260514-fz0: storefront `Price` filter section moved to the bottom of the filter rail; code commit `e4e75f6`.
 - 2026-05-14 — Quick task 260514-g5e: sold-out purchased cards are excluded from storefront aggregation and checkout revalidates the shop; code commit `d41bc6f`.
+- 2026-05-14 — Quick task 260514-gxr: order emails now use the verified `orders@wikospellbinder.com` sender and confirmation copy reflects actual buyer email delivery; code commit `dc3d624`.
 
 ## Quick Tasks Completed
 
@@ -147,3 +148,4 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 | 260514-fvh | Open Card Type and Set storefront filter sections by default | 2026-05-14 | c771512 | [260514-fvh-github-issue-14-open-card-type-and-set-f](./quick/260514-fvh-github-issue-14-open-card-type-and-set-f/) |
 | 260514-fz0 | Move storefront Price filter section to the bottom | 2026-05-14 | e4e75f6 | [260514-fz0-move-storefront-price-filter-to-the-bott](./quick/260514-fz0-move-storefront-price-filter-to-the-bott/) |
 | 260514-g5e | Hide sold-out purchased cards from the storefront | 2026-05-14 | d41bc6f | [260514-g5e-github-issue-15-hide-purchased-sold-out-](./quick/260514-g5e-github-issue-15-hide-purchased-sold-out-/) |
+| 260514-gxr | Use verified order email sender and accurate confirmation copy | 2026-05-14 | dc3d624 | [260514-gxr-github-issue-16-verified-domain-email-co](./quick/260514-gxr-github-issue-16-verified-domain-email-co/) |
