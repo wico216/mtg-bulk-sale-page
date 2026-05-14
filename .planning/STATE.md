@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T15:27:05.000Z"
-last_activity: 2026-05-14 — Quick task 260514-fvh completed: Card Type and Set filters open by default
+last_updated: "2026-05-14T15:31:44.000Z"
+last_activity: 2026-05-14 — Quick task 260514-fz0 completed: Price filter moved to the bottom
 progress:
   total_phases: 22
   completed_phases: 21
@@ -48,7 +48,7 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
 Phase: Milestone v1.3 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-05-14 — Quick task 260514-fvh completed: Card Type and Set filters open by default
+Last activity: 2026-05-14 — Quick task 260514-fz0 completed: Price filter moved to the bottom
 
 ## v1.3 Phase Sequence
 
@@ -131,6 +131,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 - 2026-05-14 — Quick task 260514-fb1: replaced the modal overlay flip button with a Scryfall-like `Transform` action and added tile-level transform controls for double-faced cards; code commit `dfddefe`.
 - 2026-05-14 — Quick task 260514-fib: header logo now refreshes the storefront when clicked on the home page while preserving normal navigation from other routes; code commit `25f63a2`.
 - 2026-05-14 — Quick task 260514-fvh: storefront `Card Type` and `Set` filter sections now open by default; code commit `c771512`.
+- 2026-05-14 — Quick task 260514-fz0: storefront `Price` filter section moved to the bottom of the filter rail; code commit `e4e75f6`.
 
 ## Quick Tasks Completed
 
@@ -143,3 +144,4 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 | 260514-fb1 | Refine double-faced card flip controls on storefront tiles and modal | 2026-05-14 | dfddefe | [260514-fb1-refine-double-faced-card-flip-controls-o](./quick/260514-fb1-refine-double-faced-card-flip-controls-o/) |
 | 260514-fib | Refresh storefront when clicking the header logo on the home page | 2026-05-14 | 25f63a2 | [260514-fib-github-issue-13-page-refresh-behavior](./quick/260514-fib-github-issue-13-page-refresh-behavior/) |
 | 260514-fvh | Open Card Type and Set storefront filter sections by default | 2026-05-14 | c771512 | [260514-fvh-github-issue-14-open-card-type-and-set-f](./quick/260514-fvh-github-issue-14-open-card-type-and-set-f/) |
+| 260514-fz0 | Move storefront Price filter section to the bottom | 2026-05-14 | e4e75f6 | [260514-fz0-move-storefront-price-filter-to-the-bott](./quick/260514-fz0-move-storefront-price-filter-to-the-bott/) |
