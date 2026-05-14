@@ -467,25 +467,38 @@ export async function placeCheckoutOrder(input: {
     WITH requested(set_code, collector_number, finish, condition, requested_qty, aggregated_id) AS (
       VALUES ${requestedValues}
     ),
-    locked_rows AS (
+    -- v1.3.5 hotfix: Postgres rejects FOR UPDATE in the same SELECT as
+    -- window functions (SQLSTATE 0A000, "FOR UPDATE is not allowed with
+    -- window functions" — CheckSelectLocking). Split the original
+    -- locked_rows CTE in two: locked_cards acquires the row locks under
+    -- the same ORDER BY (deadlock-free lock ordering preserved), then
+    -- locked_rows computes the window functions on top of the locked
+    -- snapshot. Lock granularity is unchanged — every cards row that
+    -- matches any (set_code, collector_number, finish, condition) in
+    -- requested is locked, regardless of binder.
+    locked_cards AS (
       SELECT cards.*,
-             requested.aggregated_id AS aggregated_id,
-             ROW_NUMBER() OVER (
-               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
-               ORDER BY cards.binder ASC
-             ) AS bucket_rank,
-             SUM(cards.quantity) OVER (
-               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
-               ORDER BY cards.binder ASC
-               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-             ) AS running_supply,
-             SUM(cards.quantity) OVER (
-               PARTITION BY cards.set_code, cards.collector_number, cards.finish, cards.condition
-             ) AS total_supply
+             requested.aggregated_id AS aggregated_id
       FROM cards
       INNER JOIN requested USING (set_code, collector_number, finish, condition)
       ORDER BY cards.set_code, cards.collector_number, cards.finish, cards.condition, cards.binder
       FOR UPDATE OF cards
+    ),
+    locked_rows AS (
+      SELECT lc.*,
+             ROW_NUMBER() OVER (
+               PARTITION BY lc.set_code, lc.collector_number, lc.finish, lc.condition
+               ORDER BY lc.binder ASC
+             ) AS bucket_rank,
+             SUM(lc.quantity) OVER (
+               PARTITION BY lc.set_code, lc.collector_number, lc.finish, lc.condition
+               ORDER BY lc.binder ASC
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+             ) AS running_supply,
+             SUM(lc.quantity) OVER (
+               PARTITION BY lc.set_code, lc.collector_number, lc.finish, lc.condition
+             ) AS total_supply
+      FROM locked_cards lc
     ),
     conflicts AS (
       SELECT
