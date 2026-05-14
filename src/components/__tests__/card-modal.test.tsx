@@ -89,7 +89,9 @@ describe("CardModal customer actions", () => {
       "https://cards.scryfall.io/normal/front.jpg",
     );
 
-    await user.click(screen.getByRole("button", { name: /show back side/i }));
+    await user.click(
+      screen.getByRole("button", { name: /transform card to back side/i }),
+    );
     expect(screen.getByAltText("Lightning Bolt back")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /view full image/i }));
@@ -97,7 +99,9 @@ describe("CardModal customer actions", () => {
       "https://cards.scryfall.io/normal/back.jpg",
     );
 
-    await user.click(screen.getByRole("button", { name: /show front side/i }));
+    await user.click(
+      screen.getByRole("button", { name: /transform card to front side/i }),
+    );
     expect(screen.getByAltText("Lightning Bolt front")).toBeInTheDocument();
   });
 
@@ -110,6 +114,8 @@ describe("CardModal customer actions", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /show back side/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /transform card to back side/i }),
+    ).toBeNull();
   });
 });

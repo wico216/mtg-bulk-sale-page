@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import type { PublicCard, Finish } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
@@ -50,6 +51,30 @@ function FinishPill({ finish }: { finish: Finish }) {
   );
 }
 
+function IconTransform({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M17 3h4v4" />
+      <path d="M21 3l-7 7" />
+      <path d="M7 21H3v-4" />
+      <path d="M3 21l7-7" />
+      <path d="M14 3h-3a8 8 0 0 0-8 8v1" />
+      <path d="M10 21h3a8 8 0 0 0 8-8v-1" />
+    </svg>
+  );
+}
+
 interface CardTileProps {
   card: PublicCard;
   onClick: () => void;
@@ -60,6 +85,10 @@ export default function CardTile({ card, onClick }: CardTileProps) {
   const qty = useCartStore((s) => s.getQuantity(card.id));
   const addItem = useCartStore((s) => s.addItem);
   const displayName = formatDisplayName(card);
+  const [showingBack, setShowingBack] = useState(false);
+  const hasBackFace = Boolean(card.backImageUrl);
+  const activeImageUrl =
+    showingBack && card.backImageUrl ? card.backImageUrl : card.imageUrl;
 
   return (
     <div
@@ -90,10 +119,10 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           transition: "transform 0.18s ease, box-shadow 0.18s ease",
         }}
       >
-        {card.imageUrl ? (
+        {activeImageUrl ? (
           <Image
-            src={card.imageUrl}
-            alt={card.name}
+            src={activeImageUrl}
+            alt={`${card.name} ${showingBack ? "back" : "front"}`}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 20vw"
             className="object-cover"
@@ -117,6 +146,45 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           </div>
         )}
         <FinishPill finish={card.finish} />
+        {hasBackFace && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowingBack((current) => !current);
+            }}
+            aria-label={
+              showingBack ? "Transform card to front side" : "Transform card to back side"
+            }
+            title="Transform"
+            style={{
+              position: "absolute",
+              left: 6,
+              bottom: 6,
+              zIndex: 2,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              minWidth: 86,
+              height: 28,
+              padding: "0 8px",
+              borderRadius: 3,
+              border: "1px solid rgba(17,24,39,0.18)",
+              background: "rgba(255,255,255,0.92)",
+              color: "#111827",
+              boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 11,
+              fontWeight: 600,
+              lineHeight: 1,
+            }}
+          >
+            <IconTransform />
+            <span>Transform</span>
+          </button>
+        )}
         {card.price == null && (
           <span
             style={{

@@ -61,6 +61,30 @@ function IconX({ size = 18 }: { size?: number }) {
   );
 }
 
+function IconTransform({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M17 3h4v4" />
+      <path d="M21 3l-7 7" />
+      <path d="M7 21H3v-4" />
+      <path d="M3 21l7-7" />
+      <path d="M14 3h-3a8 8 0 0 0-8 8v1" />
+      <path d="M10 21h3a8 8 0 0 0 8-8v-1" />
+    </svg>
+  );
+}
+
 const btnPrimary: React.CSSProperties = {
   background: "var(--accent)",
   color: "var(--accent-fg)",
@@ -176,85 +200,106 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
       >
         <div
           style={{
-            position: "relative",
-            aspectRatio: "5 / 7",
             background: "var(--surface-2)",
             borderRight: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <button
-            type="button"
-            onClick={
-              activeImageUrl ? () => onImageClick(activeImageUrl) : undefined
-            }
-            aria-label={activeImageUrl ? "View full image" : undefined}
+          <div
             style={{
-              position: "absolute",
-              inset: 0,
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              cursor: activeImageUrl ? "zoom-in" : "default",
+              position: "relative",
+              aspectRatio: "5 / 7",
+              width: "100%",
             }}
           >
-            {activeImageUrl ? (
-              <Image
-                src={activeImageUrl}
-                alt={`${card.name} ${showingBack ? "back" : "front"}`}
-                fill
-                sizes="(max-width: 768px) 80vw, 260px"
-                style={{ objectFit: "cover" }}
-              />
-            ) : (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--muted)",
-                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-                  fontSize: 11,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                [ no image ]
-              </div>
-            )}
-          </button>
-          {hasBackFace && (
             <button
               type="button"
-              onClick={() =>
-                setImageSide({
-                  cardId: card.id,
-                  showingBack: !showingBack,
-                })
+              onClick={
+                activeImageUrl ? () => onImageClick(activeImageUrl) : undefined
               }
-              aria-label={showingBack ? "Show front side" : "Show back side"}
-              title={showingBack ? "Show front side" : "Show back side"}
+              aria-label={activeImageUrl ? "View full image" : undefined}
               style={{
                 position: "absolute",
-                left: "50%",
-                bottom: 12,
-                transform: "translateX(-50%)",
-                zIndex: 1,
-                background: "rgba(255,255,255,0.92)",
-                color: "#111827",
-                border: "1px solid rgba(17,24,39,0.18)",
-                borderRadius: 3,
-                padding: "7px 11px",
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(0,0,0,0.22)",
-                fontFamily: "inherit",
+                inset: 0,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: activeImageUrl ? "zoom-in" : "default",
               }}
             >
-              {showingBack ? "Front side" : "Back side"}
+              {activeImageUrl ? (
+                <Image
+                  src={activeImageUrl}
+                  alt={`${card.name} ${showingBack ? "back" : "front"}`}
+                  fill
+                  sizes="(max-width: 768px) 80vw, 260px"
+                  style={{ objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--muted)",
+                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  [ no image ]
+                </div>
+              )}
             </button>
+          </div>
+          {hasBackFace && (
+            <div
+              style={{
+                padding: 8,
+                borderTop: "1px solid var(--border)",
+                background: "var(--bg)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setImageSide({
+                    cardId: card.id,
+                    showingBack: !showingBack,
+                  })
+                }
+                aria-label={
+                  showingBack
+                    ? "Transform card to front side"
+                    : "Transform card to back side"
+                }
+                title="Transform"
+                style={{
+                  width: "100%",
+                  minHeight: 34,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "var(--surface-2)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                }}
+              >
+                <IconTransform />
+                <span>Transform</span>
+              </button>
+            </div>
           )}
         </div>
 
