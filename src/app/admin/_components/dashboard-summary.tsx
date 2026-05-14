@@ -25,7 +25,7 @@ function formatRarityLabel(rarity: string): string {
     .join(" ");
 }
 
-function StatCard({
+function StatTile({
   label,
   value,
   helper,
@@ -38,20 +38,20 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-lg p-4 transition-colors"
+      className="px-4 py-3 first:rounded-l-xl last:rounded-r-xl flex flex-col gap-1 min-w-0"
       style={{
         background: "var(--surface)",
-        border: "1px solid var(--border)",
+        borderRight: "1px solid var(--border)",
       }}
     >
       <div
-        className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+        className="text-[10px] font-semibold uppercase tracking-[0.12em] truncate"
         style={{ color: "var(--muted)" }}
       >
         {label}
       </div>
       <div
-        className="mt-2 text-2xl font-semibold tabular-nums leading-none"
+        className="text-xl sm:text-2xl font-semibold tabular-nums leading-none"
         style={{
           color: tone === "warn" ? "var(--accent)" : "var(--ink)",
           fontFamily: "var(--font-display)",
@@ -59,7 +59,10 @@ function StatCard({
       >
         {value}
       </div>
-      <div className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+      <div
+        className="text-[10px] tabular-nums truncate"
+        style={{ color: "var(--muted)" }}
+      >
         {helper}
       </div>
     </div>
@@ -77,106 +80,137 @@ function BreakdownSection({
 }) {
   return (
     <section
-      className="rounded-lg p-4"
+      className="rounded-xl p-4"
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
       }}
     >
       <h3
-        className="text-sm font-semibold"
-        style={{ color: "var(--ink)" }}
+        className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+        style={{ color: "var(--muted)" }}
       >
         {title}
       </h3>
       {rows.length === 0 ? (
-        <p
-          className="mt-3 text-sm"
-          style={{ color: "var(--muted)" }}
-        >
+        <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
           {emptyLabel}
         </p>
       ) : (
-        <div
-          className="mt-3 divide-y"
-          style={{ borderColor: "var(--border)" }}
-        >
+        <ul className="mt-3 space-y-1" role="list">
           {rows.map((row) => (
-            <div
+            <li
               key={row.label}
-              className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"
-              style={{ borderTop: "1px solid var(--border)" }}
+              className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"
             >
-              <div>
+              <div className="min-w-0">
                 <div
-                  className="font-medium"
+                  className="font-medium truncate"
                   style={{ color: "var(--ink)" }}
                 >
                   {row.label}
                 </div>
                 <div
-                  className="text-xs"
+                  className="text-[10px] tabular-nums"
                   style={{ color: "var(--muted)" }}
                 >
-                  {formatNumber(row.uniqueCards)} unique · {formatCurrency(row.value)}
+                  {formatNumber(row.uniqueCards)} unique ·{" "}
+                  {formatCurrency(row.value)}
                 </div>
               </div>
               <div
-                className="text-right font-semibold tabular-nums"
+                className="text-right font-semibold tabular-nums shrink-0"
                 style={{ color: "var(--ink)" }}
               >
                 {formatNumber(row.quantity)}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </section>
   );
 }
 
+/**
+ * Tight horizontal stat band — 5 tiles in a single row on desktop, 2-3
+ * tiles per row on smaller screens. Designed to be the first thing the
+ * operator sees, ambient context for the table below.
+ */
 export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
   return (
-    <section aria-labelledby="dashboard-summary-heading" className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          label="Unique cards"
+    <section aria-labelledby="dashboard-summary-heading">
+      <h2 id="dashboard-summary-heading" className="sr-only">
+        Inventory dashboard
+      </h2>
+      <div
+        className="rounded-xl overflow-hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+        style={{ border: "1px solid var(--border)" }}
+      >
+        <StatTile
+          label="Unique"
           value={formatNumber(stats.inventory.uniqueCards)}
-          helper="Rows in inventory"
+          helper="rows"
         />
-        <StatCard
-          label="Total quantity"
+        <StatTile
+          label="Total qty"
           value={formatNumber(stats.inventory.totalQuantity)}
-          helper="Copies available"
+          helper="copies"
         />
-        <StatCard
-          label="Total value"
+        <StatTile
+          label="Value"
           value={formatCurrency(stats.inventory.totalValue)}
-          helper="Missing prices count as $0"
+          helper="missing = $0"
         />
-        <StatCard
+        <StatTile
           label="Low stock"
           value={formatNumber(stats.inventory.lowStockCount)}
-          helper="Cards with one copy"
+          helper={stats.inventory.lowStockCount > 0 ? "needs attention" : "—"}
           tone={stats.inventory.lowStockCount > 0 ? "warn" : "default"}
         />
-        <StatCard
+        <StatTile
           label="Missing prices"
           value={formatNumber(stats.inventory.missingPriceCount)}
-          helper="Rows priced as N/A"
+          helper={
+            stats.inventory.missingPriceCount > 0 ? "N/A on storefront" : "—"
+          }
           tone={stats.inventory.missingPriceCount > 0 ? "warn" : "default"}
         />
       </div>
+    </section>
+  );
+}
 
-      <h2
-        id="dashboard-summary-heading"
-        className="text-xs font-semibold uppercase tracking-[0.08em] pt-2"
-        style={{ color: "var(--muted)" }}
+/**
+ * Collapsible "Insights" disclosure that renders the four breakdown tables
+ * (by set / color / rarity / binder). Default closed — the operator can
+ * open it when they want a deeper read on inventory composition.
+ */
+export function DashboardBreakdowns({ stats }: { stats: AdminDashboardStats }) {
+  return (
+    <details
+      className="rounded-xl"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <summary
+        className="cursor-pointer list-none px-4 py-3 flex items-center justify-between"
+        style={{ color: "var(--ink)" }}
       >
-        Breakdowns
-      </h2>
-
-      <div className="grid gap-4 lg:grid-cols-4">
+        <span className="text-sm font-semibold">Insights</span>
+        <span
+          className="text-[11px]"
+          style={{ color: "var(--muted)" }}
+        >
+          Breakdowns by set, color, rarity, binder
+        </span>
+      </summary>
+      <div
+        className="p-4 grid gap-4 lg:grid-cols-4"
+        style={{ borderTop: "1px solid var(--border)" }}
+      >
         <BreakdownSection
           title="By set"
           emptyLabel="No set breakdown yet."
@@ -207,8 +241,6 @@ export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
             value: row.value,
           }))}
         />
-        {/* Phase 21 D-12: Breakdown by binder. Lowercase verbatim per
-            Phase 17 D-04 (no toUpperCase like the set codes above). */}
         <BreakdownSection
           title="By binder"
           emptyLabel="No binder breakdown yet."
@@ -220,6 +252,6 @@ export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
           }))}
         />
       </div>
-    </section>
+    </details>
   );
 }

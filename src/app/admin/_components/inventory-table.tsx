@@ -3,61 +3,33 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { InventoryRow } from "@/lib/types";
 import { useDebounce } from "@/lib/use-debounce";
-import { EditableCell } from "./editable-cell";
 import { DeleteConfirmation } from "./delete-confirmation";
 import { Toast } from "./toast";
 import { ActionBar } from "./action-bar";
 import { Pagination } from "./pagination";
+import { FilterRail, type InventorySortKey } from "./filter-rail";
+import { InventoryRowCard } from "./inventory-row";
+import { SelectionDock } from "./selection-dock";
+import { InventoryDangerZone } from "./inventory-danger-zone";
+import { useRowDensity } from "./density-toggle";
 
-type SortField = "name" | "price" | "quantity";
-type SortDir = "asc" | "desc";
-
-function SortArrow({ direction }: { direction: SortDir }) {
-  if (direction === "asc") {
-    return (
-      <svg
-        className="inline w-3 h-3 ml-1"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-      </svg>
-    );
+function sortKeyToParams(
+  sort: InventorySortKey,
+): { sortBy: "name" | "price" | "quantity"; sortDir: "asc" | "desc" } {
+  switch (sort) {
+    case "name-asc":
+      return { sortBy: "name", sortDir: "asc" };
+    case "name-desc":
+      return { sortBy: "name", sortDir: "desc" };
+    case "quantity-desc":
+      return { sortBy: "quantity", sortDir: "desc" };
+    case "quantity-asc":
+      return { sortBy: "quantity", sortDir: "asc" };
+    case "price-desc":
+      return { sortBy: "price", sortDir: "desc" };
+    case "price-asc":
+      return { sortBy: "price", sortDir: "asc" };
   }
-  return (
-    <svg
-      className="inline w-3 h-3 ml-1"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-      />
-    </svg>
-  );
 }
 
 function SelectAllCheckbox({
@@ -87,7 +59,7 @@ function SelectAllCheckbox({
       checked={checked}
       disabled={disabled}
       onChange={(event) => onChange(event.target.checked)}
-      className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+      className="h-4 w-4 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
     />
   );
 }
@@ -98,8 +70,7 @@ export function InventoryTable() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [sortBy, setSortBy] = useState<SortField | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sort, setSort] = useState<InventorySortKey>("name-asc");
   const [search, setSearch] = useState("");
   const [setFilter, setSetFilter] = useState("");
   const [conditionFilter, setConditionFilter] = useState("");
@@ -113,11 +84,10 @@ export function InventoryTable() {
   const [availableBinders, setAvailableBinders] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [inventoryTotal, setInventoryTotal] = useState(0);
-  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [confirmingDeleteSelected, setConfirmingDeleteSelected] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const [density, setDensity] = useRowDensity();
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -132,10 +102,9 @@ export function InventoryTable() {
       if (setFilter) params.set("set", setFilter);
       if (conditionFilter) params.set("condition", conditionFilter);
       if (binderFilter) params.set("binder", binderFilter);
-      if (sortBy) {
-        params.set("sortBy", sortBy);
-        params.set("sortDir", sortDir);
-      }
+      const { sortBy, sortDir } = sortKeyToParams(sort);
+      params.set("sortBy", sortBy);
+      params.set("sortDir", sortDir);
 
       const res = await fetch(`/api/admin/cards?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -151,10 +120,9 @@ export function InventoryTable() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, setFilter, conditionFilter, binderFilter, sortBy, sortDir]);
+  }, [page, debouncedSearch, setFilter, conditionFilter, binderFilter, sort]);
 
   // D-15: Post-import success toast handoff via sessionStorage.
-  // import-client sets "admin-toast" to a JSON { message, variant: "success" } before router.push("/admin").
   useEffect(() => {
     if (typeof window === "undefined") return;
     const raw = window.sessionStorage.getItem("admin-toast");
@@ -169,7 +137,7 @@ export function InventoryTable() {
     }
   }, []);
 
-  // Fetch available sets on mount (all cards, no filter)
+  // Fetch available sets + binders on mount
   useEffect(() => {
     async function fetchSets() {
       try {
@@ -182,11 +150,6 @@ export function InventoryTable() {
           ),
         ].sort();
         setAvailableSets(sets);
-        // Phase 21 D-02: also derive distinct binders from the same response.
-        // Mirrors the availableSets pattern; v1.3 acceptable for total
-        // inventory of ~136-12,749 rows where limit=200 covers the vast
-        // majority of binder names. Operators can still filter via URL
-        // ?binder=... if a binder appears only in rows beyond the sample.
         const binders = [
           ...new Set<string>(
             data.cards.map((c: InventoryRow) => c.binder),
@@ -217,7 +180,9 @@ export function InventoryTable() {
   useEffect(() => {
     setSelectedCardIds([]);
     setConfirmingDeleteSelected(false);
-  }, [page, sortBy, sortDir]);
+  }, [page, sort]);
+
+  // ─── Handlers ─────────────────────────────────────────────────
 
   async function handleSave(
     cardId: string,
@@ -256,7 +221,6 @@ export function InventoryTable() {
   }
 
   async function handleDeleteAll() {
-    setDeletingAll(true);
     try {
       const res = await fetch("/api/admin/cards", { method: "DELETE" });
       if (!res.ok) {
@@ -278,7 +242,6 @@ export function InventoryTable() {
       setSetFilter("");
       setConditionFilter("");
       setPage(1);
-      setConfirmingDeleteAll(false);
       setToastVariant("success");
       setToastMessage(
         body.deleted === 1 ? "Deleted 1 card." : `Deleted ${body.deleted} cards.`,
@@ -286,9 +249,9 @@ export function InventoryTable() {
       router.refresh();
     } catch (err) {
       setToastVariant("error");
-      setToastMessage(err instanceof Error ? err.message : "Failed to delete inventory. Try again.");
-    } finally {
-      setDeletingAll(false);
+      setToastMessage(
+        err instanceof Error ? err.message : "Failed to delete inventory. Try again.",
+      );
     }
   }
 
@@ -312,23 +275,7 @@ export function InventoryTable() {
     }
   }
 
-  function handleSort(field: SortField) {
-    if (sortBy !== field) {
-      setSortBy(field);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      // Cycle back to unsorted
-      setSortBy(null);
-      setSortDir("asc");
-    }
-  }
-
-  function getSortState(field: SortField): "ascending" | "descending" | "none" {
-    if (sortBy !== field) return "none";
-    return sortDir === "asc" ? "ascending" : "descending";
-  }
+  // ─── Selection ────────────────────────────────────────────────
 
   const selectedCardIdSet = new Set(selectedCardIds);
   const currentPageCardIds = cards.map((card) => card.id);
@@ -336,7 +283,8 @@ export function InventoryTable() {
     selectedCardIdSet.has(id),
   ).length;
   const allCurrentPageSelected =
-    currentPageCardIds.length > 0 && selectedCurrentPageCount === currentPageCardIds.length;
+    currentPageCardIds.length > 0 &&
+    selectedCurrentPageCount === currentPageCardIds.length;
   const someCurrentPageSelected =
     selectedCurrentPageCount > 0 && !allCurrentPageSelected;
 
@@ -401,30 +349,60 @@ export function InventoryTable() {
     } catch (err) {
       setToastVariant("error");
       setToastMessage(
-        err instanceof Error ? err.message : "Failed to delete selected cards. Try again.",
+        err instanceof Error
+          ? err.message
+          : "Failed to delete selected cards. Try again.",
       );
     } finally {
       setDeletingSelected(false);
     }
   }
 
+  // ─── Helpers ──────────────────────────────────────────────────
+
+  const hasFilter = Boolean(
+    debouncedSearch || setFilter || conditionFilter || binderFilter,
+  );
+
+  function resetFilters() {
+    setSearch("");
+    setSetFilter("");
+    setConditionFilter("");
+    setBinderFilter("");
+  }
+
+  const toastElement = toastMessage ? (
+    <Toast
+      message={toastMessage}
+      variant={toastVariant}
+      onDismiss={() => {
+        setToastMessage(null);
+        setToastVariant("error");
+      }}
+    />
+  ) : null;
+
+  // ─── Confirmation banner above row list (for bulk delete) ────
+
   const deleteSelectedConfirmation = confirmingDeleteSelected ? (
     <div
       role="alert"
-      className="mb-4 rounded-md p-4 text-sm"
+      className="rounded-xl p-4 text-sm mb-3"
       style={{
         background: "rgb(220 38 38 / 0.08)",
-        borderLeft: "3px solid rgb(248 113 113)",
+        border: "1px solid rgb(220 38 38 / 0.3)",
         color: "var(--ink)",
       }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">
-            Delete {selectedCardIds.length} selected {selectedCardIds.length === 1 ? "card" : "cards"}?
+            Delete {selectedCardIds.length} selected{" "}
+            {selectedCardIds.length === 1 ? "card" : "cards"}?
           </p>
           <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-            This removes only the selected rows. Export first if you need a backup; successful deletion is recorded in Audit.
+            This removes only the selected rows. The deletion is recorded in
+            Audit.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -455,86 +433,25 @@ export function InventoryTable() {
     </div>
   ) : null;
 
-  const deleteAllConfirmation = confirmingDeleteAll ? (
-    <div
-      role="alert"
-      className="mb-4 rounded-md p-4 text-sm"
-      style={{
-        background: "rgb(220 38 38 / 0.1)",
-        borderLeft: "3px solid rgb(220 38 38)",
-        color: "var(--ink)",
-      }}
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-semibold">
-            Delete all {inventoryTotal.toLocaleString()} cards from inventory?
-          </p>
-          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-            This empties the storefront until you import a new CSV. Export first if you need a backup; successful deletion is recorded in Audit.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setConfirmingDeleteAll(false)}
-            disabled={deletingAll}
-            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
-            style={{
-              background: "transparent",
-              border: "1px solid var(--border)",
-              color: "var(--ink)",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDeleteAll}
-            disabled={deletingAll}
-            className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "rgb(220 38 38)", color: "white" }}
-          >
-            {deletingAll
-              ? "Deleting…"
-              : `Delete ${inventoryTotal.toLocaleString()}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
+  // ─── Body content (loading / error / empty / rows) ────────────
 
-  const toastElement = toastMessage ? (
-    <Toast
-      message={toastMessage}
-      variant={toastVariant}
-      onDismiss={() => {
-        setToastMessage(null);
-        setToastVariant("error");
-      }}
-    />
-  ) : null;
-
-  // Loading skeleton
+  let bodyContent: React.ReactNode;
   if (loading && cards.length === 0) {
-    return (
+    bodyContent = (
       <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded h-12 w-full"
+            className="animate-pulse rounded-lg h-14 w-full"
             style={{ background: "var(--surface)" }}
           />
         ))}
       </div>
     );
-  }
-
-  // Error state
-  if (error && cards.length === 0) {
-    return (
+  } else if (error && cards.length === 0) {
+    bodyContent = (
       <div
-        className="rounded-md p-4 text-sm"
+        className="rounded-xl p-4 text-sm"
         style={{
           background: "rgb(220 38 38 / 0.08)",
           borderLeft: "3px solid rgb(220 38 38)",
@@ -544,472 +461,216 @@ export function InventoryTable() {
         Failed to load inventory. Try refreshing the page.
       </div>
     );
-  }
-
-  // Empty states
-  const hasFilters = debouncedSearch || setFilter || conditionFilter || binderFilter;
-  if (total === 0 && !loading) {
-    if (hasFilters) {
-      return (
-        <>
-          <ActionBar
-            search={search}
-            onSearchChange={setSearch}
-            setFilter={setFilter}
-            onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
-            binderFilter={binderFilter}
-            onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
-            conditionFilter={conditionFilter}
-            onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
-            availableSets={availableSets}
-            availableBinders={availableBinders}
-            exporting={exporting}
-            onExport={handleExport}
-            deletingAll={deletingAll}
-            deleteDisabled={inventoryTotal === 0}
-            onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
-            selectedCount={selectedCardIds.length}
-            deletingSelected={deletingSelected}
-            onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
-            inventoryTotal={inventoryTotal}
-          />
-          {deleteSelectedConfirmation}
-          {deleteAllConfirmation}
-          <div
-            className="text-center py-16 rounded-lg"
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-            }}
-          >
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: "var(--ink)" }}
-            >
-              No cards match your filters
-            </h2>
-            <p
-              className="text-sm mt-2"
-              style={{ color: "var(--muted)" }}
-            >
-              Try a different search term or clear your filters.
-            </p>
-            <button
-              onClick={() => {
-                setSearch("");
-                setSetFilter("");
-                setConditionFilter("");
-                setBinderFilter("");
-              }}
-              className="mt-4 inline-block text-sm font-semibold underline-offset-2 hover:underline"
-              style={{ color: "var(--accent)" }}
-            >
-              Clear filters
-            </button>
-          </div>
-          {toastElement}
-        </>
-      );
-    }
-    return (
-      <>
-        <ActionBar
-          search={search}
-          onSearchChange={setSearch}
-          setFilter={setFilter}
-          onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
-          binderFilter={binderFilter}
-          onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
-          conditionFilter={conditionFilter}
-          onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
-          availableSets={availableSets}
-          availableBinders={availableBinders}
-          exporting={exporting}
-          onExport={handleExport}
-          deletingAll={deletingAll}
-          deleteDisabled={inventoryTotal === 0}
-          onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
-          selectedCount={selectedCardIds.length}
-          deletingSelected={deletingSelected}
-          onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
-          inventoryTotal={inventoryTotal}
-        />
-        {deleteSelectedConfirmation}
-        {deleteAllConfirmation}
-        <div
-          className="text-center py-20 rounded-lg"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <div
-            className="text-4xl mb-2"
-            style={{ color: "var(--accent)", opacity: 0.6 }}
-          >
-            ✦
-          </div>
-          <h2
-            className="text-lg font-semibold"
-            style={{ color: "var(--ink)" }}
-          >
-            No cards in inventory
-          </h2>
-          <p className="text-sm mt-2" style={{ color: "var(--muted)" }}>
-            Import a CSV file to add cards to your store.
-          </p>
-          <a
-            href="/admin/import"
-            className="mt-4 inline-block rounded-md px-4 py-2 text-sm font-semibold transition-colors"
-            style={{
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
-            }}
-          >
-            Import CSV
-          </a>
-        </div>
-        {toastElement}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <ActionBar
-        search={search}
-        onSearchChange={setSearch}
-        setFilter={setFilter}
-        onSetFilterChange={(v) => { setSetFilter(v); setPage(1); }}
-        binderFilter={binderFilter}
-        onBinderFilterChange={(v) => { setBinderFilter(v); setPage(1); }}
-        conditionFilter={conditionFilter}
-        onConditionFilterChange={(v) => { setConditionFilter(v); setPage(1); }}
-        availableSets={availableSets}
-        availableBinders={availableBinders}
-        exporting={exporting}
-        onExport={handleExport}
-        deletingAll={deletingAll}
-        deleteDisabled={inventoryTotal === 0}
-        onRequestDeleteAll={() => setConfirmingDeleteAll(true)}
-        selectedCount={selectedCardIds.length}
-        deletingSelected={deletingSelected}
-        onRequestDeleteSelected={() => setConfirmingDeleteSelected(true)}
-        inventoryTotal={inventoryTotal}
-      />
-      {deleteSelectedConfirmation}
-      {deleteAllConfirmation}
-
+  } else if (total === 0 && !loading) {
+    bodyContent = hasFilter ? (
       <div
-        className="w-full overflow-x-auto rounded-lg"
+        className="text-center py-16 rounded-2xl"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
         }}
       >
-        <table className="w-full text-sm">
-          <thead>
-            <tr
-              className="text-left"
-              style={{
-                background: "var(--surface-2)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <th className="w-10 px-4 py-3">
-                <SelectAllCheckbox
-                  checked={allCurrentPageSelected}
-                  indeterminate={someCurrentPageSelected}
-                  disabled={cards.length === 0}
-                  onChange={toggleCurrentPageSelection}
-                />
-              </th>
-              <th
-                className="px-2 py-3 text-[11px] font-semibold uppercase tracking-wider w-12"
-                style={{ color: "var(--muted)" }}
-              >
-                <span className="sr-only">Image</span>
-              </th>
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider min-w-[160px]"
-                style={{ color: "var(--muted)" }}
-              >
-                <button
-                  onClick={() => handleSort("name")}
-                  aria-sort={getSortState("name")}
-                  className="transition-colors"
-                  style={{
-                    color: sortBy === "name" ? "var(--accent)" : "var(--muted)",
-                  }}
-                >
-                  Name
-                  {sortBy === "name" && <SortArrow direction={sortDir} />}
-                </button>
-              </th>
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-20"
-                style={{ color: "var(--muted)" }}
-              >
-                Set
-              </th>
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-24"
-                style={{ color: "var(--muted)" }}
-              >
-                <button
-                  onClick={() => handleSort("price")}
-                  aria-sort={getSortState("price")}
-                  className="transition-colors"
-                  style={{
-                    color: sortBy === "price" ? "var(--accent)" : "var(--muted)",
-                  }}
-                >
-                  Price
-                  {sortBy === "price" && <SortArrow direction={sortDir} />}
-                </button>
-              </th>
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-16"
-                style={{ color: "var(--muted)" }}
-              >
-                Cond
-              </th>
-              {/* Phase 21 D-01: Binder column placement after Cond before Qty. */}
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-28"
-                style={{ color: "var(--muted)" }}
-              >
-                Binder
-              </th>
-              <th
-                className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider w-20"
-                style={{ color: "var(--muted)" }}
-              >
-                <button
-                  onClick={() => handleSort("quantity")}
-                  aria-sort={getSortState("quantity")}
-                  className="transition-colors"
-                  style={{
-                    color:
-                      sortBy === "quantity" ? "var(--accent)" : "var(--muted)",
-                  }}
-                >
-                  Qty
-                  {sortBy === "quantity" && <SortArrow direction={sortDir} />}
-                </button>
-              </th>
-              <th className="px-3 py-3 w-12">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {cards.map((card) => {
-              if (deletingId === card.id) {
-                return (
-                  <tr
-                    key={card.id}
-                    style={{
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    {/* Phase 21 D-01: 9 columns (was 8) after Binder col added */}
-                    <td colSpan={9}>
-                      <DeleteConfirmation
-                        cardName={card.name}
-                        onConfirm={() => handleDelete(card.id)}
-                        onCancel={() => setDeletingId(null)}
-                      />
-                    </td>
-                  </tr>
-                );
-              }
-
-              const isLowStock = card.quantity === 1;
-              const isZeroStock = card.quantity === 0;
-
+        <div
+          className="text-3xl mb-1"
+          style={{ color: "var(--accent)", opacity: 0.4 }}
+        >
+          ✦
+        </div>
+        <h2
+          className="text-lg font-semibold"
+          style={{ color: "var(--ink)", fontFamily: "var(--font-display)" }}
+        >
+          Nothing matches.
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          Try a different search term or reset the filters.
+        </p>
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="mt-4 inline-block text-sm font-semibold underline-offset-2 hover:underline"
+          style={{ color: "var(--accent)" }}
+        >
+          Reset filters
+        </button>
+      </div>
+    ) : (
+      <div
+        className="text-center py-20 rounded-2xl"
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div
+          className="text-5xl mb-2"
+          style={{ color: "var(--accent)", opacity: 0.5 }}
+        >
+          ✦
+        </div>
+        <h2
+          className="text-xl font-semibold"
+          style={{ color: "var(--ink)", fontFamily: "var(--font-display)" }}
+        >
+          The shelves are empty.
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          Import a Manabox CSV to seed the storefront.
+        </p>
+        <a
+          href="/admin/import"
+          className="mt-5 inline-block rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+          style={{
+            background: "var(--accent)",
+            color: "var(--accent-fg)",
+          }}
+        >
+          Import CSV →
+        </a>
+      </div>
+    );
+  } else {
+    bodyContent = (
+      <>
+        {/* Select-all / count strip — sits above the row list */}
+        <div
+          className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-t-2xl"
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid var(--border)",
+            borderBottom: "none",
+          }}
+        >
+          <SelectAllCheckbox
+            checked={allCurrentPageSelected}
+            indeterminate={someCurrentPageSelected}
+            disabled={cards.length === 0}
+            onChange={toggleCurrentPageSelection}
+          />
+          <span
+            className="text-[11px] uppercase tracking-wider font-semibold"
+            style={{ color: "var(--muted)" }}
+          >
+            Select page
+          </span>
+          <span
+            className="ml-auto text-[11px] tabular-nums"
+            style={{ color: "var(--muted)" }}
+          >
+            Page {page} · {cards.length} of {total.toLocaleString()}
+          </span>
+        </div>
+        <ul
+          role="list"
+          className="overflow-hidden"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderTop: "none",
+            borderBottomLeftRadius: "1rem",
+            borderBottomRightRadius: "1rem",
+          }}
+        >
+          {cards.map((card) => {
+            if (deletingId === card.id) {
               return (
-                <tr
+                <li
                   key={card.id}
-                  className="transition-colors"
-                  style={{
-                    borderBottom: "1px solid var(--border)",
-                    background: isZeroStock
-                      ? "color-mix(in oklab, rgb(220 38 38) 6%, transparent)"
-                      : "transparent",
-                    borderLeft: isLowStock
-                      ? "2px solid var(--accent)"
-                      : isZeroStock
-                      ? "2px solid rgb(220 38 38)"
-                      : "2px solid transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isZeroStock) {
-                      e.currentTarget.style.background =
-                        "color-mix(in oklab, var(--ink) 4%, transparent)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = isZeroStock
-                      ? "color-mix(in oklab, rgb(220 38 38) 6%, transparent)"
-                      : "transparent";
-                  }}
+                  style={{ borderBottom: "1px solid var(--border)" }}
                 >
-                  <td className="px-4 py-2.5">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${card.name}`}
-                      checked={selectedCardIdSet.has(card.id)}
-                      onChange={(event) =>
-                        toggleCardSelection(card.id, event.target.checked)
-                      }
-                      className="h-4 w-4 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    {card.imageUrl ? (
-                      <img
-                        src={card.imageUrl}
-                        alt=""
-                        aria-hidden="true"
-                        className="w-9 h-[50px] rounded object-cover"
-                        style={{ border: "1px solid var(--border)" }}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div
-                        className="w-9 h-[50px] rounded"
-                        style={{
-                          background: "var(--surface-2)",
-                          border: "1px solid var(--border)",
-                        }}
-                      />
-                    )}
-                  </td>
-                  <td
-                    className="px-3 py-2 truncate max-w-[260px]"
-                    style={{ color: "var(--ink)" }}
-                  >
-                    {card.name}
-                  </td>
-                  <td
-                    className="px-3 py-2 text-xs font-mono"
-                    style={{ color: "var(--muted)" }}
-                  >
-                    {card.setCode.toUpperCase()}
-                  </td>
-                  <td className="px-3 py-2">
-                    <EditableCell
-                      value={card.price ?? ""}
-                      cardId={card.id}
-                      field="price"
-                      cardName={card.name}
-                      onSave={handleSave}
-                      onError={(msg) => {
-                        setToastVariant("error");
-                        setToastMessage(msg);
-                      }}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <EditableCell
-                      value={card.condition}
-                      cardId={card.id}
-                      field="condition"
-                      cardName={card.name}
-                      onSave={handleSave}
-                      onError={(msg) => {
-                        setToastVariant("error");
-                        setToastMessage(msg);
-                      }}
-                    />
-                  </td>
-                  {/* Phase 21 D-01: render binder verbatim (lowercase
-                      normalized per Phase 17 D-04). */}
-                  <td className="px-3 py-2">
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-md"
-                      style={{
-                        background: "var(--surface-2)",
-                        color: "var(--muted)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      {card.binder}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <EditableCell
-                        value={card.quantity}
-                        cardId={card.id}
-                        field="quantity"
-                        cardName={card.name}
-                        onSave={handleSave}
-                        onError={(msg) => {
-                          setToastVariant("error");
-                          setToastMessage(msg);
-                        }}
-                      />
-                      {isLowStock && (
-                        <span
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
-                          style={{
-                            background:
-                              "color-mix(in oklab, var(--accent) 20%, transparent)",
-                            color: "var(--accent)",
-                          }}
-                          title="Only 1 copy remaining"
-                        >
-                          Low
-                        </span>
-                      )}
-                      {isZeroStock && (
-                        <span
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
-                          style={{
-                            background: "rgb(220 38 38 / 0.2)",
-                            color: "rgb(248 113 113)",
-                          }}
-                          title="Out of stock"
-                        >
-                          0
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => setDeletingId(card.id)}
-                      aria-label={`Delete ${card.name}`}
-                      className="transition-colors p-1 rounded"
-                      style={{ color: "var(--muted)" }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "rgb(248 113 113)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "var(--muted)")
-                      }
-                    >
-                      <TrashIcon />
-                    </button>
-                  </td>
-                </tr>
+                  <DeleteConfirmation
+                    cardName={card.name}
+                    onConfirm={() => handleDelete(card.id)}
+                    onCancel={() => setDeletingId(null)}
+                  />
+                </li>
               );
-            })}
-          </tbody>
-        </table>
+            }
+            return (
+              <InventoryRowCard
+                key={card.id}
+                card={card}
+                selected={selectedCardIdSet.has(card.id)}
+                density={density}
+                onSelect={toggleCardSelection}
+                onRequestDelete={setDeletingId}
+                onSave={handleSave}
+                onError={(msg) => {
+                  setToastVariant("error");
+                  setToastMessage(msg);
+                }}
+              />
+            );
+          })}
+        </ul>
+
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={50}
+            onPageChange={setPage}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ─── Render ───────────────────────────────────────────────────
+
+  return (
+    <>
+      <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
+        <FilterRail
+          binderFilter={binderFilter}
+          onBinderFilterChange={setBinderFilter}
+          availableBinders={availableBinders}
+          setFilter={setFilter}
+          onSetFilterChange={setSetFilter}
+          availableSets={availableSets}
+          conditionFilter={conditionFilter}
+          onConditionFilterChange={setConditionFilter}
+          sort={sort}
+          onSortChange={setSort}
+          onReset={resetFilters}
+          hasActiveFilter={hasFilter}
+          totalUniverse={inventoryTotal}
+        />
+
+        <section className="min-w-0 mt-6 lg:mt-0">
+          <ActionBar
+            search={search}
+            onSearchChange={setSearch}
+            density={density}
+            onDensityChange={setDensity}
+            exporting={exporting}
+            onExport={handleExport}
+            displayedCount={total}
+            inventoryTotal={inventoryTotal}
+            hasFilter={hasFilter}
+          />
+
+          <div className="mt-3">
+            {deleteSelectedConfirmation}
+            {bodyContent}
+          </div>
+        </section>
       </div>
 
-      {totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={50}
-          onPageChange={setPage}
-        />
-      )}
+      <InventoryDangerZone
+        inventoryTotal={inventoryTotal}
+        onDeleteAll={handleDeleteAll}
+      />
+
+      <SelectionDock
+        count={selectedCardIds.length}
+        deleting={deletingSelected}
+        exporting={exporting}
+        onRequestDelete={() => setConfirmingDeleteSelected(true)}
+        onExport={handleExport}
+        onClear={() => setSelectedCardIds([])}
+      />
 
       {toastElement}
     </>

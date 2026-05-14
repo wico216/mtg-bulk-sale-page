@@ -3,7 +3,10 @@ import { getAdminDashboardStats } from "@/db/queries";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { DashboardSummary } from "./_components/dashboard-summary";
+import {
+  DashboardSummary,
+  DashboardBreakdowns,
+} from "./_components/dashboard-summary";
 import { InventoryTable } from "./_components/inventory-table";
 
 export const metadata: Metadata = {
@@ -26,10 +29,10 @@ export default async function AdminPage() {
   const stats = await getAdminDashboardStats();
 
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-6">
+      <header>
         <h1
-          className="text-2xl font-semibold tracking-tight"
+          className="text-2xl sm:text-3xl font-semibold tracking-tight"
           style={{
             fontFamily: "var(--font-display)",
             color: "var(--ink)",
@@ -37,14 +40,14 @@ export default async function AdminPage() {
         >
           Inventory
         </h1>
-        <p
-          className="mt-1 text-sm"
-          style={{ color: "var(--muted)" }}
-        >
-          Manage inventory, pricing, stock, and bulk operations.
+        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          Pricing, stock, bulk operations.
         </p>
-      </div>
+      </header>
+
       <DashboardSummary stats={stats} />
+      <DashboardBreakdowns stats={stats} />
+
       <InventoryTable />
     </div>
   );
