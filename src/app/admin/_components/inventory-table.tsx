@@ -12,6 +12,7 @@ import { InventoryRowCard } from "./inventory-row";
 import { SelectionDock } from "./selection-dock";
 import { InventoryDangerZone } from "./inventory-danger-zone";
 import { useRowDensity } from "./density-toggle";
+import { InventoryLightbox } from "./inventory-lightbox";
 
 function sortKeyToParams(
   sort: InventorySortKey,
@@ -88,6 +89,9 @@ export function InventoryTable() {
   const [confirmingDeleteSelected, setConfirmingDeleteSelected] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [density, setDensity] = useRowDensity();
+  const [inspectingCard, setInspectingCard] = useState<InventoryRow | null>(
+    null,
+  );
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -594,6 +598,7 @@ export function InventoryTable() {
                 density={density}
                 onSelect={toggleCardSelection}
                 onRequestDelete={setDeletingId}
+                onInspect={setInspectingCard}
                 onSave={handleSave}
                 onError={(msg) => {
                   setToastVariant("error");
@@ -670,6 +675,11 @@ export function InventoryTable() {
         onRequestDelete={() => setConfirmingDeleteSelected(true)}
         onExport={handleExport}
         onClear={() => setSelectedCardIds([])}
+      />
+
+      <InventoryLightbox
+        card={inspectingCard}
+        onClose={() => setInspectingCard(null)}
       />
 
       {toastElement}

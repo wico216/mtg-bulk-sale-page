@@ -12,6 +12,7 @@ interface InventoryRowProps {
   density: RowDensity;
   onSelect: (cardId: string, checked: boolean) => void;
   onRequestDelete: (cardId: string) => void;
+  onInspect: (card: InventoryRowType) => void;
   onSave: (
     cardId: string,
     field: string,
@@ -81,6 +82,7 @@ export function InventoryRowCard({
   density,
   onSelect,
   onRequestDelete,
+  onInspect,
   onSave,
   onError,
 }: InventoryRowProps) {
@@ -89,13 +91,19 @@ export function InventoryRowCard({
   const config = densityConfig(density);
   const finish = String(card.finish);
 
+  // Grid columns match child count one-to-one. The filmstrip <span> is
+  // `position: absolute` so it's removed from grid auto-placement; do
+  // NOT allocate a column for it.
+  //   children: [checkbox, (thumbnail?), name, price, qty, delete]
+  const gridTemplateColumns = config.showThumbnail
+    ? `20px ${config.thumbnailWidth}px minmax(0,1fr) auto auto 32px`
+    : `20px minmax(0,1fr) auto auto 32px`;
+
   return (
     <li
       className={`group relative grid items-center gap-3 sm:gap-4 px-3 sm:px-4 ${config.verticalPaddingClass} transition-colors`}
       style={{
-        gridTemplateColumns: `12px 18px ${
-          config.showThumbnail ? `${config.thumbnailWidth}px ` : ""
-        }minmax(0,1fr) auto auto 32px`,
+        gridTemplateColumns,
         borderBottom: "1px solid var(--border)",
         background:
           stock === "zero"
@@ -133,32 +141,56 @@ export function InventoryRowCard({
         />
       </span>
 
-      {/* Thumbnail (only at standard / comfortable density) */}
-      {config.showThumbnail &&
-        (card.imageUrl ? (
-          <img
-            src={card.imageUrl}
-            alt=""
+      {/* Thumbnail (only at standard / comfortable density). Clickable —
+          opens the inspection lightbox so the operator can verify
+          condition / printing without leaving the page. */}
+      {config.showThumbnail && (
+        <button
+          type="button"
+          onClick={() => onInspect(card)}
+          aria-label={`Inspect ${card.name}`}
+          className="group/thumb relative rounded overflow-hidden cursor-zoom-in"
+          style={{
+            width: config.thumbnailWidth,
+            height: config.thumbnailHeight,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+          }}
+        >
+          {card.imageUrl ? (
+            <img
+              src={card.imageUrl}
+              alt=""
+              aria-hidden="true"
+              className="block h-full w-full object-cover transition-transform duration-200 group-hover/thumb:scale-[1.06]"
+              loading="lazy"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="flex h-full w-full items-center justify-center text-[10px]"
+              style={{ color: "var(--muted)" }}
+            >
+              no img
+            </span>
+          )}
+          {/* Subtle zoom-in glyph that appears on hover. Not load-bearing
+              (the cursor: zoom-in already signals intent), just polish. */}
+          <span
             aria-hidden="true"
-            className="rounded object-cover"
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
             style={{
-              width: config.thumbnailWidth,
-              height: config.thumbnailHeight,
-              border: "1px solid var(--border)",
+              background:
+                "color-mix(in oklab, var(--bg) 50%, transparent)",
+              color: "var(--accent)",
+              fontSize: "18px",
+              fontWeight: 700,
             }}
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="rounded"
-            style={{
-              width: config.thumbnailWidth,
-              height: config.thumbnailHeight,
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-            }}
-          />
-        ))}
+          >
+            ⊕
+          </span>
+        </button>
+      )}
 
       {/* Name + meta */}
       <div className="min-w-0">
