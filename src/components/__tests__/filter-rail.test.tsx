@@ -34,7 +34,7 @@ function resetFilterStore(cards: PublicCard[]) {
     selectedRarities: new Set<string>(),
     selectedFinishes: new Set(),
     priceRange: [0, PRICE_MAX],
-    sortBy: "name-asc",
+    sortBy: "price-desc",
   });
 }
 
@@ -76,5 +76,15 @@ describe("FilterRail set filter", () => {
     expect(search).toHaveValue("");
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(useFilterStore.getState().selectedSets.has("Alpha")).toBe(true);
+  });
+
+  it("renders official Scryfall mana symbols in color filters", () => {
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    const redMana = screen.getByAltText("{R}");
+    expect(redMana).toHaveAttribute(
+      "src",
+      "https://svgs.scryfall.io/card-symbols/R.svg",
+    );
   });
 });

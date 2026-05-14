@@ -6,86 +6,13 @@ import {
   type PriceRange,
   useFilterStore,
 } from "@/lib/store/filter-store";
+import { ManaSymbol } from "@/components/mana-symbol";
 
 const COLOR_KEYS = ["W", "U", "B", "R", "G"] as const;
 type ColorKey = (typeof COLOR_KEYS)[number];
 
-const COLOR_SWATCH: Record<ColorKey, string> = {
-  W: "oklch(0.94 0.02 85)",
-  U: "oklch(0.72 0.08 240)",
-  B: "oklch(0.35 0.02 280)",
-  R: "oklch(0.68 0.14 25)",
-  G: "oklch(0.65 0.09 145)",
-};
-
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"] as const;
 const fmtRarity = (r: string) => r[0].toUpperCase() + r.slice(1);
-
-function ColorGlyph({
-  color,
-  size = 14,
-  fg = "rgba(0,0,0,0.75)",
-}: {
-  color: ColorKey;
-  size?: number;
-  fg?: string;
-}) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: "0 0 20 20",
-    fill: "none",
-    stroke: fg,
-    strokeWidth: 1.4,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  switch (color) {
-    case "W":
-      return (
-        <svg {...common}>
-          <circle cx="10" cy="10" r="4" fill={fg} stroke="none" />
-          <g stroke={fg}>
-            <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" />
-          </g>
-        </svg>
-      );
-    case "U":
-      return (
-        <svg {...common}>
-          <path
-            d="M10 3c2.5 3.2 4.5 5.8 4.5 8.3a4.5 4.5 0 1 1-9 0C5.5 8.8 7.5 6.2 10 3Z"
-            fill={fg}
-            stroke="none"
-          />
-        </svg>
-      );
-    case "B":
-      return (
-        <svg {...common}>
-          <path d="M10 3 17 10 10 17 3 10Z" fill={fg} stroke="none" />
-          <circle cx="10" cy="10" r="1.6" fill="var(--bg)" />
-        </svg>
-      );
-    case "R":
-      return (
-        <svg {...common}>
-          <path d="M10 3 17 16 3 16Z" fill={fg} stroke="none" />
-        </svg>
-      );
-    case "G":
-      return (
-        <svg {...common}>
-          <g fill={fg} stroke="none">
-            <ellipse cx="10" cy="6" rx="2.2" ry="3.2" />
-            <ellipse cx="6" cy="12" rx="2.2" ry="3.2" transform="rotate(-35 6 12)" />
-            <ellipse cx="14" cy="12" rx="2.2" ry="3.2" transform="rotate(35 14 12)" />
-            <rect x="9.3" y="11" width="1.4" height="5" rx="0.5" />
-          </g>
-        </svg>
-      );
-  }
-}
 
 function IconSearch({ size = 14 }: { size?: number }) {
   return (
@@ -247,21 +174,17 @@ function ColorChip({
           width: 26,
           height: 26,
           borderRadius: "50%",
-          background: COLOR_SWATCH[color],
+          background: "transparent",
           boxShadow: checked
             ? "0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent)"
-            : "inset 0 0 0 1px rgba(0,0,0,0.08)",
+            : "none",
           transition: "all 0.12s",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <ColorGlyph
-          color={color}
-          size={14}
-          fg={color === "W" || color === "R" ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.75)"}
-        />
+        <ManaSymbol symbol={color} size={26} />
       </span>
       <span
         style={{

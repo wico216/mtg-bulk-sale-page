@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Image from "next/image";
 import type { PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
+import { ManaSymbol } from "@/components/mana-symbol";
 
 const CONDITION_MAP: Record<string, string> = {
   near_mint: "NM",
@@ -28,23 +29,6 @@ function formatRarity(rarity: string): string {
 
 const MANA_SYMBOL_RE = /\{([^}]+)\}/g;
 
-function ManaSymbol({ symbol }: { symbol: string }) {
-  const code = symbol.replace("/", "");
-  return (
-    <img
-      src={`https://svgs.scryfall.io/card-symbols/${encodeURIComponent(code)}.svg`}
-      alt={`{${symbol}}`}
-      style={{
-        display: "inline-block",
-        width: 16,
-        height: 16,
-        verticalAlign: "text-bottom",
-        margin: "0 2px",
-      }}
-    />
-  );
-}
-
 function OracleText({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -53,7 +37,9 @@ function OracleText({ text }: { text: string }) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    parts.push(<ManaSymbol key={match.index} symbol={match[1]} />);
+    parts.push(
+      <ManaSymbol key={match.index} symbol={match[1]} style={{ margin: "0 2px" }} />,
+    );
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) {
@@ -277,7 +263,15 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
             </dd>
             <dt style={{ color: "var(--muted)" }}>Color identity</dt>
             <dd style={{ margin: 0, color: "var(--muted)", fontSize: 11 }}>
-              {card.colorIdentity.length ? card.colorIdentity.join(" / ") : "Colorless"}
+              {card.colorIdentity.length ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {card.colorIdentity.map((symbol) => (
+                    <ManaSymbol key={symbol} symbol={symbol} size={15} />
+                  ))}
+                </span>
+              ) : (
+                "Colorless"
+              )}
             </dd>
             <dt style={{ color: "var(--muted)" }}>In stock</dt>
             <dd style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{card.quantity}</dd>
