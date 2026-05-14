@@ -44,7 +44,15 @@
  * SUM across binders.
  */
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+// `src/db/orders.ts` and its transitive deps import `"server-only"`,
+// which is a Next.js virtual module not present in node_modules. Without
+// this hoisted mock the dynamic `await import("../orders")` in beforeAll
+// throws "Cannot find package 'server-only'" and the entire suite reports
+// as 2 skipped tests under a failed suite. Same pattern as the rest of
+// the db __tests__ files (see queries-aggregated.test.ts:4 etc.).
+vi.mock("server-only", () => ({}));
 
 const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 
@@ -138,7 +146,12 @@ describeIfDb("placeCheckoutOrder — multi-binder concurrent proof (D-07)", () =
    * SUM=0 spirit with seeding that mathematically produces SUM=0.
    */
   it("two concurrent buyers ×3 against (A02:2 + A05:2) → 1 success + 1 conflict; SUM=1 (corrected from CONTEXT D-07 SUM=0)", async () => {
-    testCollectorNumber = `v1-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    // No hyphens in this string — the aggregated cardId is hyphen-delimited
+    // (set_code-collector_number-finish-condition) so any hyphen here turns
+    // a 4-segment id into 6 and trips parseAggregatedCardId. Real MTG
+    // collector numbers don't contain hyphens, so this is purely a test-id
+    // hygiene constraint.
+    testCollectorNumber = `v1_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
     aggregatedKey = `${TEST_SET_CODE}-${testCollectorNumber}-${TEST_FINISH}-${TEST_CONDITION}`;
 
     // Seed (X, A02, 2) + (X, A05, 2). Total stock 4.
@@ -252,7 +265,8 @@ describeIfDb("placeCheckoutOrder — multi-binder concurrent proof (D-07)", () =
    * makes SUM=0 mathematically correct.
    */
   it("two concurrent buyers ×3 against (A02:2 + A05:1) → 1 success + 1 conflict; SUM=0 (D-07 spirit)", async () => {
-    testCollectorNumber = `v2-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    // Same hyphen-free constraint as Variant 1 above.
+    testCollectorNumber = `v2_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
     aggregatedKey = `${TEST_SET_CODE}-${testCollectorNumber}-${TEST_FINISH}-${TEST_CONDITION}`;
 
     // Seed (X, A02, 2) + (X, A05, 1). Total stock 3.
