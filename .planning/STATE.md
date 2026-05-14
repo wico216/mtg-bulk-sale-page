@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T14:53:30.000Z"
-last_activity: 2026-05-14 — Quick task 260514-ewz completed: storefront modal flips double-faced cards front/back
+last_updated: "2026-05-14T15:06:30.000Z"
+last_activity: 2026-05-14 — Quick task 260514-fb1 completed: Scryfall-like Transform controls on card tiles and modal
 progress:
   total_phases: 22
   completed_phases: 21
@@ -128,6 +128,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 - 2026-05-14 — Quick task 260514-afo: GitHub issues #8-#12 implemented; Scryfall-style search, card type filters, larger search input, Scryfall modal links, and modal close/go-to-cart actions shipped in code commits `6227501`, `8d4b2e7`, `1288b58`; `cards.type_line` / `cards.mana_value` migration applied and backfilled (1,384 rows preserved, missing metadata 0).
 - 2026-05-14 — Quick task 260514-bjt: storefront card tile names now append finish text for non-normal cards (`Card Name - Foil`, `Card Name - Etched`); code commit `1f7f711`.
 - 2026-05-14 — Quick task 260514-ewz: storefront card modal now flips double-faced cards front/back; `cards.back_image_url` migration applied and backfilled (1,384 rows preserved, 18 rows updated with second-face images); code commit `a207739`.
+- 2026-05-14 — Quick task 260514-fb1: replaced the modal overlay flip button with a Scryfall-like `Transform` action and added tile-level transform controls for double-faced cards; code commit `dfddefe`.
 
 ## Quick Tasks Completed
 
@@ -137,3 +138,4 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 | 260514-afo | GitHub issues #8-#12 storefront search and card modal improvements | 2026-05-14 | 1288b58 | [260514-afo-github-issues-8-12-storefront-search-and](./quick/260514-afo-github-issues-8-12-storefront-search-and/) |
 | 260514-bjt | Show foil finish in storefront card names | 2026-05-14 | 1f7f711 | [260514-bjt-show-foil-finish-in-storefront-card-name](./quick/260514-bjt-show-foil-finish-in-storefront-card-name/) |
 | 260514-ewz | Add storefront card flip button for double-faced cards | 2026-05-14 | a207739 | [260514-ewz-add-storefront-card-flip-button-for-doub](./quick/260514-ewz-add-storefront-card-flip-button-for-doub/) |
+| 260514-fb1 | Refine double-faced card flip controls on storefront tiles and modal | 2026-05-14 | dfddefe | [260514-fb1-refine-double-faced-card-flip-controls-o](./quick/260514-fb1-refine-double-faced-card-flip-controls-o/) |
