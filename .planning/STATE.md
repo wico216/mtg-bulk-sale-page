@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-11T14:55:00.000Z"
-last_activity: 2026-05-11 — v1.3.1 patch pushed to origin/main (Vercel auto-deploy)
+last_updated: "2026-05-14T03:30:00.000Z"
+last_activity: 2026-05-13 — v1.3.5 allocator fix shipped (FOR UPDATE + window-function regression); Phase 18 concurrent-proof promoted from deferred to Operator Next Steps
 progress:
   total_phases: 22
   completed_phases: 21
@@ -29,8 +29,8 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
 | Category | Item | Status |
 |----------|------|--------|
 | operator_handoff | Phase 16 production migration cutover | `npm run migrate:v1.3:dry-run` then `npm run migrate:v1.3` against prod DATABASE_URL; runbook in 16-01-SUMMARY.md |
-| operator_handoff | Phase 18 multi-binder concurrent-proof 5x flake check | Requires TEST_DATABASE_URL via Neon test branch; runbook in 22-SECURITY-REVIEW.md |
 | operator_handoff | Phase 22 5-scenario live-deployment UAT | Operator-on-autopilot picker, v1.2→v1.3 cart hydration, CHECK trip detection, public-page binder leak grep, multi-binder concurrent checkout — runbook in 22-HUMAN-UAT.md |
+| ~~deferred~~ → **active** | ~~Phase 18 concurrent-proof~~ | **PROMOTED 2026-05-13 to Operator Next Steps** — see todo `.planning/todos/pending/01-phase-18-concurrent-proof.md`. Reason: the same harness that would have caught the v1.3.5 `FOR UPDATE`+window-function regression remains env-gated. Two prod incidents within 48h justify provisioning. |
 | process_artifact | Phase 22 missing canonical VERIFICATION.md aggregator | Work captured in 22-SECURITY-REVIEW.md + 22-HUMAN-UAT.md + per-plan SUMMARYs; aggregator file absent |
 | verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical, never closed via /gsd:complete-milestone) |
 | verification_gap | 04-VERIFICATION.md | human_needed (v1.0 historical) |
@@ -117,4 +117,6 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+1. **(NEXT) Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness.** Runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`. The v1.3.5 hotfix exposed that this harness — the *single most important test in the milestone per its own CONTEXT D-07* — has never run in CI because it's env-gated. The exact bug class it covers (allocator SQL correctness against real Postgres) already cost two production incidents.
+2. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
+3. When ready: start the next milestone with `/gsd:new-milestone`.
