@@ -14,6 +14,8 @@ const makeCard = (overrides: Partial<InventoryRow> = {}): InventoryRow => ({
   colorIdentity: ["W", "U"],
   imageUrl: "https://example.com/card.jpg",
   oracleText: "Flying, vigilance",
+  typeLine: "Creature — Angel",
+  manaValue: 4,
   rarity: "rare",
   finish: "normal",
   binder: "unsorted",
@@ -59,6 +61,8 @@ describe("cardToRow", () => {
     expect(row.quantity).toBe(3);
     expect(row.imageUrl).toBe("https://example.com/card.jpg");
     expect(row.oracleText).toBe("Flying, vigilance");
+    expect(row.typeLine).toBe("Creature — Angel");
+    expect(row.manaValue).toBe(4);
     expect(row.rarity).toBe("rare");
     // Phase 17 D-07: finish + binder pass through 1:1; no derivation.
     expect(row.finish).toBe("normal");

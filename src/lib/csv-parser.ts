@@ -170,6 +170,8 @@ function rowToCardOrSkip(
     colorIdentity: [],
     imageUrl: null,
     oracleText: null,
+    typeLine: null,
+    manaValue: null,
     rarity: row.Rarity || "unknown",
     finish,
     binder,

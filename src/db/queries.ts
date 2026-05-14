@@ -50,6 +50,8 @@ export function rowToCard(row: typeof cards.$inferSelect): InventoryRow {
     colorIdentity: row.colorIdentity,
     imageUrl: row.imageUrl,
     oracleText: row.oracleText,
+    typeLine: row.typeLine,
+    manaValue: row.manaValue,
     rarity: row.rarity,
     finish: row.finish,
     binder: row.binder,
@@ -80,6 +82,8 @@ interface AggregatedCardRow {
   colorIdentity: string[];
   imageUrl: string | null;
   oracleText: string | null;
+  typeLine: string | null;
+  manaValue: number | null;
   rarity: string;
   finish: Finish;
   binders: string[];
@@ -106,6 +110,8 @@ export function rowToAggregatedCard(row: AggregatedCardRow): AdminCard {
     colorIdentity: row.colorIdentity,
     imageUrl: row.imageUrl,
     oracleText: row.oracleText,
+    typeLine: row.typeLine,
+    manaValue: row.manaValue,
     rarity: row.rarity,
     finish: row.finish,
     binders: row.binders,
@@ -152,10 +158,10 @@ export async function getCardById(id: string): Promise<InventoryRow | null> {
  * (D-05/D-06 + AGG-02; enforced via the PublicCard type).
  *
  * Notes:
- *   - `setName`, `name`, `imageUrl`, `oracleText`, `rarity`, `scryfallId`
- *     use `MAX(...)` because they are identical across binder rows of the
- *     same logical card (Scryfall enriches on (setCode, collectorNumber)).
- *     MAX gives a deterministic representative.
+ *   - `setName`, `name`, `imageUrl`, `oracleText`, `typeLine`, `manaValue`,
+ *     `rarity`, `scryfallId` use `MAX(...)` because they are identical
+ *     across binder rows of the same logical card (Scryfall enriches on
+ *     (setCode, collectorNumber)). MAX gives a deterministic representative.
  *   - `colorIdentity` is `text[]`. `MAX(color_identity)` is deterministic
  *     because every row in a `(setCode, collectorNumber, finish, condition)`
  *     group is the same Oracle card, so all `color_identity` values match.
@@ -187,6 +193,8 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
       MAX(color_identity)                                                        AS "colorIdentity",
       MAX(image_url)                                                             AS "imageUrl",
       MAX(oracle_text)                                                           AS "oracleText",
+      MAX(type_line)                                                             AS "typeLine",
+      MAX(mana_value)                                                            AS "manaValue",
       MAX(rarity)                                                                AS "rarity",
       finish                                                                     AS "finish",
       ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)                             AS "binders",

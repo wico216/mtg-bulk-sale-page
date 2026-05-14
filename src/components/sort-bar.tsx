@@ -40,7 +40,7 @@ export default function SortBar() {
         flexWrap: "wrap",
       }}
     >
-      <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 420 }}>
+      <div style={{ position: "relative", flex: "1 1 560px", minWidth: 220, maxWidth: 760 }}>
         <span
           style={{
             position: "absolute",
@@ -56,7 +56,7 @@ export default function SortBar() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by card name…"
+          placeholder="Search cards or Scryfall syntax..."
           style={{
             width: "100%",
             padding: "9px 12px 9px 34px",

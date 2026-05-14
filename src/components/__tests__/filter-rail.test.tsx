@@ -19,6 +19,8 @@ function publicCard(overrides: Partial<PublicCard> = {}): PublicCard {
     colorIdentity: ["R"],
     imageUrl: null,
     oracleText: null,
+    typeLine: "Instant",
+    manaValue: 1,
     rarity: "common",
     finish: "normal",
     ...overrides,
@@ -32,6 +34,7 @@ function resetFilterStore(cards: PublicCard[]) {
     selectedColors: new Set<string>(),
     selectedSets: new Set<string>(),
     selectedRarities: new Set<string>(),
+    selectedTypes: new Set<string>(),
     selectedFinishes: new Set(),
     priceRange: [0, PRICE_MAX],
     sortBy: "price-desc",
@@ -49,6 +52,7 @@ describe("FilterRail set filter", () => {
         setName: "Beta",
         collectorNumber: "1",
         colorIdentity: ["U"],
+        typeLine: "Creature — Merfolk Wizard",
       }),
     ]);
   });
@@ -86,5 +90,19 @@ describe("FilterRail set filter", () => {
       "src",
       "https://svgs.scryfall.io/card-symbols/R.svg",
     );
+  });
+
+  it("adds a card type filter section with counts", async () => {
+    const user = userEvent.setup();
+
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    await user.click(screen.getByRole("button", { name: /card type/i }));
+    await user.click(screen.getByText("Creature"));
+
+    expect(useFilterStore.getState().selectedTypes.has("Creature")).toBe(true);
+    expect(useFilterStore.getState().getFilteredCards().map((card) => card.name)).toEqual([
+      "Counterspell",
+    ]);
   });
 });

@@ -4,6 +4,7 @@ import {
   pgEnum,
   text,
   integer,
+  real,
   bigserial,
   jsonb,
   timestamp,
@@ -49,6 +50,8 @@ export const cards = pgTable(
       .default(sql`'{}'::text[]`),
     imageUrl: text("image_url"),
     oracleText: text("oracle_text"),
+    typeLine: text("type_line"),
+    manaValue: real("mana_value"),
     rarity: text("rarity").notNull(),
     // Phase 16 FIN-01 / D-07: 3-value finish enum (replaces the legacy `foil`
     // boolean). The migration script drops the foil column after backfilling

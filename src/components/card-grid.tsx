@@ -20,6 +20,7 @@ export default function CardGrid({ cards }: CardGridProps) {
   const selectedColors = useFilterStore((s) => s.selectedColors);
   const selectedSets = useFilterStore((s) => s.selectedSets);
   const selectedRarities = useFilterStore((s) => s.selectedRarities);
+  const selectedTypes = useFilterStore((s) => s.selectedTypes);
   const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
   const priceRange = useFilterStore((s) => s.priceRange);
   const sortBy = useFilterStore((s) => s.sortBy);
@@ -33,6 +34,7 @@ export default function CardGrid({ cards }: CardGridProps) {
       selectedColors,
       selectedSets,
       selectedRarities,
+      selectedTypes,
       selectedFinishes,
       priceRange,
       sortBy,

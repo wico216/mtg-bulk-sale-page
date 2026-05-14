@@ -22,13 +22,13 @@ describe("cards table schema", () => {
 
   // Phase 16 BIND-01 / BIND-02 / FIN-01 / D-06 / D-07: post-migration column
   // shape — `foil` is gone (dropped, replaced by `finish`); `binder` and
-  // `finish` are added. Net column count: 16 - 1 (foil) + 2 (finish + binder)
-  // = 17.
-  it("has all 17 required card columns (Phase 16: +binder, +finish, -foil)", () => {
+  // `finish` are added. Quick task 260514-afo adds nullable Scryfall search
+  // metadata columns typeLine and manaValue.
+  it("has all 19 required card columns", () => {
     const requiredColumns = [
       "id", "name", "setCode", "setName", "collectorNumber",
       "price", "condition", "quantity", "colorIdentity",
-      "imageUrl", "oracleText", "rarity",
+      "imageUrl", "oracleText", "typeLine", "manaValue", "rarity",
       "finish", "binder",
       "scryfallId", "createdAt", "updatedAt",
     ];
@@ -36,7 +36,7 @@ describe("cards table schema", () => {
     for (const col of requiredColumns) {
       expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
-    expect(Object.keys(columns).length).toBe(17);
+    expect(Object.keys(columns).length).toBe(19);
   });
 
   it("has no foil column (Phase 16 D-07: replaced by finish enum)", () => {
@@ -86,7 +86,7 @@ describe("cards table schema", () => {
   });
 
   it("has no deletedAt column (D-06 hard delete)", () => {
-    expect((columns as any).deletedAt).toBeUndefined();
+    expect((columns as Record<string, unknown>).deletedAt).toBeUndefined();
   });
 });
 

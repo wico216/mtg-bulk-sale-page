@@ -40,6 +40,26 @@ function getOracleText(card: ScryfallCard): string | null {
 }
 
 /**
+ * Extract a searchable Scryfall type line.
+ * Double-faced cards may only expose per-face type lines; joining them keeps
+ * both faces searchable without adding another public card shape.
+ */
+function getTypeLine(card: ScryfallCard): string | null {
+  if (card.type_line) {
+    return card.type_line;
+  }
+
+  if (card.card_faces) {
+    const typeLines = card.card_faces
+      .map((face) => face.type_line)
+      .filter((typeLine): typeLine is string => !!typeLine);
+    return typeLines.length > 0 ? typeLines.join(" // ") : null;
+  }
+
+  return null;
+}
+
+/**
  * Extract USD price preferring the printing finish that matches the listing.
  *
  * Phase 17 D-08 — three-branch ladder per finish enum value:
@@ -221,6 +241,8 @@ export async function enrichCards(
     card.price = getPrice(scryfallData.prices, card.finish);
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);
+    card.typeLine = getTypeLine(scryfallData);
+    card.manaValue = typeof scryfallData.cmc === "number" ? scryfallData.cmc : null;
 
     if (card.price === null) {
       stats.missingPrices++;

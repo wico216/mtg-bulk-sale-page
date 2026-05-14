@@ -29,6 +29,8 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
   colorIdentity: ["W", "U"],
   imageUrl: "https://example.com/card.jpg",
   oracleText: "Flying, vigilance",
+  typeLine: "Creature — Angel",
+  manaValue: 4,
   rarity: "rare",
   // Phase 17: row carries finish enum + binder; foil boolean is gone.
   finish: "normal",
@@ -95,6 +97,8 @@ describe("rowToCard", () => {
       colorIdentity: ["W", "U"],
       imageUrl: "https://example.com/card.jpg",
       oracleText: "Flying, vigilance",
+      typeLine: "Creature — Angel",
+      manaValue: 4,
       rarity: "rare",
       finish: "normal",
       binder: "unsorted",

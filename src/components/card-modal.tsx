@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import type { PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import { ManaSymbol } from "@/components/mana-symbol";
@@ -25,6 +26,10 @@ function formatPrice(price: number | null): string {
 
 function formatRarity(rarity: string): string {
   return rarity[0].toUpperCase() + rarity.slice(1);
+}
+
+function getScryfallUrl(card: PublicCard): string {
+  return `https://scryfall.com/card/${encodeURIComponent(card.setCode)}/${encodeURIComponent(card.collectorNumber)}`;
 }
 
 const MANA_SYMBOL_RE = /\{([^}]+)\}/g;
@@ -67,6 +72,7 @@ const btnPrimary: React.CSSProperties = {
   borderRadius: 3,
   cursor: "pointer",
   fontFamily: "inherit",
+  textDecoration: "none",
 };
 
 const btnStep: React.CSSProperties = {
@@ -90,6 +96,19 @@ const btnGhost: React.CSSProperties = {
   textDecoration: "underline",
   textUnderlineOffset: 3,
   fontFamily: "inherit",
+};
+
+const btnSecondary: React.CSSProperties = {
+  background: "var(--surface-2)",
+  color: "var(--ink)",
+  border: "1px solid var(--border)",
+  padding: "10px 14px",
+  fontSize: 12,
+  fontWeight: 500,
+  borderRadius: 3,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  textDecoration: "none",
 };
 
 interface CardModalProps {
@@ -216,6 +235,20 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
                 {card.setCode.toUpperCase()} · {card.setName} · №{card.collectorNumber} ·{" "}
                 {formatRarity(card.rarity)}
               </p>
+              <a
+                href={getScryfallUrl(card)}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-block",
+                  marginTop: 10,
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  textUnderlineOffset: 3,
+                }}
+              >
+                View on Scryfall
+              </a>
             </div>
             <button
               type="button"
@@ -333,43 +366,53 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
                 Add to satchel
               </button>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    qty <= 1
-                      ? removeItem(card.id)
-                      : setQuantity(card.id, qty - 1, card.quantity)
-                  }
-                  style={btnStep}
-                >
-                  −
-                </button>
-                <span
-                  style={{
-                    fontSize: 15,
-                    minWidth: 24,
-                    textAlign: "center",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {qty}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
-                  disabled={qty >= card.quantity}
-                  style={{ ...btnStep, opacity: qty >= card.quantity ? 0.3 : 1 }}
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeItem(card.id)}
-                  style={{ ...btnGhost, marginLeft: 6 }}
-                >
-                  Remove
-                </button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      qty <= 1
+                        ? removeItem(card.id)
+                        : setQuantity(card.id, qty - 1, card.quantity)
+                    }
+                    style={btnStep}
+                  >
+                    −
+                  </button>
+                  <span
+                    style={{
+                      fontSize: 15,
+                      minWidth: 24,
+                      textAlign: "center",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {qty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
+                    disabled={qty >= card.quantity}
+                    style={{ ...btnStep, opacity: qty >= card.quantity ? 0.3 : 1 }}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(card.id)}
+                    style={{ ...btnGhost, marginLeft: 6 }}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <button type="button" onClick={onClose} style={btnSecondary}>
+                    Close
+                  </button>
+                  <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
+                    Go to cart
+                  </Link>
+                </div>
               </div>
             )}
           </div>

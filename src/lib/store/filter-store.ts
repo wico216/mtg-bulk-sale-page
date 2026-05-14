@@ -21,6 +21,154 @@ const RARITY_RANK: Record<string, number> = {
   common: 3,
 };
 
+const SEARCH_TOKEN_RE = /^([a-z]+)(<=|>=|!=|=|<|>|:)(.+)$/i;
+
+function normalize(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function searchTokens(query: string): string[] {
+  return (
+    query.match(/"[^"]+"|'[^']+'|\S+/g)?.map((token) =>
+      token.replace(/^["']|["']$/g, ""),
+    ) ?? []
+  );
+}
+
+function compareNumber(actual: number | null | undefined, operator: string, raw: string): boolean {
+  if (actual == null) return false;
+  const expected = Number(raw);
+  if (!Number.isFinite(expected)) return false;
+
+  switch (operator) {
+    case "<":
+      return actual < expected;
+    case "<=":
+      return actual <= expected;
+    case ">":
+      return actual > expected;
+    case ">=":
+      return actual >= expected;
+    case "!=":
+      return actual !== expected;
+    case ":":
+    case "=":
+    default:
+      return actual === expected;
+  }
+}
+
+function parseColorQuery(raw: string): string[] | null {
+  const text = normalize(raw).replace(/[^a-z]/g, "");
+  if (!text) return null;
+  if (text === "c" || text === "colorless") return [];
+
+  const aliases: Record<string, string> = {
+    white: "w",
+    blue: "u",
+    black: "b",
+    red: "r",
+    green: "g",
+  };
+  const compact = aliases[text] ?? text;
+  const colors = Array.from(new Set(compact.toUpperCase().match(/[WUBRG]/g) ?? []));
+  return colors.length > 0 ? colors : null;
+}
+
+function setsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((value) => b.includes(value));
+}
+
+function matchesColorQuery(
+  colorIdentity: string[],
+  operator: string,
+  raw: string,
+): boolean {
+  const expected = parseColorQuery(raw);
+  if (expected == null) return false;
+  const actual = Array.from(new Set(colorIdentity));
+  const actualSubsetOfExpected = actual.every((color) => expected.includes(color));
+  const actualSupersetOfExpected = expected.every((color) => actual.includes(color));
+  const exact = setsEqual(actual, expected);
+
+  switch (operator) {
+    case "<":
+      return actual.length < expected.length && actualSubsetOfExpected;
+    case "<=":
+      return actualSubsetOfExpected;
+    case ">":
+      return actual.length > expected.length && actualSupersetOfExpected;
+    case ">=":
+      return actualSupersetOfExpected;
+    case "!=":
+      return !exact;
+    case ":":
+    case "=":
+    default:
+      return exact;
+  }
+}
+
+function fieldIncludes(value: string | null | undefined, needle: string): boolean {
+  return normalize(value).includes(normalize(needle));
+}
+
+function matchesSearchToken(card: PublicCard, token: string): boolean {
+  const tokenMatch = token.match(SEARCH_TOKEN_RE);
+  if (!tokenMatch) {
+    const needle = normalize(token);
+    return [
+      card.name,
+      card.setCode,
+      card.setName,
+      card.collectorNumber,
+      card.oracleText,
+      card.typeLine,
+      card.rarity,
+    ].some((value) => normalize(value).includes(needle));
+  }
+
+  const [, rawKey, operator, rawValue] = tokenMatch;
+  const key = rawKey.toLowerCase();
+  const value = rawValue.trim();
+
+  switch (key) {
+    case "t":
+    case "type":
+      return fieldIncludes(card.typeLine, value);
+    case "o":
+    case "oracle":
+      return fieldIncludes(card.oracleText, value);
+    case "n":
+    case "name":
+      return fieldIncludes(card.name, value);
+    case "set":
+    case "s":
+      return normalize(card.setCode) === normalize(value) || fieldIncludes(card.setName, value);
+    case "r":
+    case "rarity":
+      return normalize(card.rarity).startsWith(normalize(value));
+    case "f":
+    case "finish":
+      return normalize(card.finish) === normalize(value);
+    case "id":
+    case "identity":
+    case "c":
+    case "color":
+      return matchesColorQuery(card.colorIdentity, operator, value);
+    case "cmc":
+    case "mv":
+    case "mana":
+      return compareNumber(card.manaValue, operator, value);
+    default:
+      return false;
+  }
+}
+
+function matchesSearchQuery(card: PublicCard, query: string): boolean {
+  return searchTokens(query).every((token) => matchesSearchToken(card, token));
+}
+
 interface FilterState {
   /** Source data set once on mount */
   allCards: PublicCard[];
@@ -32,6 +180,8 @@ interface FilterState {
   selectedSets: Set<string>;
   /** Rarity filter */
   selectedRarities: Set<string>;
+  /** Card type filter (Creature, Land, Instant, etc.) */
+  selectedTypes: Set<string>;
   /** Finish filter — 'normal' | 'foil' | 'etched' (Phase 17 — etched is first-class). */
   selectedFinishes: Set<Finish>;
   /** Price range in USD, [min, max]. PRICE_MAX means "no upper bound". */
@@ -44,6 +194,7 @@ interface FilterState {
   toggleColor: (color: string) => void;
   toggleSet: (set: string) => void;
   toggleRarity: (rarity: string) => void;
+  toggleType: (typeName: string) => void;
   toggleFinish: (finish: Finish) => void;
   setPriceRange: (range: PriceRange) => void;
   setSortBy: (sort: SortOption) => void;
@@ -59,6 +210,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
   selectedColors: new Set<string>(),
   selectedSets: new Set<string>(),
   selectedRarities: new Set<string>(),
+  selectedTypes: new Set<string>(),
   selectedFinishes: new Set<Finish>(),
   priceRange: [0, PRICE_MAX],
   sortBy: DEFAULT_SORT,
@@ -100,6 +252,17 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       return { selectedRarities: next };
     }),
 
+  toggleType: (typeName) =>
+    set((state) => {
+      const next = new Set(state.selectedTypes);
+      if (next.has(typeName)) {
+        next.delete(typeName);
+      } else {
+        next.add(typeName);
+      }
+      return { selectedTypes: next };
+    }),
+
   toggleFinish: (finish: Finish) =>
     set((state) => {
       const next = new Set(state.selectedFinishes);
@@ -121,6 +284,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       selectedColors: new Set<string>(),
       selectedSets: new Set<string>(),
       selectedRarities: new Set<string>(),
+      selectedTypes: new Set<string>(),
       selectedFinishes: new Set<Finish>(),
       priceRange: [0, PRICE_MAX],
       sortBy: state.sortBy,
@@ -133,6 +297,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       selectedColors,
       selectedSets,
       selectedRarities,
+      selectedTypes,
       selectedFinishes,
       priceRange,
       sortBy,
@@ -140,13 +305,9 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
 
     let result = allCards;
 
-    const query = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim();
     if (query) {
-      result = result.filter(
-        (card) =>
-          card.name.toLowerCase().includes(query) ||
-          card.setName.toLowerCase().includes(query),
-      );
+      result = result.filter((card) => matchesSearchQuery(card, query));
     }
 
     if (selectedColors.size > 0) {
@@ -168,6 +329,15 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
 
     if (selectedRarities.size > 0) {
       result = result.filter((card) => selectedRarities.has(card.rarity));
+    }
+
+    if (selectedTypes.size > 0) {
+      result = result.filter((card) => {
+        const typeLine = normalize(card.typeLine);
+        return [...selectedTypes].some((typeName) =>
+          typeLine.includes(typeName.toLowerCase()),
+        );
+      });
     }
 
     if (selectedFinishes.size > 0) {
@@ -219,6 +389,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       selectedColors,
       selectedSets,
       selectedRarities,
+      selectedTypes,
       selectedFinishes,
       priceRange,
       sortBy,
@@ -228,6 +399,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
       selectedColors.size > 0 ||
       selectedSets.size > 0 ||
       selectedRarities.size > 0 ||
+      selectedTypes.size > 0 ||
       selectedFinishes.size > 0 ||
       priceRange[0] > 0 ||
       priceRange[1] < PRICE_MAX ||

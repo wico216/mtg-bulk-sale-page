@@ -63,6 +63,10 @@ export interface PublicCard {
   imageUrl: string | null;
   /** Oracle rules text, null if unavailable */
   oracleText: string | null;
+  /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
+  typeLine?: string | null;
+  /** Scryfall mana value / CMC. */
+  manaValue?: number | null;
   rarity: string;
   /** Card finish — drives Scryfall price selection and display badge. */
   finish: Finish;
@@ -108,6 +112,10 @@ export interface InventoryRow {
   imageUrl: string | null;
   /** Oracle rules text, null if unavailable */
   oracleText: string | null;
+  /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
+  typeLine?: string | null;
+  /** Scryfall mana value / CMC. */
+  manaValue?: number | null;
   rarity: string;
   /** Card finish — drives Scryfall price selection and display badge. */
   finish: Finish;
@@ -145,6 +153,8 @@ export interface ScryfallCard {
   name: string;
   color_identity: string[];
   oracle_text?: string;
+  type_line?: string;
+  cmc?: number;
   image_uris?: {
     normal: string;
     small: string;
@@ -153,6 +163,7 @@ export interface ScryfallCard {
   card_faces?: Array<{
     name: string;
     oracle_text?: string;
+    type_line?: string;
     image_uris?: {
       normal: string;
     };

@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 vi.mock("@/lib/scryfall", () => ({
   fetchCard: vi.fn(),
+  fetchCardsByScryfallIds: vi.fn(() => Promise.resolve(new Map())),
 }));
 
 import { fetchCard } from "@/lib/scryfall";
@@ -34,6 +35,8 @@ function makeScryfallCard(overrides: Partial<ScryfallCard> = {}): ScryfallCard {
     name: "Lightning Bolt",
     color_identity: ["R"],
     oracle_text: "Lightning Bolt deals 3 damage to any target.",
+    type_line: "Instant",
+    cmc: 1,
     image_uris: {
       normal: "https://example.com/normal.jpg",
       small: "https://example.com/small.jpg",
@@ -81,6 +84,20 @@ describe("enrichCards onProgress + scryfallMisses", () => {
     expect(result).toBeDefined();
     expect(result.cards).toHaveLength(1);
     expect(result.scryfallMisses).toEqual([]);
+  });
+
+  it("stores Scryfall type line and mana value for storefront search metadata", async () => {
+    vi.mocked(fetchCard).mockResolvedValueOnce(
+      makeScryfallCard({
+        type_line: "Creature — Goblin",
+        cmc: 2,
+      }),
+    );
+
+    const result = await enrichCards([makeCard()]);
+
+    expect(result.cards[0].typeLine).toBe("Creature — Goblin");
+    expect(result.cards[0].manaValue).toBe(2);
   });
 
   it("populates scryfallMisses for cards fetchCard returns null for; those cards are excluded from cards[] (Test C)", async () => {
