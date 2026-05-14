@@ -110,4 +110,25 @@ describe("FilterRail set filter", () => {
     expect(screen.getByPlaceholderText("Search sets")).toBeInTheDocument();
     expect(screen.getByText("Creature")).toBeInTheDocument();
   });
+
+  it("renders price as the final filter section", () => {
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    const price = screen.getByRole("button", { name: /^price/i });
+
+    [
+      screen.getByRole("button", { name: /^color/i }),
+      screen.getByRole("button", { name: /^rarity/i }),
+      screen.getByRole("button", { name: /^card type/i }),
+      screen.getByRole("button", { name: /^finish/i }),
+      screen.getByRole("button", { name: /^set/i }),
+    ].forEach((section) => {
+      expect(
+        Boolean(
+          section.compareDocumentPosition(price) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+      ).toBe(true);
+    });
+  });
 });

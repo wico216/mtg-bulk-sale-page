@@ -671,16 +671,6 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
         </div>
       </FilterSection>
 
-      <FilterSection title="Price">
-        <RangeSlider
-          value={priceRange}
-          onChange={setPriceRange}
-          min={0}
-          max={PRICE_MAX}
-          step={1}
-        />
-      </FilterSection>
-
       <FilterSection title="Finish">
         <div style={{ display: "flex", flexDirection: "column" }}>
           <Checkbox
@@ -707,6 +697,16 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
           counts={setCounts}
           selected={selectedSets}
           onToggle={toggleSet}
+        />
+      </FilterSection>
+
+      <FilterSection title="Price">
+        <RangeSlider
+          value={priceRange}
+          onChange={setPriceRange}
+          min={0}
+          max={PRICE_MAX}
+          step={1}
         />
       </FilterSection>
     </aside>
