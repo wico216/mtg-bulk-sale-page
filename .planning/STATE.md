@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T11:58:30.000Z"
-last_activity: 2026-05-14 — Quick task 260514-afo completed: GitHub issues #8-#12 storefront search and card modal improvements; card-search metadata migration applied
+last_updated: "2026-05-14T12:20:30.000Z"
+last_activity: 2026-05-14 — Quick task 260514-bjt completed: storefront card names show Foil/Etched finish text
 progress:
   total_phases: 22
   completed_phases: 21
@@ -126,6 +126,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 - 2026-05-14 — Quick task 260514-7z2 (buyer_phone end-to-end): code shipped via b17ec52..d101581; prod migration applied (`orders.buyer_phone` column live, 1 existing row preserved with NULL phone, idempotent re-run verified).
 - 2026-05-14 — Quick task 260514-95g: storefront Set filter search moved into the set list and clears after selecting a set; code commit `8038d84`.
 - 2026-05-14 — Quick task 260514-afo: GitHub issues #8-#12 implemented; Scryfall-style search, card type filters, larger search input, Scryfall modal links, and modal close/go-to-cart actions shipped in code commits `6227501`, `8d4b2e7`, `1288b58`; `cards.type_line` / `cards.mana_value` migration applied and backfilled (1,384 rows preserved, missing metadata 0).
+- 2026-05-14 — Quick task 260514-bjt: storefront card tile names now append finish text for non-normal cards (`Card Name - Foil`, `Card Name - Etched`); code commit `1f7f711`.
 
 ## Quick Tasks Completed
 
@@ -133,3 +134,4 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 |---|-------------|------|--------|-----------|
 | 260514-95g | Add a searchable first row to the storefront set filter and clear the set search after selecting a set | 2026-05-14 | 8038d84 | [260514-95g-add-a-searchable-first-row-to-the-storef](./quick/260514-95g-add-a-searchable-first-row-to-the-storef/) |
 | 260514-afo | GitHub issues #8-#12 storefront search and card modal improvements | 2026-05-14 | 1288b58 | [260514-afo-github-issues-8-12-storefront-search-and](./quick/260514-afo-github-issues-8-12-storefront-search-and/) |
+| 260514-bjt | Show foil finish in storefront card names | 2026-05-14 | 1f7f711 | [260514-bjt-show-foil-finish-in-storefront-card-name](./quick/260514-bjt-show-foil-finish-in-storefront-card-name/) |
