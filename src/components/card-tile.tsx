@@ -9,6 +9,12 @@ function formatPrice(price: number | null): string {
   return `$${price.toFixed(2)}`;
 }
 
+function formatDisplayName(card: PublicCard): string {
+  if (card.finish === "foil") return `${card.name} - Foil`;
+  if (card.finish === "etched") return `${card.name} - Etched`;
+  return card.name;
+}
+
 /**
  * Phase 17 D-09 — finish badge in the top-left of a tile.
  * - 'normal' renders nothing (the absence of a badge IS the signal).
@@ -53,6 +59,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
   const inCart = useCartStore((s) => s.hasItem(card.id));
   const qty = useCartStore((s) => s.getQuantity(card.id));
   const addItem = useCartStore((s) => s.addItem);
+  const displayName = formatDisplayName(card);
 
   return (
     <div
@@ -161,9 +168,9 @@ export default function CardTile({ card, onClick }: CardTileProps) {
             whiteSpace: "nowrap",
             letterSpacing: "-0.005em",
           }}
-          title={card.name}
+          title={displayName}
         >
-          {card.name}
+          {displayName}
         </div>
         <div
           style={{
