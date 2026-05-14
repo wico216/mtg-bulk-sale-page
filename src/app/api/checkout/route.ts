@@ -45,6 +45,24 @@ function validateCheckoutRequest(body: CheckoutRequest): string | null {
     return "Valid email is required";
   }
 
+  // Optional buyerPhone. Undefined / null / empty-after-trim → treated as
+  // omitted (caller will pass null to placeCheckoutOrder). Otherwise the
+  // trimmed value must be ≤32 chars and contain at least one digit. No
+  // E.164 enforcement, no format normalization — the operator-grade rule
+  // is intentionally loose so buyers can paste however they have it stored.
+  // Single error string ("Invalid phone") for any failure shape so the API
+  // doesn't leak the validation rules.
+  if (body.buyerPhone !== undefined && body.buyerPhone !== null) {
+    if (typeof body.buyerPhone !== "string") {
+      return "Invalid phone";
+    }
+    const trimmed = body.buyerPhone.trim();
+    if (trimmed.length > 0) {
+      if (trimmed.length > 32) return "Invalid phone";
+      if (!/\d/.test(trimmed)) return "Invalid phone";
+    }
+  }
+
   if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
     return "Cart is empty";
   }
@@ -116,6 +134,13 @@ export async function POST(request: NextRequest) {
         orderRef: generateOrderRef(),
         buyerName: body.buyerName.trim(),
         buyerEmail: body.buyerEmail.trim(),
+        // Quick 260514-7z2: optional buyer phone for shipping/pickup
+        // coordination. Stored on AdminOrderDetail; stripped from
+        // PublicOrderData before the CheckoutResponse leaves the server.
+        buyerPhone:
+          typeof body.buyerPhone === "string" && body.buyerPhone.trim().length > 0
+            ? body.buyerPhone.trim()
+            : null,
         message: body.message?.trim() || undefined,
         items: body.items.map((item) => ({
           cardId: item.cardId,
@@ -211,15 +236,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // v1.3 Phase 20 D-07 / AGG-02: strip the per-binder source from the
-    // public CheckoutResponse. The binder snapshot lives on order_items in
-    // the DB (Phase 18 ADM-01) and is consumed by the seller email +
-    // future admin order detail (Phase 21), but MUST NOT cross the public
-    // response boundary. The PublicOrderItem type guarantees this is a
-    // compile-time error if a future caller forgets the strip.
+    // v1.3 Phase 20 D-07 / AGG-02 + Quick 260514-7z2: strip the per-binder
+    // source from the public CheckoutResponse, AND strip the admin-only
+    // buyerPhone snapshot. The binder lives on order_items in the DB
+    // (Phase 18 ADM-01) and is consumed by the seller email + admin order
+    // detail (Phase 21), but MUST NOT cross the public response boundary.
+    // The buyerPhone is captured for the operator's tel: link on the admin
+    // detail page; it MUST NOT echo back in the buyer's confirmation
+    // response (defense-in-depth — PublicOrderData already Omits it as a
+    // compile-time guarantee).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { buyerPhone: _buyerPhone, ...orderWithoutPhone } =
+      checkoutResult.order;
     const publicOrder = {
-      ...checkoutResult.order,
-      items: checkoutResult.order.items.map(
+      ...orderWithoutPhone,
+      items: orderWithoutPhone.items.map(
         ({ binder: _binder, ...item }) => item,
       ),
     };

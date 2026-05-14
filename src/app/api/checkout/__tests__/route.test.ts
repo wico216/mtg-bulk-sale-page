@@ -36,6 +36,7 @@ const sampleOrder = {
   orderRef: "ORD-20260427-020304-ABCD12",
   buyerName: "Viki",
   buyerEmail: "viki@example.com",
+  buyerPhone: null as string | null,
   message: "pickup tomorrow",
   items: [
     {
@@ -99,12 +100,17 @@ describe("POST /api/checkout", () => {
     const data = await response.json();
 
     expect(response.status).toBe(201);
-    // v1.3 Phase 20 D-07/AGG-02: response.order is PublicOrderData with
-    // `binder` stripped from each item. Build the expected shape from
-    // sampleOrder by destructuring out `binder` per item.
+    // v1.3 Phase 20 D-07/AGG-02 + Quick 260514-7z2: response.order is
+    // PublicOrderData with `binder` stripped from each item AND
+    // `buyerPhone` stripped from the order itself. Build the expected
+    // shape from sampleOrder by destructuring out both.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { buyerPhone: _buyerPhone, ...orderWithoutPhone } = sampleOrder;
     const expectedPublicOrder = {
-      ...sampleOrder,
-      items: sampleOrder.items.map(({ binder: _binder, ...item }) => item),
+      ...orderWithoutPhone,
+      items: orderWithoutPhone.items.map(
+        ({ binder: _binder, ...item }) => item,
+      ),
     };
     expect(data).toEqual({
       success: true,
@@ -474,6 +480,84 @@ describe("POST /api/checkout", () => {
       const serialized = JSON.stringify(body).toLowerCase();
       expect(serialized.includes("binder")).toBe(false);
       expect(serialized.includes("binders")).toBe(false);
+    });
+  });
+
+  // Quick 260514-7z2: optional buyerPhone field validation + admin-only
+  // persistence (the response must NOT carry it back to the buyer).
+  describe("buyer phone (Quick 260514-7z2)", () => {
+    it("accepts a checkout with no buyerPhone (omitted)", async () => {
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: true,
+        order: sampleOrder,
+      });
+      const response = await POST(makeCheckoutRequest(validBody()));
+      expect(response.status).toBe(201);
+      expect(mockPlaceCheckoutOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ buyerPhone: null }),
+      );
+    });
+
+    it("accepts a checkout with a valid buyerPhone", async () => {
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: true,
+        order: { ...sampleOrder, buyerPhone: "555-1234" },
+      });
+      const response = await POST(
+        makeCheckoutRequest(validBody({ buyerPhone: "555-1234" })),
+      );
+      expect(response.status).toBe(201);
+      expect(mockPlaceCheckoutOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ buyerPhone: "555-1234" }),
+      );
+    });
+
+    it("rejects buyerPhone > 32 chars with 400 Invalid phone", async () => {
+      const response = await POST(
+        makeCheckoutRequest(validBody({ buyerPhone: "5".repeat(33) })),
+      );
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid phone");
+      expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
+    });
+
+    it("rejects buyerPhone with no digits with 400 Invalid phone", async () => {
+      const response = await POST(
+        makeCheckoutRequest(validBody({ buyerPhone: "abc" })),
+      );
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid phone");
+      expect(mockPlaceCheckoutOrder).not.toHaveBeenCalled();
+    });
+
+    it("strips buyerPhone from the public CheckoutResponse", async () => {
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: true,
+        order: { ...sampleOrder, buyerPhone: "555-1234" },
+      });
+      const response = await POST(
+        makeCheckoutRequest(validBody({ buyerPhone: "555-1234" })),
+      );
+      expect(response.status).toBe(201);
+      const data = await response.json();
+      // Admin-only field: must not echo back to the buyer's CheckoutResponse.
+      expect(data.order).not.toHaveProperty("buyerPhone");
+    });
+
+    it("treats whitespace-only buyerPhone as null", async () => {
+      mockPlaceCheckoutOrder.mockResolvedValueOnce({
+        ok: true,
+        order: sampleOrder,
+      });
+      const response = await POST(
+        makeCheckoutRequest(validBody({ buyerPhone: "  " })),
+      );
+      expect(response.status).toBe(201);
+      expect(mockPlaceCheckoutOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ buyerPhone: null }),
+      );
     });
   });
 });
