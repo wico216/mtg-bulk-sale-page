@@ -61,7 +61,6 @@ describe("FilterRail set filter", () => {
     const user = userEvent.setup();
 
     render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
-    await user.click(screen.getByRole("button", { name: /set/i }));
 
     const search = screen.getByPlaceholderText("Search sets");
     const alpha = screen.getByText("Alpha");
@@ -97,12 +96,18 @@ describe("FilterRail set filter", () => {
 
     render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: /card type/i }));
     await user.click(screen.getByText("Creature"));
 
     expect(useFilterStore.getState().selectedTypes.has("Creature")).toBe(true);
     expect(useFilterStore.getState().getFilteredCards().map((card) => card.name)).toEqual([
       "Counterspell",
     ]);
+  });
+
+  it("opens card type and set filter sections by default", () => {
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    expect(screen.getByPlaceholderText("Search sets")).toBeInTheDocument();
+    expect(screen.getByText("Creature")).toBeInTheDocument();
   });
 });

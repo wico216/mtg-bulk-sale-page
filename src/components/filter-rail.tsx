@@ -657,7 +657,7 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
         </div>
       </FilterSection>
 
-      <FilterSection title="Card Type" defaultOpen={false}>
+      <FilterSection title="Card Type">
         <div style={{ display: "flex", flexDirection: "column" }}>
           {TYPE_OPTIONS.map((typeName) => (
             <Checkbox
@@ -701,7 +701,7 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
         </div>
       </FilterSection>
 
-      <FilterSection title="Set" defaultOpen={false}>
+      <FilterSection title="Set">
         <SetFilter
           sets={sortedSets}
           counts={setCounts}
