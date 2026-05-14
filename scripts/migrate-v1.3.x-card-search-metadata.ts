@@ -18,8 +18,11 @@
 
 import { sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { config } from "dotenv";
 import type { ScryfallCard } from "@/lib/types";
 import { fetchCard, fetchCardsByScryfallIds } from "@/lib/scryfall";
+
+config({ path: ".env.local" });
 
 export interface MigrationDb {
   execute: NeonHttpDatabase<Record<string, never>>["execute"];
