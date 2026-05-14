@@ -207,6 +207,7 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
       MAX(updated_at)                                                            AS "updatedAt"
     FROM cards
     GROUP BY set_code, collector_number, finish, condition
+    HAVING SUM(quantity) > 0
     ORDER BY MAX(name) ASC
   `);
   return result.rows.map(rowToAggregatedCard);

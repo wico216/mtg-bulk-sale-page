@@ -5,11 +5,13 @@ const {
   mockPlaceCheckoutOrder,
   mockNotifyOrder,
   mockEnforceRateLimit,
+  mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockGetCards: vi.fn(),
   mockPlaceCheckoutOrder: vi.fn(),
   mockNotifyOrder: vi.fn(),
   mockEnforceRateLimit: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -29,6 +31,9 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
     enforceRateLimit: mockEnforceRateLimit,
   };
 });
+vi.mock("next/cache", () => ({
+  revalidatePath: mockRevalidatePath,
+}));
 
 import { POST } from "../route";
 
@@ -84,6 +89,7 @@ describe("POST /api/checkout", () => {
     mockPlaceCheckoutOrder.mockReset();
     mockNotifyOrder.mockReset();
     mockEnforceRateLimit.mockReset();
+    mockRevalidatePath.mockReset();
     mockGetCards.mockRejectedValue(new Error("legacy getCards should not be called"));
     mockNotifyOrder.mockResolvedValue({
       sellerEmailSent: true,
@@ -108,9 +114,10 @@ describe("POST /api/checkout", () => {
     const { buyerPhone: _buyerPhone, ...orderWithoutPhone } = sampleOrder;
     const expectedPublicOrder = {
       ...orderWithoutPhone,
-      items: orderWithoutPhone.items.map(
-        ({ binder: _binder, ...item }) => item,
-      ),
+      items: orderWithoutPhone.items.map(({ binder, ...item }) => {
+        void binder;
+        return item;
+      }),
     };
     expect(data).toEqual({
       success: true,
@@ -131,6 +138,7 @@ describe("POST /api/checkout", () => {
     // 18 D-15). Only the public response is stripped.
     expect(mockNotifyOrder).toHaveBeenCalledWith(sampleOrder);
     expect(mockGetCards).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 
   it("still returns success when post-commit notifications fail", async () => {
@@ -236,6 +244,7 @@ describe("POST /api/checkout", () => {
       conflicts,
     });
     expect(mockNotifyOrder).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { placeCheckoutOrder } from "@/db/orders";
 import { generateOrderRef } from "@/lib/order";
 import { notifyOrder, type NotifyResult } from "@/lib/notifications";
@@ -93,6 +94,18 @@ async function notifyOrderAfterCommit(order: OrderData): Promise<NotifyResult> {
       metadata: { orderRef: order.orderRef, totalItems: order.totalItems },
     });
     return { sellerEmailSent: false, buyerEmailSent: false };
+  }
+}
+
+function revalidateStorefrontAfterCheckout() {
+  try {
+    revalidatePath("/");
+  } catch (error) {
+    logError({
+      event: "checkout.revalidate_failed",
+      route: ROUTE,
+      error,
+    });
   }
 }
 
@@ -221,6 +234,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    revalidateStorefrontAfterCheckout();
+
     const notification = await notifyOrderAfterCommit(checkoutResult.order);
 
     if (!notification.sellerEmailSent || !notification.buyerEmailSent) {
@@ -250,9 +265,10 @@ export async function POST(request: NextRequest) {
       checkoutResult.order;
     const publicOrder = {
       ...orderWithoutPhone,
-      items: orderWithoutPhone.items.map(
-        ({ binder: _binder, ...item }) => item,
-      ),
+      items: orderWithoutPhone.items.map(({ binder, ...item }) => {
+        void binder;
+        return item;
+      }),
     };
     const response: CheckoutResponse = {
       success: true,

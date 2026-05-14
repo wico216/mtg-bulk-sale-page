@@ -16,9 +16,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockPlaceCheckoutOrder,
   mockNotifyOrder,
+  mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockPlaceCheckoutOrder: vi.fn(),
   mockNotifyOrder: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -27,6 +29,9 @@ vi.mock("@/db/orders", () => ({
 }));
 vi.mock("@/lib/notifications", () => ({
   notifyOrder: mockNotifyOrder,
+}));
+vi.mock("next/cache", () => ({
+  revalidatePath: mockRevalidatePath,
 }));
 // NOTE: no mock of @/lib/rate-limit -- real module exercised.
 
@@ -65,6 +70,7 @@ describe("Phase 15-01 verification: checkout rate-limit (real module)", () => {
     __resetDefaultRateLimitStoreForTests();
     mockPlaceCheckoutOrder.mockReset();
     mockNotifyOrder.mockReset();
+    mockRevalidatePath.mockReset();
     mockPlaceCheckoutOrder.mockResolvedValue({ ok: true, order: sampleOrder });
     mockNotifyOrder.mockResolvedValue({ sellerEmailSent: true, buyerEmailSent: true });
     process.env.RESEND_API_KEY = "test-resend-key";
