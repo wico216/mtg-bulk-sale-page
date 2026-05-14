@@ -610,6 +610,25 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
           >
             {order.buyerEmail}
           </a>
+          {/* Quick 260514-7z2 — admin-only tel: link for shipping/pickup
+              coordination. Mirrors the "No message provided." italic-
+              muted fallback used in the message card. */}
+          {order.buyerPhone ? (
+            <a
+              href={`tel:${order.buyerPhone}`}
+              className="block text-sm transition-colors hover:underline mt-1"
+              style={{ color: "var(--accent)" }}
+            >
+              {order.buyerPhone}
+            </a>
+          ) : (
+            <p
+              className="mt-1 text-xs italic"
+              style={{ color: "var(--muted)" }}
+            >
+              No phone provided.
+            </p>
+          )}
         </div>
         <div className="p-5 sm:p-6">
           <h2

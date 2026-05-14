@@ -64,6 +64,7 @@ function makeOrder(overrides: Partial<AdminOrderDetail> = {}): AdminOrderDetail 
     orderRef: "ORD-2026-001",
     buyerName: "Alex Buyer",
     buyerEmail: "alex@example.com",
+    buyerPhone: null,
     message: undefined,
     adminNote: null,
     totalItems: 1,
@@ -171,5 +172,21 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
       ancestor = ancestor.parentElement;
     }
     expect(ancestor).not.toBeNull();
+  });
+});
+
+describe("OrderDetail buyer phone (Quick 260514-7z2)", () => {
+  it("renders a tel: link when buyerPhone is set", () => {
+    render(<OrderDetail order={makeOrder({ buyerPhone: "555-1234" })} />);
+    const phoneLink = screen.getByRole("link", { name: "555-1234" });
+    expect(phoneLink).toBeInTheDocument();
+    expect(phoneLink.getAttribute("href")).toBe("tel:555-1234");
+  });
+
+  it("renders 'No phone provided.' fallback when buyerPhone is null", () => {
+    render(<OrderDetail order={makeOrder({ buyerPhone: null })} />);
+    expect(screen.getByText(/no phone provided/i)).toBeInTheDocument();
+    // And the tel: link MUST NOT exist in this branch.
+    expect(screen.queryByRole("link", { name: /tel:/ })).toBeNull();
   });
 });

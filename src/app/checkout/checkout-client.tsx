@@ -53,6 +53,7 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
   // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
         body: JSON.stringify({
           buyerName: name.trim(),
           buyerEmail: email.trim(),
+          buyerPhone: phone.trim() || undefined,
           message: message.trim() || undefined,
           items: cartEntries.map(([cardId, qty]) => ({
             cardId,
@@ -247,6 +249,32 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                     disabled={submitting}
                     className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                </div>
+
+                {/* Phone field (optional) — Quick 260514-7z2 */}
+                <div>
+                  <label
+                    htmlFor="buyerPhone"
+                    className="text-sm font-semibold mb-1 block"
+                  >
+                    Phone (optional)
+                  </label>
+                  <input
+                    id="buyerPhone"
+                    name="buyerPhone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={32}
+                    placeholder="555-1234"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={submitting}
+                    className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    For shipping coordination. Optional.
+                  </p>
                 </div>
 
                 {/* Message field */}
