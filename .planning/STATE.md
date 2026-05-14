@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Binder-Aware Inventory & Pick Workflow
 status: Awaiting next milestone
-last_updated: "2026-05-14T06:02:00.000Z"
-last_activity: 2026-05-14 — buyer_phone slice shipped (orders.buyer_phone column + idempotent migration + storefront input + admin tel: link); prod cutover pending operator manual run
+last_updated: "2026-05-14T10:15:00.000Z"
+last_activity: 2026-05-14 — buyer_phone slice shipped + prod migration applied (orders.buyer_phone column live, 1 existing order row preserved with NULL phone)
 progress:
   total_phases: 22
   completed_phases: 21
@@ -117,12 +117,10 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-1. **(NEXT) Run the buyer_phone migration against prod.** Same pattern as the deferred Phase 16 cutover. Locally:
-   ```bash
-   npm run migrate:phone:dry-run   # against a Neon branch first
-   npm run migrate:phone           # against the production DATABASE_URL
-   ```
-   The migration is idempotent: re-running on a schema that already has `buyer_phone` exits 0 with the "already present" summary. Runbook header in `scripts/migrate-v1.3.x-buyer-phone.ts`. The buyer-side input and admin tel: link are already deployed; until the migration runs, checkout POSTs will fail at the INSERT because the column doesn't exist on prod.
-2. **Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness.** Runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`. The v1.3.5 hotfix exposed that this harness — the *single most important test in the milestone per its own CONTEXT D-07* — has never run in CI because it's env-gated. The exact bug class it covers (allocator SQL correctness against real Postgres) already cost two production incidents.
-3. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
-4. When ready: start the next milestone with `/gsd:new-milestone`.
+1. **(NEXT) Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness.** Runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`. The v1.3.5 hotfix exposed that this harness — the *single most important test in the milestone per its own CONTEXT D-07* — has never run in CI because it's env-gated. The exact bug class it covers (allocator SQL correctness against real Postgres) already cost two production incidents.
+2. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
+3. When ready: start the next milestone with `/gsd:new-milestone`.
+
+## Recently Completed
+
+- 2026-05-14 — Quick task 260514-7z2 (buyer_phone end-to-end): code shipped via b17ec52..d101581; prod migration applied (`orders.buyer_phone` column live, 1 existing row preserved with NULL phone, idempotent re-run verified).
