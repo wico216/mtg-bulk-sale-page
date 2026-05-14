@@ -19,6 +19,9 @@ const sqlOrder = {
   orderRef: "ORD-20260427-020304-ABCD12",
   buyerName: "Viki",
   buyerEmail: "viki@example.com",
+  // 2026-05-14 quick task 260514-7z2: SQL payload now carries a nullable
+  // buyer_phone snapshot. Default fixture omits → null (buyer didn't supply).
+  buyerPhone: null,
   message: "pickup tomorrow",
   totalItems: 3,
   totalPrice: 425,
@@ -35,6 +38,8 @@ const sqlOrder = {
       quantity: 3,
       lineTotal: 375,
       imageUrl: "https://example.com/bolt.jpg",
+      // Phase 18 D-11: order_items.binder snapshot (NOT NULL DEFAULT 'unsorted').
+      binder: "unsorted",
     },
     {
       cardId: "mh2-45-normal-lightly_played",
@@ -47,6 +52,7 @@ const sqlOrder = {
       quantity: 1,
       lineTotal: 50,
       imageUrl: null,
+      binder: "unsorted",
     },
   ],
 };

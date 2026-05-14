@@ -90,6 +90,8 @@ interface PersistedOrder {
   orderRef: string;
   buyerName: string;
   buyerEmail: string;
+  // 2026-05-14 quick task 260514-7z2: optional buyer phone snapshot.
+  buyerPhone?: string | null;
   message?: string | null;
   totalItems: number;
   totalPrice: number;
@@ -134,6 +136,10 @@ function normalizeOrder(order: PersistedOrder): OrderData {
     orderRef: order.orderRef,
     buyerName: order.buyerName,
     buyerEmail: order.buyerEmail,
+    // 2026-05-14 quick task 260514-7z2: phone is OPTIONAL — buyers can omit.
+    // Normalize null/undefined to null so downstream callers have a single
+    // sentinel for "not provided".
+    buyerPhone: order.buyerPhone ?? null,
     message: order.message ?? undefined,
     items,
     totalItems: order.totalItems,
@@ -277,6 +283,8 @@ interface AdminOrderRow {
   id: string;
   buyerName: string;
   buyerEmail: string;
+  // 2026-05-14 quick task 260514-7z2: optional buyer phone snapshot.
+  buyerPhone?: string | null;
   message?: string | null;
   adminNote?: string | null;
   totalItems: number;
@@ -439,6 +447,10 @@ export async function placeCheckoutOrder(input: {
   orderRef: string;
   buyerName: string;
   buyerEmail: string;
+  // 2026-05-14 quick task 260514-7z2: optional buyer phone for pickup/shipping
+  // coordination. Validated by the API route before reaching this helper;
+  // here we trust it and thread it into the INSERT.
+  buyerPhone?: string | null;
   message?: string;
   items: CheckoutLineInput[];
 }): Promise<PlaceCheckoutOrderResult> {
@@ -556,12 +568,12 @@ export async function placeCheckoutOrder(input: {
         FROM nonzero_allocations nz
     ),
     inserted_order AS (
-      INSERT INTO orders (id, buyer_name, buyer_email, message, total_items, total_price, status)
-      SELECT ${input.orderRef}, ${input.buyerName}, ${input.buyerEmail}, ${input.message ?? null},
+      INSERT INTO orders (id, buyer_name, buyer_email, buyer_phone, message, total_items, total_price, status)
+      SELECT ${input.orderRef}, ${input.buyerName}, ${input.buyerEmail}, ${input.buyerPhone ?? null}, ${input.message ?? null},
              order_totals.total_items, order_totals.total_price, 'pending'::order_status
         FROM order_totals, write_check
        WHERE write_check.ok
-      RETURNING id, buyer_name, buyer_email, message, total_items, total_price, status, created_at
+      RETURNING id, buyer_name, buyer_email, buyer_phone, message, total_items, total_price, status, created_at
     ),
     inserted_items AS (
       INSERT INTO order_items (
@@ -596,6 +608,7 @@ export async function placeCheckoutOrder(input: {
           'orderRef', inserted_order.id,
           'buyerName', inserted_order.buyer_name,
           'buyerEmail', inserted_order.buyer_email,
+          'buyerPhone', inserted_order.buyer_phone,
           'message', inserted_order.message,
           'totalItems', inserted_order.total_items,
           'totalPrice', inserted_order.total_price,
@@ -726,6 +739,7 @@ export async function getOrderById(
       id,
       buyer_name AS "buyerName",
       buyer_email AS "buyerEmail",
+      buyer_phone AS "buyerPhone",
       message,
       admin_note AS "adminNote",
       total_items AS "totalItems",
@@ -762,6 +776,9 @@ export async function getOrderById(
     orderRef: order.id,
     buyerName: order.buyerName,
     buyerEmail: order.buyerEmail,
+    // 2026-05-14 quick task 260514-7z2: thread buyer_phone through. NULL
+    // when buyer omitted; admin order detail uses this for the tel: link.
+    buyerPhone: order.buyerPhone ?? null,
     message: order.message ?? undefined,
     adminNote: order.adminNote ?? null,
     totalItems: order.totalItems,

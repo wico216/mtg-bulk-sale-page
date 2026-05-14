@@ -49,6 +49,9 @@ const detailOrderRow = {
   id: "ORD-20260427-020304-ABC123",
   buyerName: "Viki",
   buyerEmail: "viki@example.com",
+  // 2026-05-14 quick task 260514-7z2: orders SELECT now reads buyer_phone.
+  // Default fixture omits → null (buyer didn't supply).
+  buyerPhone: null,
   message: "Bring to FNM",
   totalItems: 3,
   totalPrice: 425,
@@ -69,6 +72,8 @@ const detailItemRows = [
     quantity: 3,
     lineTotal: 375,
     imageUrl: "https://example.com/bolt.jpg",
+    // Phase 18 D-11: order_items.binder snapshot (NOT NULL DEFAULT 'unsorted').
+    binder: "unsorted",
   },
   {
     cardId: "mh2-45-normal-lightly_played",
@@ -81,6 +86,7 @@ const detailItemRows = [
     quantity: 1,
     lineTotal: 50,
     imageUrl: null,
+    binder: "unsorted",
   },
 ];
 
@@ -191,6 +197,8 @@ describe("getOrderById", () => {
       orderRef: detailOrderRow.id,
       buyerName: detailOrderRow.buyerName,
       buyerEmail: detailOrderRow.buyerEmail,
+      // 2026-05-14 quick task 260514-7z2: getOrderById now threads buyer_phone.
+      buyerPhone: null,
       message: detailOrderRow.message,
       adminNote: detailOrderRow.adminNote,
       totalItems: 3,

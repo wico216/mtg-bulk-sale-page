@@ -206,8 +206,15 @@ export type PublicOrderItem = Omit<OrderItem, "binder">;
  * v1.3 Phase 20 D-07 — public-facing variant of OrderData with binder-less
  * items[]. Used by `CheckoutResponse.order`. Internal `OrderData` (Phase 18)
  * retains the full `OrderItem[]` for email + admin paths.
+ *
+ * 2026-05-14 quick task 260514-7z2: also strips the admin-only buyer_phone
+ * snapshot before the response leaves the server, alongside the existing
+ * per-binder strip on items[]. Phone is admin-only context (used for
+ * pickup/shipping coordination via tel: link on admin order detail) and
+ * never returned to the buyer's CheckoutResponse — even on their own order,
+ * since the buyer entered it and doesn't need it echoed back.
  */
-export type PublicOrderData = Omit<OrderData, "items"> & {
+export type PublicOrderData = Omit<OrderData, "items" | "buyerPhone"> & {
   items: PublicOrderItem[];
 };
 
@@ -234,6 +241,13 @@ export interface OrderData {
   orderRef: string;
   buyerName: string;
   buyerEmail: string;
+  /**
+   * 2026-05-14 quick task 260514-7z2: optional buyer phone for
+   * shipping/pickup coordination. Validated server-side (≤32 chars, must
+   * contain at least one digit). Stored on AdminOrderDetail; NEVER
+   * returned on PublicOrderData (stripped by the checkout route handler).
+   */
+  buyerPhone?: string | null;
   message?: string;
   items: OrderItem[];
   totalItems: number;
@@ -245,6 +259,12 @@ export interface OrderData {
 export interface CheckoutRequest {
   buyerName: string;
   buyerEmail: string;
+  /**
+   * 2026-05-14 quick task 260514-7z2: optional buyer phone for
+   * shipping/pickup coordination. Validated server-side (≤32 chars, must
+   * contain at least one digit). Empty/whitespace is treated as omitted.
+   */
+  buyerPhone?: string | null;
   message?: string;
   items: Array<{ cardId: string; quantity: number }>;
 }

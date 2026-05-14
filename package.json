@@ -10,7 +10,9 @@
     "lint": "eslint",
     "smoke:production": "tsx scripts/smoke-production.ts",
     "migrate:v1.3": "tsx scripts/migrate-v1.3-binder.ts",
-    "migrate:v1.3:dry-run": "tsx scripts/migrate-v1.3-binder.ts --dry-run"
+    "migrate:v1.3:dry-run": "tsx scripts/migrate-v1.3-binder.ts --dry-run",
+    "migrate:phone": "tsx scripts/migrate-v1.3.x-buyer-phone.ts",
+    "migrate:phone:dry-run": "tsx scripts/migrate-v1.3.x-buyer-phone.ts --dry-run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

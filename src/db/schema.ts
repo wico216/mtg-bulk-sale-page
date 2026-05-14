@@ -140,6 +140,12 @@ export const orders = pgTable(
     id: text("id").primaryKey(),
     buyerName: text("buyer_name").notNull(),
     buyerEmail: text("buyer_email").notNull(),
+    // 2026-05-14 quick task 260514-7z2: optional buyer phone for pickup/shipping
+    // coordination. NULLABLE — buyers can submit without a phone. Validated
+    // server-side (≤32 chars, must contain at least one digit) at the API
+    // boundary. Lives on AdminOrderDetail; explicitly stripped from
+    // PublicOrderData so it NEVER reaches the buyer's CheckoutResponse.
+    buyerPhone: text("buyer_phone"),
     message: text("message"),
     adminNote: text("admin_note"),
     totalItems: integer("total_items").notNull(),
