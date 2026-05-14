@@ -13,6 +13,7 @@ const makeCard = (overrides: Partial<InventoryRow> = {}): InventoryRow => ({
   quantity: 3,
   colorIdentity: ["W", "U"],
   imageUrl: "https://example.com/card.jpg",
+  backImageUrl: "https://example.com/card-back.jpg",
   oracleText: "Flying, vigilance",
   typeLine: "Creature — Angel",
   manaValue: 4,
@@ -60,6 +61,7 @@ describe("cardToRow", () => {
     expect(row.condition).toBe("NearMint");
     expect(row.quantity).toBe(3);
     expect(row.imageUrl).toBe("https://example.com/card.jpg");
+    expect(row.backImageUrl).toBe("https://example.com/card-back.jpg");
     expect(row.oracleText).toBe("Flying, vigilance");
     expect(row.typeLine).toBe("Creature — Angel");
     expect(row.manaValue).toBe(4);

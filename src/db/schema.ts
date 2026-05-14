@@ -49,6 +49,7 @@ export const cards = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     imageUrl: text("image_url"),
+    backImageUrl: text("back_image_url"),
     oracleText: text("oracle_text"),
     typeLine: text("type_line"),
     manaValue: real("mana_value"),

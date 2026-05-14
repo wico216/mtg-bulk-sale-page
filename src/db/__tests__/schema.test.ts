@@ -23,12 +23,13 @@ describe("cards table schema", () => {
   // Phase 16 BIND-01 / BIND-02 / FIN-01 / D-06 / D-07: post-migration column
   // shape — `foil` is gone (dropped, replaced by `finish`); `binder` and
   // `finish` are added. Quick task 260514-afo adds nullable Scryfall search
-  // metadata columns typeLine and manaValue.
-  it("has all 19 required card columns", () => {
+  // metadata columns typeLine and manaValue. Quick task 260514-ewz adds
+  // nullable backImageUrl for double-faced storefront flip support.
+  it("has all 20 required card columns", () => {
     const requiredColumns = [
       "id", "name", "setCode", "setName", "collectorNumber",
       "price", "condition", "quantity", "colorIdentity",
-      "imageUrl", "oracleText", "typeLine", "manaValue", "rarity",
+      "imageUrl", "backImageUrl", "oracleText", "typeLine", "manaValue", "rarity",
       "finish", "binder",
       "scryfallId", "createdAt", "updatedAt",
     ];
@@ -36,7 +37,7 @@ describe("cards table schema", () => {
     for (const col of requiredColumns) {
       expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
-    expect(Object.keys(columns).length).toBe(19);
+    expect(Object.keys(columns).length).toBe(20);
   });
 
   it("has no foil column (Phase 16 D-07: replaced by finish enum)", () => {

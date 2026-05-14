@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import type { PublicCard, CardData } from "@/lib/types";
 import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
@@ -138,11 +139,9 @@ export default function CardGrid({ cards }: CardGridProps) {
         <CardModal
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
-          onImageClick={() => {
-            if (selectedCard.imageUrl) {
-              setSelectedCard(null);
-              setLightboxUrl(selectedCard.imageUrl.replace("/normal/", "/large/"));
-            }
+          onImageClick={(imageUrl) => {
+            setSelectedCard(null);
+            setLightboxUrl(imageUrl.replace("/normal/", "/large/"));
           }}
         />
       )}
@@ -153,9 +152,11 @@ export default function CardGrid({ cards }: CardGridProps) {
           onClick={() => setLightboxUrl(null)}
         >
           <div className="min-h-full flex items-center justify-center p-4">
-            <img
+            <Image
               src={lightboxUrl}
               alt="Full card art"
+              width={672}
+              height={936}
               className="max-h-[90vh] max-w-[90vw] object-contain cursor-zoom-out"
               onClick={(e) => {
                 e.stopPropagation();

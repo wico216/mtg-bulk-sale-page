@@ -1,22 +1,26 @@
 import type { InventoryRow, Finish, ScryfallCard } from "./types";
 import { fetchCard, fetchCardsByScryfallIds } from "./scryfall";
 
+interface CardImageUrls {
+  frontImageUrl: string | null;
+  backImageUrl: string | null;
+}
+
 /**
- * Extract the normal image URL from a Scryfall card.
- * Handles double-faced cards by falling back to card_faces[0].
+ * Extract storefront image URLs from a Scryfall card.
+ * Double-faced cards store each side under card_faces instead of image_uris.
  */
-function getImageUrl(card: ScryfallCard): string | null {
+function getImageUrls(card: ScryfallCard): CardImageUrls {
   if (card.image_uris) {
-    return card.image_uris.normal;
+    return {
+      frontImageUrl: card.image_uris.normal,
+      backImageUrl: null,
+    };
   }
 
-  // Double-faced cards have no top-level image_uris
-  const frontFace = card.card_faces?.[0];
-  if (frontFace?.image_uris?.normal) {
-    return frontFace.image_uris.normal;
-  }
-
-  return null;
+  const frontImageUrl = card.card_faces?.[0]?.image_uris?.normal ?? null;
+  const backImageUrl = card.card_faces?.[1]?.image_uris?.normal ?? null;
+  return { frontImageUrl, backImageUrl };
 }
 
 /**
@@ -267,7 +271,9 @@ export async function enrichCards(
       continue;
     }
 
-    card.imageUrl = getImageUrl(scryfallData);
+    const imageUrls = getImageUrls(scryfallData);
+    card.imageUrl = imageUrls.frontImageUrl;
+    card.backImageUrl = imageUrls.backImageUrl;
     card.price = getPrice(scryfallData.prices, card.finish);
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);

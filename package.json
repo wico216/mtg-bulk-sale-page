@@ -14,7 +14,9 @@
     "migrate:phone": "tsx scripts/migrate-v1.3.x-buyer-phone.ts",
     "migrate:phone:dry-run": "tsx scripts/migrate-v1.3.x-buyer-phone.ts --dry-run",
     "migrate:card-search": "tsx scripts/migrate-v1.3.x-card-search-metadata.ts",
-    "migrate:card-search:dry-run": "tsx scripts/migrate-v1.3.x-card-search-metadata.ts --dry-run"
+    "migrate:card-search:dry-run": "tsx scripts/migrate-v1.3.x-card-search-metadata.ts --dry-run",
+    "migrate:card-faces": "tsx scripts/migrate-v1.3.x-card-face-images.ts",
+    "migrate:card-faces:dry-run": "tsx scripts/migrate-v1.3.x-card-face-images.ts --dry-run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

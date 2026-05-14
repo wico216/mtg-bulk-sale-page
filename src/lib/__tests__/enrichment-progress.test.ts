@@ -23,6 +23,7 @@ function makeCard(overrides: Partial<InventoryRow> = {}): InventoryRow {
     price: null,
     colorIdentity: [],
     imageUrl: null,
+    backImageUrl: null,
     oracleText: null,
     rarity: "rare",
     ...overrides,
@@ -116,6 +117,31 @@ describe("enrichCards onProgress + scryfallMisses", () => {
 
     expect(result.cards[0].typeLine).toBe("Creature — Dragon // Sorcery — Omen");
     expect(result.cards[0].manaValue).toBe(5);
+  });
+
+  it("stores front and back image URLs for double-faced cards", async () => {
+    vi.mocked(fetchCard).mockResolvedValueOnce(
+      makeScryfallCard({
+        image_uris: undefined,
+        card_faces: [
+          {
+            name: "Front",
+            type_line: "Creature",
+            image_uris: { normal: "https://example.com/front-normal.jpg" },
+          },
+          {
+            name: "Back",
+            type_line: "Sorcery",
+            image_uris: { normal: "https://example.com/back-normal.jpg" },
+          },
+        ],
+      }),
+    );
+
+    const result = await enrichCards([makeCard()]);
+
+    expect(result.cards[0].imageUrl).toBe("https://example.com/front-normal.jpg");
+    expect(result.cards[0].backImageUrl).toBe("https://example.com/back-normal.jpg");
   });
 
   it("populates scryfallMisses for cards fetchCard returns null for; those cards are excluded from cards[] (Test C)", async () => {

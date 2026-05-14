@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { PublicCard } from "@/lib/types";
@@ -114,7 +114,7 @@ const btnSecondary: React.CSSProperties = {
 interface CardModalProps {
   card: PublicCard;
   onClose: () => void;
-  onImageClick: () => void;
+  onImageClick: (imageUrl: string) => void;
 }
 
 export default function CardModal({ card, onClose, onImageClick }: CardModalProps) {
@@ -123,6 +123,15 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
   const addItem = useCartStore((s) => s.addItem);
   const setQuantity = useCartStore((s) => s.setQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
+  const [imageSide, setImageSide] = useState({
+    cardId: card.id,
+    showingBack: false,
+  });
+  const showingBack =
+    imageSide.cardId === card.id ? imageSide.showingBack : false;
+  const activeImageUrl =
+    showingBack && card.backImageUrl ? card.backImageUrl : card.imageUrl;
+  const hasBackFace = Boolean(card.backImageUrl);
 
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
@@ -165,47 +174,89 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
         }}
         className="wiko-card-modal"
       >
-        <button
-          type="button"
-          onClick={card.imageUrl ? onImageClick : undefined}
-          aria-label={card.imageUrl ? "View full image" : undefined}
+        <div
           style={{
             position: "relative",
             aspectRatio: "5 / 7",
             background: "var(--surface-2)",
-            border: "none",
-            padding: 0,
-            cursor: card.imageUrl ? "zoom-in" : "default",
             borderRight: "1px solid var(--border)",
           }}
         >
-          {card.imageUrl ? (
-            <Image
-              src={card.imageUrl}
-              alt={card.name}
-              fill
-              sizes="(max-width: 768px) 80vw, 260px"
-              style={{ objectFit: "cover" }}
-            />
-          ) : (
-            <div
+          <button
+            type="button"
+            onClick={
+              activeImageUrl ? () => onImageClick(activeImageUrl) : undefined
+            }
+            aria-label={activeImageUrl ? "View full image" : undefined}
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: activeImageUrl ? "zoom-in" : "default",
+            }}
+          >
+            {activeImageUrl ? (
+              <Image
+                src={activeImageUrl}
+                alt={`${card.name} ${showingBack ? "back" : "front"}`}
+                fill
+                sizes="(max-width: 768px) 80vw, 260px"
+                style={{ objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--muted)",
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                [ no image ]
+              </div>
+            )}
+          </button>
+          {hasBackFace && (
+            <button
+              type="button"
+              onClick={() =>
+                setImageSide({
+                  cardId: card.id,
+                  showingBack: !showingBack,
+                })
+              }
+              aria-label={showingBack ? "Show front side" : "Show back side"}
+              title={showingBack ? "Show front side" : "Show back side"}
               style={{
                 position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--muted)",
-                fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                left: "50%",
+                bottom: 12,
+                transform: "translateX(-50%)",
+                zIndex: 1,
+                background: "rgba(255,255,255,0.92)",
+                color: "#111827",
+                border: "1px solid rgba(17,24,39,0.18)",
+                borderRadius: 3,
+                padding: "7px 11px",
                 fontSize: 11,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.22)",
+                fontFamily: "inherit",
               }}
             >
-              [ no image ]
-            </div>
+              {showingBack ? "Front side" : "Back side"}
+            </button>
           )}
-        </button>
+        </div>
 
         <div style={{ padding: "28px 28px 24px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>

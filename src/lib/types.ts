@@ -61,6 +61,8 @@ export interface PublicCard {
   colorIdentity: string[];
   /** Scryfall image URL, null if unavailable */
   imageUrl: string | null;
+  /** Scryfall reverse-face image URL for double-faced cards, null if unavailable */
+  backImageUrl?: string | null;
   /** Oracle rules text, null if unavailable */
   oracleText: string | null;
   /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
@@ -110,6 +112,8 @@ export interface InventoryRow {
   colorIdentity: string[];
   /** Scryfall image URL, null if unavailable */
   imageUrl: string | null;
+  /** Scryfall reverse-face image URL for double-faced cards, null if unavailable */
+  backImageUrl?: string | null;
   /** Oracle rules text, null if unavailable */
   oracleText: string | null;
   /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
@@ -167,6 +171,7 @@ export interface ScryfallCard {
     mana_cost?: string;
     image_uris?: {
       normal: string;
+      large?: string;
     };
   }>;
   prices: {

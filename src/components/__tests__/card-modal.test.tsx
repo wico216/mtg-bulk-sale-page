@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import CardModal from "../card-modal";
@@ -17,6 +18,7 @@ function publicCard(overrides: Partial<PublicCard> = {}): PublicCard {
     quantity: 4,
     colorIdentity: ["R"],
     imageUrl: null,
+    backImageUrl: null,
     oracleText: "Lightning Bolt deals 3 damage to any target.",
     typeLine: "Instant",
     manaValue: 1,
@@ -63,5 +65,51 @@ describe("CardModal customer actions", () => {
       "href",
       "/cart",
     );
+  });
+
+  it("flips double-faced card images front to back and back again", async () => {
+    const user = userEvent.setup();
+    const onImageClick = vi.fn();
+
+    render(
+      <CardModal
+        card={publicCard({
+          imageUrl: "https://cards.scryfall.io/normal/front.jpg",
+          backImageUrl: "https://cards.scryfall.io/normal/back.jpg",
+        })}
+        onClose={() => {}}
+        onImageClick={onImageClick}
+      />,
+    );
+
+    expect(screen.getByAltText("Lightning Bolt front")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /view full image/i }));
+    expect(onImageClick).toHaveBeenLastCalledWith(
+      "https://cards.scryfall.io/normal/front.jpg",
+    );
+
+    await user.click(screen.getByRole("button", { name: /show back side/i }));
+    expect(screen.getByAltText("Lightning Bolt back")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /view full image/i }));
+    expect(onImageClick).toHaveBeenLastCalledWith(
+      "https://cards.scryfall.io/normal/back.jpg",
+    );
+
+    await user.click(screen.getByRole("button", { name: /show front side/i }));
+    expect(screen.getByAltText("Lightning Bolt front")).toBeInTheDocument();
+  });
+
+  it("does not show the flip action for single-faced cards", () => {
+    render(
+      <CardModal
+        card={publicCard({ imageUrl: "https://cards.scryfall.io/normal/front.jpg" })}
+        onClose={() => {}}
+        onImageClick={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /show back side/i })).toBeNull();
   });
 });

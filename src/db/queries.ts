@@ -49,6 +49,7 @@ export function rowToCard(row: typeof cards.$inferSelect): InventoryRow {
     quantity: row.quantity,
     colorIdentity: row.colorIdentity,
     imageUrl: row.imageUrl,
+    backImageUrl: row.backImageUrl,
     oracleText: row.oracleText,
     typeLine: row.typeLine,
     manaValue: row.manaValue,
@@ -81,6 +82,7 @@ interface AggregatedCardRow {
   quantity: number;
   colorIdentity: string[];
   imageUrl: string | null;
+  backImageUrl: string | null;
   oracleText: string | null;
   typeLine: string | null;
   manaValue: number | null;
@@ -109,6 +111,7 @@ export function rowToAggregatedCard(row: AggregatedCardRow): AdminCard {
     quantity: row.quantity,
     colorIdentity: row.colorIdentity,
     imageUrl: row.imageUrl,
+    backImageUrl: row.backImageUrl,
     oracleText: row.oracleText,
     typeLine: row.typeLine,
     manaValue: row.manaValue,
@@ -158,8 +161,8 @@ export async function getCardById(id: string): Promise<InventoryRow | null> {
  * (D-05/D-06 + AGG-02; enforced via the PublicCard type).
  *
  * Notes:
- *   - `setName`, `name`, `imageUrl`, `oracleText`, `typeLine`, `manaValue`,
- *     `rarity`, `scryfallId` use `MAX(...)` because they are identical
+ *   - `setName`, `name`, `imageUrl`, `backImageUrl`, `oracleText`,
+ *     `typeLine`, `manaValue`, `rarity`, `scryfallId` use `MAX(...)` because they are identical
  *     across binder rows of the same logical card (Scryfall enriches on
  *     (setCode, collectorNumber)). MAX gives a deterministic representative.
  *   - `colorIdentity` is `text[]`. `MAX(color_identity)` is deterministic
@@ -192,6 +195,7 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
       SUM(quantity)::int                                                         AS "quantity",
       MAX(color_identity)                                                        AS "colorIdentity",
       MAX(image_url)                                                             AS "imageUrl",
+      MAX(back_image_url)                                                        AS "backImageUrl",
       MAX(oracle_text)                                                           AS "oracleText",
       MAX(type_line)                                                             AS "typeLine",
       MAX(mana_value)                                                            AS "manaValue",
