@@ -12,7 +12,7 @@ export type SortOption =
 export const PRICE_MAX = 100;
 export type PriceRange = [number, number];
 
-const DEFAULT_SORT: SortOption = "name-asc";
+const DEFAULT_SORT: SortOption = "price-desc";
 
 const RARITY_RANK: Record<string, number> = {
   mythic: 0,
@@ -70,28 +70,44 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
   toggleColor: (color) =>
     set((state) => {
       const next = new Set(state.selectedColors);
-      next.has(color) ? next.delete(color) : next.add(color);
+      if (next.has(color)) {
+        next.delete(color);
+      } else {
+        next.add(color);
+      }
       return { selectedColors: next };
     }),
 
   toggleSet: (setName) =>
     set((state) => {
       const next = new Set(state.selectedSets);
-      next.has(setName) ? next.delete(setName) : next.add(setName);
+      if (next.has(setName)) {
+        next.delete(setName);
+      } else {
+        next.add(setName);
+      }
       return { selectedSets: next };
     }),
 
   toggleRarity: (rarity) =>
     set((state) => {
       const next = new Set(state.selectedRarities);
-      next.has(rarity) ? next.delete(rarity) : next.add(rarity);
+      if (next.has(rarity)) {
+        next.delete(rarity);
+      } else {
+        next.add(rarity);
+      }
       return { selectedRarities: next };
     }),
 
   toggleFinish: (finish: Finish) =>
     set((state) => {
       const next = new Set(state.selectedFinishes);
-      next.has(finish) ? next.delete(finish) : next.add(finish);
+      if (next.has(finish)) {
+        next.delete(finish);
+      } else {
+        next.add(finish);
+      }
       return { selectedFinishes: next };
     }),
 
