@@ -117,6 +117,7 @@ All env keys are listed in `.env.local.example`. The admin health page (`/admin/
 | `AUTH_GOOGLE_SECRET`    | Google OAuth             | Google Cloud Console → OAuth 2.0 Client Secret. |
 | `RESEND_API_KEY`        | Order notification emails | <https://resend.com/api-keys>. |
 | `SELLER_EMAIL`          | Order notification emails | Inbox for `[ORDER]` notifications. |
+| `ORDER_EMAIL_FROM`      | Order notification emails | Optional sender identity. Defaults to `Viki MTG Store <orders@wikospellbinder.com>`; use a Resend-verified sender if changed. |
 | `ENABLE_PASSWORD_LOGIN` | Local dev only           | `false` to hide the local username/password form. Always disabled in production regardless. |
 | `ADMIN_USERNAME`        | Local dev only           | Required when local password login is enabled. |
 | `ADMIN_PASSWORD`        | Local dev only           | Required when local password login is enabled. |

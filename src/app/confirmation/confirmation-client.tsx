@@ -3,9 +3,31 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { OrderData } from "@/lib/types";
+import type { CheckoutResponse, PublicOrderData } from "@/lib/types";
 import OrderSummary from "@/components/order-summary";
 import type { OrderSummaryItem } from "@/components/order-summary";
+
+type StoredConfirmation = {
+  order: PublicOrderData;
+  notification?: CheckoutResponse["notification"];
+};
+
+function parseStoredConfirmation(raw: string): StoredConfirmation | null {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object") return null;
+
+  if ("order" in parsed) {
+    const confirmation = parsed as Partial<StoredConfirmation>;
+    if (!confirmation.order) return null;
+    return {
+      order: confirmation.order,
+      notification: confirmation.notification,
+    };
+  }
+
+  // Backward compatibility with older sessions that stored only the order.
+  return { order: parsed as PublicOrderData };
+}
 
 export default function ConfirmationClient() {
   const searchParams = useSearchParams();
@@ -13,17 +35,20 @@ export default function ConfirmationClient() {
   const emailParam = searchParams.get("email");
   const totalParam = searchParams.get("total");
   const countParam = searchParams.get("count");
-  const buyerName = searchParams.get("name");
 
   // Try sessionStorage for full order (may be empty on refresh/new tab)
-  const [fullOrder, setFullOrder] = useState<OrderData | null>(null);
+  const [storedConfirmation, setStoredConfirmation] =
+    useState<StoredConfirmation | null>(null);
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("lastOrder");
-      if (stored) setFullOrder(JSON.parse(stored));
-    } catch {
-      /* ignore parse errors */
-    }
+    const timeout = window.setTimeout(() => {
+      try {
+        const stored = sessionStorage.getItem("lastOrder");
+        if (stored) setStoredConfirmation(parseStoredConfirmation(stored));
+      } catch {
+        /* ignore parse errors */
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   // No order data guard (D-22)
@@ -42,6 +67,7 @@ export default function ConfirmationClient() {
   }
 
   // Use fullOrder data if available, otherwise fall back to URL params
+  const fullOrder = storedConfirmation?.order ?? null;
   const displayCount = fullOrder
     ? fullOrder.totalItems
     : countParam
@@ -53,6 +79,13 @@ export default function ConfirmationClient() {
       ? parseFloat(totalParam)
       : 0;
   const displayEmail = fullOrder ? fullOrder.buyerEmail : emailParam ?? "";
+  const notification = storedConfirmation?.notification;
+  const buyerEmailSent = notification?.buyerEmailSent === true;
+  const emailNote = buyerEmailSent
+    ? `Confirmation sent to ${displayEmail}`
+    : notification
+      ? "Order placed, but email confirmation could not be sent. Save this order number."
+      : "Save this order number. If an email does not arrive, use it when you contact us.";
 
   // Convert fullOrder items to OrderSummaryItem format
   const orderSummaryItems: OrderSummaryItem[] = fullOrder
@@ -97,9 +130,7 @@ export default function ConfirmationClient() {
       <p className="text-sm text-zinc-400 mb-6">Order {ref}</p>
 
       {/* Email note */}
-      <p className="text-sm text-zinc-400 mb-6">
-        Confirmation sent to {displayEmail}
-      </p>
+      <p className="text-sm text-zinc-400 mb-6">{emailNote}</p>
 
       {/* Full order list from sessionStorage */}
       {fullOrder && fullOrder.items.length > 0 && (

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { PublicCard, StockConflict } from "@/lib/types";
+import type { CheckoutResponse, PublicCard, StockConflict } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import OrderSummary from "@/components/order-summary";
 import type { OrderSummaryItem } from "@/components/order-summary";
@@ -112,14 +112,18 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
         }),
       });
 
-      const data = (await res.json()) as CheckoutErrorResponse & {
-        order?: unknown;
-        orderRef?: string;
-      };
+      const data = (await res.json()) as CheckoutErrorResponse &
+        Partial<CheckoutResponse>;
       if (!res.ok) throw new Error(formatCheckoutError(data));
 
-      // D-20: Stash full order in sessionStorage BEFORE clearing cart (Pitfall 4)
-      sessionStorage.setItem("lastOrder", JSON.stringify(data.order));
+      // D-20: Stash confirmation payload BEFORE clearing cart (Pitfall 4)
+      sessionStorage.setItem(
+        "lastOrder",
+        JSON.stringify({
+          order: data.order,
+          notification: data.notification,
+        }),
+      );
       // D-21: Clear cart
       clearCart();
       // D-20: Navigate to confirmation with essential fields in URL

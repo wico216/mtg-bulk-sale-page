@@ -9,6 +9,13 @@ export interface NotifyResult {
   buyerEmailSent: boolean;
 }
 
+export const DEFAULT_ORDER_EMAIL_FROM =
+  "Viki MTG Store <orders@wikospellbinder.com>";
+
+function getOrderEmailFrom(): string {
+  return process.env.ORDER_EMAIL_FROM?.trim() || DEFAULT_ORDER_EMAIL_FROM;
+}
+
 /**
  * Sends order notification emails via Resend.
  * Seller email is sent first (priority per D-17).
@@ -24,6 +31,7 @@ export interface NotifyResult {
 export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const sellerEmail = process.env.SELLER_EMAIL;
+  const orderEmailFrom = getOrderEmailFrom();
   const result: NotifyResult = { sellerEmailSent: false, buyerEmailSent: false };
 
   // Operational record: order received for notification dispatch. PII
@@ -60,7 +68,7 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
 
   // Send seller email FIRST (priority per D-17)
   const { error: sellerError } = await resend.emails.send({
-    from: "Viki MTG Store <onboarding@resend.dev>",
+    from: orderEmailFrom,
     to: [sellerEmail],
     subject: `New order from ${order.buyerName}`,
     html: buildSellerEmailHtml(order),
@@ -86,7 +94,7 @@ export async function notifyOrder(order: OrderData): Promise<NotifyResult> {
   // Send buyer email SECOND (best-effort per D-17)
   try {
     const { error: buyerError } = await resend.emails.send({
-      from: "Viki MTG Store <onboarding@resend.dev>",
+      from: orderEmailFrom,
       to: [order.buyerEmail],
       replyTo: sellerEmail, // D-16: buyer replies go to seller (validated above)
       subject: "Your order is confirmed!",
