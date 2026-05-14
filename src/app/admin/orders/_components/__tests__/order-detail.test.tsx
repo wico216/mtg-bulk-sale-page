@@ -76,18 +76,32 @@ function makeOrder(overrides: Partial<AdminOrderDetail> = {}): AdminOrderDetail 
 }
 
 describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
-  it("renders [binder] pill with CONTEXT D-05 styling (ADM-01)", () => {
+  it("renders [binder] pill identifiable + distinct from name text (ADM-01)", () => {
     render(<OrderDetail order={makeOrder()} />);
     const pill = screen.getByText("[a02]");
     expect(pill).toBeInTheDocument();
-    const className = pill.getAttribute("class") ?? "";
-    expect(className).toContain("bg-gray-100");
-    expect(className).toContain("text-gray-700");
-    expect(className).toContain("text-xs");
-    expect(className).toContain("rounded");
-    expect(className).toContain("px-1.5");
-    expect(className).toContain("py-0.5");
-    expect(className).toContain("ml-2");
+    // Behaviour-level checks (post-v1.4 admin redesign): the pill is now
+    // styled via brand-token inline styles instead of literal Tailwind
+    // classes. The load-bearing requirements per Phase 21 D-05/D-06 are:
+    //   1. Square brackets are literal in the text content.
+    //   2. The pill is its own element (not inline with the card name),
+    //      identifiable via data-binder-pill, so screen readers and DOM
+    //      tooling can find it.
+    //   3. Visually distinct from the card name via background + border
+    //      (chip / badge affordance).
+    expect(pill.hasAttribute("data-binder-pill")).toBe(true);
+    expect(pill.tagName.toLowerCase()).toBe("span");
+    // Pill is NOT the same element as the card name.
+    const name = screen.getByText("Lightning Bolt");
+    expect(pill).not.toBe(name);
+    // Pill carries some visual styling that distinguishes it from plain
+    // text — either inline background (post-redesign) or a class-driven
+    // background (legacy). Asserting "has *some* visual differentiation"
+    // rather than pinning specific tokens keeps the test robust to
+    // future palette swaps.
+    const hasInlineBg = (pill.getAttribute("style") ?? "").includes("background");
+    const hasBgClass = (pill.getAttribute("class") ?? "").match(/(^|\s)bg-/);
+    expect(hasInlineBg || Boolean(hasBgClass)).toBe(true);
   });
 
   it("renders [unsorted] literally for legacy pre-v1.3 items (D-08)", () => {
