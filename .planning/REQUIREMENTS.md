@@ -10,11 +10,11 @@ Requirements for v1.4 Import UX & Price Refresh. Each maps to roadmap phases.
 
 ### Import Picker UX
 
-- [ ] **IMPORT-UX-01**: Operator can click Select All to check every binder in the import binder picker
-- [ ] **IMPORT-UX-02**: Operator can click Deselect All to uncheck every binder in the import binder picker
-- [ ] **IMPORT-UX-03**: The import binder picker opens with every binder unchecked on every import session (prior-session `defaultCheckedFor` memory is dropped)
-- [ ] **IMPORT-UX-04**: The Continue button is disabled and shows helper text when no binders are selected and no will-delete entries are checked
-- [ ] **IMPORT-UX-05**: Picker shows a live "X of Y selected" count near the Select All / Deselect All buttons
+- [x] **IMPORT-UX-01**: Operator can click Select All to check every binder in the import binder picker
+- [x] **IMPORT-UX-02**: Operator can click Deselect All to uncheck every binder in the import binder picker
+- [x] **IMPORT-UX-03**: The import binder picker opens with every binder unchecked on every import session (prior-session `defaultCheckedFor` memory is dropped)
+- [x] **IMPORT-UX-04**: The Continue button is disabled and shows helper text when no binders are selected and no will-delete entries are checked
+- [x] **IMPORT-UX-05**: Picker shows a live "X of Y selected" count near the Select All / Deselect All buttons
 
 ### Price Refresh
 
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Plan | Status |
 |-------------|-------|------|--------|
-| IMPORT-UX-01 | Phase 23 | 23-02 | Pending |
-| IMPORT-UX-02 | Phase 23 | 23-02 | Pending |
-| IMPORT-UX-03 | Phase 23 | 23-02 | Pending |
-| IMPORT-UX-04 | Phase 23 | 23-02 | Pending |
-| IMPORT-UX-05 | Phase 23 | 23-02 | Pending |
+| IMPORT-UX-01 | Phase 23 | 23-02 | Complete (2026-05-20) |
+| IMPORT-UX-02 | Phase 23 | 23-02 | Complete (2026-05-20) |
+| IMPORT-UX-03 | Phase 23 | 23-02 | Complete (2026-05-20) |
+| IMPORT-UX-04 | Phase 23 | 23-02 | Complete (2026-05-20) |
+| IMPORT-UX-05 | Phase 23 | 23-02 | Complete (2026-05-20) |
 | PRICE-REFRESH-01 | Phase 23 | 23-01 | Pending |
 | PRICE-REFRESH-02 | Phase 23 | 23-01 | Pending |
 | PRICE-REFRESH-03 | Phase 23 | 23-01 | Pending |

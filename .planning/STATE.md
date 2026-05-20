@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
 status: executing
-last_updated: "2026-05-20T20:12:51.633Z"
-last_activity: 2026-05-20 -- Plan 23-01 Daily Price Refresh complete (vercel cron + manual button + advisory lock)
+last_updated: "2026-05-20T20:40:11.068Z"
+last_activity: 2026-05-20 -- Plan 23-02 Import Picker UX complete (Tasks 1-3 + SUMMARY committed on `main`; v1.4 milestone now feature-complete pending operator setup + UAT)
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 50
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **23 — Import UX & Price Refresh** (in progress — 1/2 plans complete)
-Plan: **23-02 Import Picker UX** (next — UI-only; LOW risk; Plan 23-01 shipped)
-Status: Ready to execute Plan 23-02
-Last activity: 2026-05-20 -- Plan 23-01 Daily Price Refresh complete (Tasks 1-4 + SUMMARY committed on `main`; SDK metric helpers not wired to this STATE.md layout — manual position update applied)
+Phase: **23 — Import UX & Price Refresh** (complete — 2/2 plans shipped)
+Plan: **23-02 Import Picker UX** (just shipped — feat `6e9ce34`, `2e45ab2`, `4c156c7` + docs SUMMARY commit)
+Status: v1.4 feature-complete on `main`; awaiting operator setup (Plan 23-01 CRON_SECRET) + UAT for both plans
+Last activity: 2026-05-20 -- Plan 23-02 Import Picker UX complete (Tasks 1-3 + SUMMARY committed on `main`; 540/2 skipped tests; IMPORT-UX-01..05 marked complete in REQUIREMENTS.md)
 
 ## v1.4 Phase Sequence
 
@@ -81,6 +81,7 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Recently Completed
 
+- 2026-05-20 — Plan 23-02 Import Picker UX shipped (`refactor(23-02)` `6e9ce34`, `feat(23-02)` `2e45ab2`, `test(23-02)` `4c156c7` + docs SUMMARY commit). `defaultCheckedFor` removed from zustand store (Shape B per PATTERNS.md); BinderPicker gains Select all + Deselect all native buttons with `onBulkSet(names, checked)` callback (D-15 single render); picker opens UNCHECKED every session (D-05 / IMPORT-UX-03); Continue button surfaces helper text via `aria-describedby` when disabled (IMPORT-UX-04 + PITFALLS Pitfall 8). 540/2 skipped tests (net +10 over Plan 23-01 baseline); IMPORT-UX-01..05 complete. Will-delete amber panel default-CHECKED behavior UNCHANGED per D-05 explicit clause.
 - 2026-05-20 — Plan 23-01 Daily Price Refresh shipped (`feat(23-01)` x4: `f4835d2`, `27ef9a9`, `4a4f030`, `bdf8cbe`). Vercel cron + admin manual button + Postgres advisory-lock single-flight + lastPriceRefreshAt + cronSecret env check on `/admin/health`. 530/2 skipped tests; PRICE-REFRESH-01..11 complete. Operator setup: provision `CRON_SECRET` in Vercel env before first deploy (runbook inline in 23-01-SUMMARY.md).
 - 2026-05-20 — v1.4 ROADMAP.md appended with Phase 23 (Import UX & Price Refresh); 2 plans, 16 requirements, 100% coverage
 - 2026-05-20 — v1.4 milestone bootstrap: PROJECT.md updated, REQUIREMENTS.md authored (16 requirements), research synthesis complete (STACK/FEATURES/ARCHITECTURE/PITFALLS + SUMMARY)
@@ -97,16 +98,17 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 ## Operator Next Steps
 
 1. **Provision `CRON_SECRET` in Vercel env + redeploy** (Plan 23-01 ship gate). Runbook inline in `.planning/phases/23-import-ux-price-refresh/23-01-SUMMARY.md` → "Operator Setup" (4 steps: `openssl rand -hex 32` → paste into Vercel env → redeploy → verify `cronSecret: "configured"` on `/admin/health`).
-2. **(NEXT) Execute Plan 23-02 Import Picker UX** with `/gsd:execute-phase 23 02` — UI-only, LOW risk, fully independent of Plan 23-01 (different files, no shared state per CONTEXT D-17).
+2. **UAT Plan 23-02 Import Picker UX on a live Manabox CSV** — drop a real multi-binder CSV into `/admin/import`, confirm the picker opens with every binder unchecked, click Select all, observe the live "X of Y selected" counter, verify the will-delete amber panel still default-checks any missing prior binder, click Continue and confirm the rest of the import flow is unchanged. Keyboard-only walkthrough + screen-reader announcement of the disabled-Continue helper text complete the UAT.
 3. After first cron firing window (09:00–09:59 UTC, post-deploy), confirm one new `admin_audit_log` row with `action='price_refresh'` per day. PITFALLS Pitfall 9 (Vercel Hobby cron drift ±59min within the hour) is normal — do NOT report as a bug.
 4. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; deliberately NOT folded into Plan 23-01 per D-01.
 5. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
+6. **Complete v1.4 milestone** with `/gsd:complete-milestone` once Plan 23-01 cron has run successfully against the deployed environment and Plan 23-02 UAT passes.
 
 ## Session Continuity
 
-Last session: 2026-05-20T20:12:46.995Z
+Last session: 2026-05-20T20:37:00.000Z
 
-Next action: `/gsd:execute-phase 23 02` to ship the Import Picker UX (Plan 23-02). Independent of Plan 23-01; can interleave with the operator's CRON_SECRET provisioning step.
+Next action: complete the v1.4 milestone with `/gsd:complete-milestone` once operator setup (CRON_SECRET) + UAT for both Plan 23-01 and Plan 23-02 are confirmed. No further plan execution remains in Phase 23.
 
 ## Quick Tasks Completed
 
