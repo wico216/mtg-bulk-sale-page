@@ -1,293 +1,247 @@
-# Feature Research
+# Feature Research — v1.4 Import UX & Price Refresh
 
-**Domain:** Binder-aware inventory + multi-source pick workflow for an MTG bulk-sale store (Next.js, single admin, friend-circle scale)
-**Researched:** 2026-05-10
-**Confidence:** HIGH for the comparable patterns (SortSwift, Shopify multi-location, Manabox CSV); MEDIUM for the "fewest research subjects" question of which allocator MTG sellers prefer specifically (no public data — all signal is from general WMS literature applied to the MTG single-seller case).
+**Domain:** Personal e-commerce (single-operator MTG bulk store) — import workflow UX + scheduled inventory price refresh
+**Researched:** 2026-05-20
+**Confidence:** MEDIUM-HIGH (binder picker UX backed by NN/g + Helios + PatternFly conventions; Vercel Cron + Scryfall constraints backed by official docs)
 
-## Question-by-Question Findings
+## Scope Reminder
 
-### Q1. Allocator strategy when stock is split across binders
+This is v1.4 of a **personal-scale** MTG store for a friend group, not a Shopify clone. v1.3 already shipped the heavy lifting (two-stage NDJSON binder picker, allocator, audit log, `/admin/health`). v1.4 only adds:
 
-Three deterministic strategies are documented in the wider WMS literature and they have **named, opposite consequences**. Source: SAP Bin Location optimization docs and Extensiv 3PL allocation logic — both explicitly describe this trade as a binary toggle.
+1. **Select-All / Deselect-All buttons** on the existing binder picker, with **default = all deselected** (explicit opt-in).
+2. **Daily Vercel Cron price refresh** with audit log + `lastPriceRefreshAt` on `/admin/health` + manual "Refresh now" escape hatch.
 
-| Strategy | One-line definition | Real-world consequence | Fit for this milestone |
-|---|---|---|---|
-| **Smallest-quantity-first** ("ascending qty") | Deplete the binder with the fewest copies first | Frees up empty bins, naturally consolidates as you sell. Costs more picks per order on average. | **RECOMMENDED.** A consolidation force is exactly what a hobbyist seller wants — over months, A02's last 1 copy and A07's last 1 copy get picked, and eventually the binder shows up empty. Aligns with the user's stated workflow ("I just consolidated A02 into A07"). |
-| **Largest-quantity-first** ("descending qty") | Pick everything from the binder with the most copies | Minimum number of binders touched per order (best for seller's hands). Costs storage — small leftover stocks linger forever in many binders. | Better for a high-throughput pro shop. Wrong for a bulk-collection seller because it forever keeps tiny remainders sprinkled across binders. |
-| **Lexicographic / FIFO by binder name** | Always pick from the alphabetically first binder containing the card | Most predictable. Simplest implementation (`ORDER BY binder ASC` then drain). Tends to favor whichever bin the operator named "A01". | Tempting but weakest behavior — entrenches bias toward `A01`-style names, never consolidates the long tail. Use as the **tiebreaker** inside the chosen strategy, not as the strategy itself. |
-
-**Real example with the user's stock pattern (3 copies across 5 binders 3+2+1+1+1, buyer wants 3):**
-
-- Smallest-first: pick 1 from each of three "1-copy" binders → eliminates 3 trailing remainders in one order. Pick list reads "binder A04, A09, A12 — 1 each."
-- Largest-first: pick 3 from the "3-copy" binder → 1 binder touched, but remainders 2+1+1+1 still scattered next time.
-- FIFO by name: pick 1 from A04 + 1 from A09 + 1 from A11 (whatever the alpha order is) — same touch count as smallest-first but no consolidation pressure.
-
-**Recommendation for v1.3:** Smallest-first **with** lexicographic-name tiebreaker, codified as a single SQL `ORDER BY` (`stock ASC, binder ASC`). Keeps the algorithm in one place, deterministic, and testable.
-
-### Q2. Binder-name conventions
-
-**SortSwift uses free-text "Remarks"** as bin labels and explicitly accepts mixed forms in their own docs: `"A1"`, `"B3"`, `"Shelf-2"`, `"Back Room"`, `"Display Case"`. Their best-practice guidance is **consistency, not format** — i.e., whatever you type must match what you typed before for the same physical bin. They also handle empty/missing remarks by sorting them to the end and treating `"No Remark"` literally as empty.
-
-This matches the user's real binder set perfectly: `A01`–`A14` (alphanumeric) coexist with `Bulk Drawers`, `foundation box`, `lord of the rings`, and `compré titán` (multilingual). The user has already named these things — the system should not rename them.
-
-**Anti-pattern observed:** eBay sellers commonly stuff bin location into the `Custom Label (SKU)` field as a free-form prefix (e.g., `Box012 2#shp 1#5oz 10"x5"x4" ITM142KM`). This works for eBay because the SKU is the only writable per-listing field, but it's a hack — sorting/filtering becomes substring matching. **Don't do this.** Make `binder` a first-class column.
-
-**Recommendations:**
-- Free-text string, no validation beyond `trim()` + non-empty + length cap (suggest 64 chars — SortSwift implicitly handles up to label-printing length).
-- Case-sensitive storage (operator's "A01" and "a01" are different intent), but **case-insensitive uniqueness check** at import time so the operator catches typos like `A01` vs `A01 ` (trailing space) — show a "did you mean?" hint.
-- Sort lexicographically by default in admin views. Admin can toggle to sort by stock-count (helps spot near-empty binders) or by last-touched.
-- Reserve **`unsorted`** (lowercase) as the system value for migration backfill so it sorts to the bottom in admin and is easily filterable.
-
-### Q3. Pick-list UX in similar apps
-
-The single most directly comparable system is **SortSwift** (a Shopify app for TCG card stores; their docs literally describe the same scenario):
-
-> "Remarks are location identifiers stored with inventory stock... For warehouse efficiency, use 'Remark / Set / A-Z' or 'Remark / A-Z' sorting to group items by physical location (bin/remark), making picking faster and reducing travel time."
-
-SortSwift's exact pattern (HIGH confidence — pulled from `sortswift.com/docs/inventory/picklist/location-grouping`):
-
-1. **Pick list is one screen, grouped by remark/binder.** No separate view per location — operator scrolls one printable page.
-2. **Items without remarks appear together at the end.** This is exactly what `unsorted` should do for us.
-3. **Grouping is the consolidation mechanism**, not a special "pick view." This validates the user's locked decision to use **per-line annotation only**, no separate pick view. It's how the leading TCG-specific app does it.
-
-**TCGplayer Pro** uses a different pattern — Quicklist/Kiosks model multiple "digital binders" but their inventory-pick affordance is documented per-listing (the Custom Label / SKU field again). Less directly comparable.
-
-**eBay** has a printable "Pick List" document but **does not show photos**, which seller forums repeatedly complain about. For a card store this is a real gap because cards-by-name-only causes mispicks (foreign printings, alt arts, basic-land variants). Our admin order detail already shows card images — keep that on the picked-line view.
-
-**Mana Pool / ShipStation** consolidate orders from multiple platforms but they delegate the actual pick UI to ShipStation, which is platform-agnostic and just shows a SKU + location field. Not informative for our case.
-
-**Pattern to adopt (this is the locked decision, validated by SortSwift):**
-- Admin order detail page, each `order_items` row shows `[binder]` next to card name + image.
-- Sort lines so identical binders cluster together (`ORDER BY binder, card_name`).
-- Visually separate the "unsorted" group at the bottom.
-- No separate pick view, no print step, no checklist state.
-
-### Q4. Buyer-facing aggregation
-
-**Sum-the-quantities is the universal pattern.** TCGplayer aggregates across sellers (each seller stays a separate listing under a card detail page); Shopify aggregates across locations into a single available count; SortSwift's location summary aggregates per card. Nobody surfaces per-bin breakdowns to buyers. The user's locked decision (storefront aggregates qty, binder hidden) matches the dominant pattern.
-
-**Threshold displays ("low stock!" / "many in stock") are an urgency tactic from large e-commerce platforms** (Magento has explicit "Only X left" thresholds, BigCommerce has it as a config). For a friend-circle store this is unnecessary and slightly tacky — friends don't need fake urgency. Show the actual integer.
-
-**Edge cases worth handling:**
-- A card with stock 3+2+1+1+1 across 5 binders should show `"In stock: 8"`. The aggregation must happen at query time, not via a denormalized cached column (otherwise we have to invalidate it on every binder edit).
-- A buyer adding 5 to cart then 4 to cart then checking out for 9 must succeed even though no single binder holds 9. The allocator handles this on commit.
-- A buyer adding 9 to cart when only 8 exist must fail at cart-add or checkout — same as today, just summed across binders.
-
-### Q5. Multi-binder transitions
-
-The user explicitly said "We're shipping the simplest version that works, but understanding the ceiling matters." Here's the ceiling and the floor:
-
-**Floor (ship this):** Inline edit of the `binder` column on the admin inventory table, same as inline price/quantity editing. Operator types new binder name, hits enter, row updates. To "consolidate A02 into A07": filter by binder=A02, bulk-edit binder column to A07. The merge logic — same card key from two binders becoming one — needs explicit handling: either (a) error on collision and force the operator to delete-then-edit, or (b) sum quantities into the surviving row. **Recommend (b)** with a confirmation modal: "X rows will merge with existing rows in A07. Quantities will be summed."
-
-**Mid-tier (defer to v1.4 if requested):** Bulk-select rows by checkbox, then a "Move to binder…" action button. Same merge logic. Better UX than per-row inline edit when moving 50+ cards.
-
-**Ceiling (don't build):** Drag-and-drop between visual binder panes. Microsoft Dynamics 365 has "Item Reclassification Journals" with audit trails and approval flows; SortSwift has bin-to-bin transfer with capacity warnings. These are appropriate at warehouse scale and would feel absurd here.
-
-**The "delete + re-import" path always exists** as a fallback (Manabox is the source of truth — re-export with new binder names), so even the floor implementation has an escape hatch.
+Target: 2 phases, 3-5 days. Anti-features are the load-bearing section of this document — most "obvious next steps" are scope creep for a friend store.
 
 ---
 
-## Feature Landscape
+## Feature 1 — Import Binder Picker: Select All / Deselect All
 
 ### Table Stakes (Users Expect These)
 
-The "user" here = the seller (admin) doing fulfillment, plus secondary "users" = friends browsing the storefront. Missing any of these and the milestone goal ("pull orders without flipping every binder") fails.
-
 | Feature | Why Expected | Complexity | Notes |
-|---|---|---|---|
-| `binder` column on every stock row, displayed on admin order detail next to each line | This is the entire milestone goal — without per-line binder annotation, the seller still has to flip binders. | LOW | One column on `cards` table + adjustment to existing order detail render. Migration backfills `binder='unsorted'`. |
-| Composite key change: `(card_id, binder)` (or equivalent) so same card can live in multiple binders as separate rows | User explicitly listed this as locked. Without it, the schema can't represent reality. | MEDIUM | Schema migration + every JOIN/upsert touching `cards` needs review. Affects checkout commit, CSV import upsert, admin bulk delete, audit log identifiers. |
-| Manabox CSV: parse `Binder Name` + `Binder Type` columns; skip rows where `Binder Type != 'binder'` (i.e., skip `deck` and `list` rows) | Manabox has three container types (`binder`, `deck`, `list` — confirmed from manabox.app/guides). Decks contain reference-only entries that aren't physical stock; lists are wishlists. Importing them as inventory would inflate stock with cards the seller doesn't actually own. | LOW | One filter line in the parser. Show a row count in the preview ("Skipped 47 rows: 32 deck, 15 list"). |
-| Storefront aggregates quantity across binders; binder hidden from public pages | Buyers don't care about physical organization. Universal pattern across TCGplayer / Shopify / SortSwift. | LOW | One `SUM(quantity) GROUP BY card_id` change in the storefront query. Public card detail page doesn't render binder field. |
-| Server-side allocator at checkout commit decides which binders to decrement | Race-safe + deterministic + auditable. The user already has a Phase 11 atomic checkout — this extends it. Without server-side allocation, the cart can pass validation but commit can fail in non-obvious ways. | MEDIUM | Algorithm: smallest-first with lexicographic tiebreaker (see Q1). Inside the existing atomic transaction; one buyer line can spawn multiple `order_items` rows. |
-| Admin inventory table: `Binder` column visible + filterable | Standard table affordance — once the data exists, admins immediately want to slice by it. SortSwift, Shopify, NetSuite all do this. | LOW | Add column + filter dropdown populated from `SELECT DISTINCT binder`. |
-| Migration backfills existing rows with `binder='unsorted'` so checkout/cart don't break before first binder-aware import | Without this, the very first deploy after schema change either crashes or has NULL binders, which breaks the new uniqueness key. User explicitly listed this. | LOW | One migration step, idempotent. |
-| `etched` becomes a valid `Foil` enum value | User listed it. Manabox emits this for special foil treatments (Double Masters foil-etched, Universes Beyond foil-etched). Without it, those rows fail import. | TRIVIAL | Enum + parser + display label. |
+|---------|--------------|------------|-------|
+| **Two action controls labeled "Select all" / "Deselect all"** | Standard pattern across PatternFly, Helios (HashiCorp), GitLab Pajamas, eBay Playbook for bulk-action lists. Users expect to see both verbs explicitly when the list has >5 items. | LOW | Wire to the same setter as individual checkboxes; reuse v1.3 `binder-picker.tsx` reducer. Place buttons inline above the checkbox list, left-aligned to the column. |
+| **"X of Y selected" counter near the buttons** | Operator needs to confirm intent before pressing REPLACE. v1.3 already shows per-binder counts; an aggregate "3 of 12 binders / 4,217 cards selected" line closes the loop. | LOW | Single derived value from existing selection state. Renders inline next to Select/Deselect buttons. |
+| **Default state = ALL DESELECTED on every open** | Operator's stated motivation. v1.3 already does this for `unsorted` binder (Phase 16 D-10 / D-13). Generalizes the same "explicit opt-in" principle to every binder. Eleken + GitLab Pajamas + NN/g all converge: destructive bulk ops should make the user *choose* the scope, not the system. | LOW | Flip the initial reducer state in `binder-picker.tsx` from `Set(allBinderNames)` to `new Set()`. The two-stage NDJSON contract is unchanged; only the initial selection differs. Remove the v1.3 "remembered selection" behavior (or keep it strictly within a single import session). |
+| **Disabled-state semantics on the REPLACE button when 0 selected** | Without this, "Deselect all" → REPLACE → typed confirm → DELETE 0 rows is a footgun against operator muscle memory. | LOW | Existing inline destructive confirmation already exists; just gate the typed-REPLACE-phrase input behind `selectedCount > 0`. |
+| **Will-delete preview stays accurate as selection changes** | v1.3 already computes this; it just needs to react to the new bulk toggles. | LOW | No new code path; existing memoization handles it. |
 
-### Differentiators (Competitive Advantage)
-
-These set this milestone apart from a naive "just add a binder column" — they're the operator-experience polish that turns a feature into a workflow. Not all are required; flagged below.
+### Differentiators (Competitive Advantage — Personal Store Edition)
 
 | Feature | Value Proposition | Complexity | Notes |
-|---|---|---|---|
-| **Import preview's "binder picker"** with checkboxes per discovered binder + row count + remembered selection | This is the user's locked decision and the right call. Replace-by-binder lets the seller import one binder's CSV without nuking unrelated binders. Memory across imports = no clicking 14 checkboxes every Sunday. | MEDIUM | Preview already exists; add per-binder grouping + checkbox state. Persist selection in `localStorage` (no DB needed — it's per-browser preference). |
-| **Allocator preview in admin order detail** showing the SQL `ORDER BY` outcome before commit (i.e., "If this order ships now, A04 → 1, A09 → 1, A12 → 1") | Confidence-builder. The seller can verify the algorithm did the right thing on their first few orders. Once trust is built it's just visual confirmation. | LOW | Run the same allocator logic in read-only mode; render the results as `[binder×qty]` next to the line. Doesn't decrement anything. |
-| **Bulk-edit binder column** on selected admin inventory rows (checkbox-select + "Move to binder…") with merge-on-collision | The user explicitly mentioned consolidation as a real workflow. Without this, consolidating A02 into A07 means delete + re-export from Manabox + re-import. | MEDIUM | UI is the heaviest part; the merge logic is just `INSERT ... ON CONFLICT (card_id, binder) DO UPDATE SET quantity = quantity + EXCLUDED.quantity`. Show a confirmation modal listing collisions. |
-| **`unsorted` filter shortcut** on admin inventory | After the first binder-aware import, the operator wants to find what's still unsorted. SortSwift handles this implicitly by sorting blanks to the end; an explicit filter is one click instead of scrolling. | TRIVIAL | One predefined filter chip. |
-| **Per-binder row count badges** in the binder picker preview ("A07 — 247 rows", "Bulk Drawers — 3576 rows") | Lets the operator spot anomalies — if `Bulk Drawers` shows 12 rows you know something went wrong with the export. | LOW | Already part of the locked scope ("every binder name + row count"). |
-| **Audit log records which binders an order's allocator hit** (not just total decrement) | The seller already has audit logging from v1.2; extending it costs almost nothing and pays off at debug time when a buyer says "you said you had 3 but only sent me 2." | LOW | Add `binder` to the `order_items` audit metadata. Each `order_items` row already encodes one binder under the new schema, so the audit data is the same data the row already has. |
+|---------|-------------------|------------|-------|
+| **Indeterminate state on a master checkbox row** | NN/g, MUI, PatternFly all describe this as the canonical pattern. The master checkbox shows `-` when *some* binders selected, `✓` when *all*, empty when *none*, and clicking it toggles between "all" and "none". | MEDIUM | This is the **alternative** to two separate buttons. Decision recommended below in "Open question." |
+| **Persist selection only within the current import session (not across imports)** | v1.3 currently remembers selection across imports — that's the autopilot risk operator wants to break. Scoping memory to "this import preview only" preserves "fix typo, re-preview, keep picks" without enabling "press the same buttons in your sleep next month." | LOW | Drop the localStorage key; keep selection in React state only. |
+| **NEW binders sort to top (already exists)** | v1.3 already sorts NEW binders with a green pill. With deselect-by-default, this becomes *more* useful — the operator's eye lands on what they almost certainly want to import. No code change. | n/a | Already shipped. Just note it interacts well with the new default. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-These are things that *sound* right for a binder-aware inventory feature but should be explicitly excluded so they don't sneak into scope. Each comes with a documented reason and the alternative.
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| **"Smart Select: NEW only" as a third button** | Looks elegant; "select the binders that don't exist yet." | Scope creep. Operator already sees NEW binders sorted to top with green pills — visual scanning + click is ~2 seconds. Adding a third button introduces a third mental model ("what counts as new?"), a third truthiness branch in the reducer, and a third test case. For a friend store with <30 binders, it saves zero meaningful time. NN/g + Eleken both warn: "many people know how to use checkboxes — keep things as simple as possible." | **DO NOT BUILD.** If operator finds NEW-only useful after 3 months of v1.4 in production, reconsider in v1.5. Defer with a one-line note in PROJECT.md "Out of Scope." |
+| **"Smart Select: replace only existing"** | Inverse of NEW-only. | Same scope-creep argument; even worse signal-to-noise because "existing" is the default mental category. | DO NOT BUILD. |
+| **Keyboard shortcut (`Cmd-A` / `Ctrl-A`)** | "Power user" appeal. | Conflicts with browser-native "select all text" inside the same page. Operator imports cards <weekly. Zero ROI vs. the risk of stomping a familiar shortcut. | Just use the visible button. If operator ever asks for it explicitly, add `aria-keyshortcuts` and a visible hint then. |
+| **Per-binder Select-All for sub-items** | The picker currently selects whole binders, not individual cards. Sub-selection would be a different feature entirely. | Would require a card-level picker UI that doesn't exist. v1.3 deliberately picks at the binder boundary because Manabox exports are organized that way. | Out of scope — possibly never. The Manabox-binder boundary is the operator's mental model. |
+| **Saved "selection presets"** | "I always import my Modern + Pioneer binders together." | Premature optimization for a friend store. Three Manabox imports per month × 2 seconds of clicking = 6 seconds/month. Building presets = >2 hours of work. | DO NOT BUILD. |
+| **Multi-step wizard for the import flow** | Some bulk-action UX articles suggest a wizard. | v1.3's inline panel already lives on one page with a typed-REPLACE confirmation. A wizard adds friction without adding safety. Operator already explicitly types REPLACE. | Keep the inline pattern. |
+
+### Open Question: Buttons vs. Master Checkbox
+
+Two valid patterns. Picking one matters for consistency.
+
+**Recommendation: Two buttons ("Select all" / "Deselect all") above the list.**
+
+Reasons:
+1. The v1.3 picker is **not a table** — it's a column of named checkboxes with badges and counts. The "master checkbox on a column header" pattern (Helios, PatternFly) presumes tabular layout. Forcing a master checkbox into a non-table layout creates ambiguity about *what column* it controls.
+2. Buttons are an *action* (transitive — "do this now"), checkboxes are a *state*. Operator wants explicit *actions* to break autopilot habit. NN/g notes that for destructive contexts, action verbs read more decisively than toggle states.
+3. The operator's mental model after deselect-by-default is "I am opting in to specific binders." Two named buttons reinforce that. A master checkbox with indeterminate state is more abstract.
+4. Lower implementation complexity: no indeterminate-state logic, no tri-state ARIA work.
+
+**Counter-arguments** (for completeness):
+- A master checkbox is more space-efficient (one row vs. two buttons + counter).
+- It's the pattern of every email client.
+
+**Verdict:** Buttons win on this list because the list is not a table and clarity > density for a destructive action. (Confidence: MEDIUM — operator can override.)
+
+---
+
+## Feature 2 — Daily Price Refresh
+
+### Table Stakes (Users Expect These)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Vercel Cron daily schedule at off-peak (recommend 04:00 UTC ≈ 21:00 PT / 23:00 CT)** | Scryfall refreshes prices from affiliates once per 24h. Running before North American morning means buyers see fresh prices when browsing. Off-peak = lower 429 risk if Scryfall is restarting workers. | LOW | `vercel.json` cron entry: `{"path": "/api/cron/refresh-prices", "schedule": "0 4 * * *"}`. Free tier supports daily cron. |
+| **Authorization on the cron endpoint (CRON_SECRET header check)** | Vercel docs require this for paid plans; on free tier it's still load-bearing for defense-in-depth. Without it, anyone who guesses the path can trigger expensive Scryfall traffic. | LOW | Read `process.env.CRON_SECRET`, compare against `Authorization: Bearer ${CRON_SECRET}` header. Vercel injects this automatically when configured. Same pattern as v1.2 admin route auth. |
+| **Idempotency: running twice in 24h is safe** | Vercel explicitly warns crons can fire more than once for a single scheduled trigger. Two refreshes back-to-back must not corrupt prices or double-write audit rows. | MEDIUM | Two layers: (a) Scryfall is the source of truth — second fetch returns same prices, so `UPDATE` is a no-op for "unchanged"; (b) gate with an advisory lock OR check "did a `price_refresh` audit row land in the last N minutes? skip if yes" early in the handler. Recommend the audit-row guard (1 SQL query, no lock-leak risk). |
+| **Partial-failure tolerance: some cards 404 (e.g. rotated set, typo'd collector number)** | Manabox exports occasionally produce cards Scryfall doesn't recognize (alt-art mismatches, miscut collector numbers). One bad card must not kill the whole run. | MEDIUM | Existing v1.3.1 batched `/cards/collection` already returns `not_found` array per batch — treat that as `failed` count, log card identifiers in audit metadata (bounded), continue. The endpoint accepts up to 75 identifiers per call; chunk accordingly. |
+| **One `admin_audit_log` row per run with counts** | Operator's explicit requirement. Schema already supports it (v1.2 Phase 14). Counts: `{updated, unchanged, failed}` + duration ms + Scryfall-batch count. | LOW | New audit kind `price_refresh` with `ScopedPriceRefreshMetadata`. Reuse the bounded-metadata pattern from v1.3 import audit. Stays under 4KB cap easily. |
+| **`lastPriceRefreshAt` on `/admin/health`** | Operator's explicit requirement. v1.2 already returns literals — extend the shape with a timestamp value (this is operator-only data, not env config). | LOW | New `MAX(created_at) FROM admin_audit_log WHERE kind = 'price_refresh'` parallel query, returned as ISO-8601 string or `null`. Add a row to the existing health page table. |
+| **Manual "Refresh now" admin button** | Escape hatch for "I imported a new binder, prices are stale until tomorrow's 04:00 UTC." Operator's explicit requirement. | LOW | Add a button to `/admin` (or `/admin/health`) that POSTs to the same handler logic the cron uses. Rate-limit with `ADMIN_BULK` (20/min — already exists). |
+| **Timeout-safe execution** | Scryfall `/cards/collection` batched at 75 ids × ~12k rows = ~170 batches × ~200ms = ~35s. Comfortably under Vercel Pro 300s, but operator is on Hobby (10s) → would fail. | MEDIUM | Two options: (a) **Move to Vercel Pro for cron-only** (adds cost — violates budget constraint), (b) **Stream-and-update**: chunk into multiple cron invocations that each handle a slice with a cursor. Recommend a third option: **deploy on Pro only if needed**; for ~12k rows at neon-http latency, profile first. Alternatively the cron route uses `export const maxDuration = 300` (works on Pro) and falls back to a 10s budget on Hobby (process N batches, persist progress, schedule continuation). **Document the budget assumption explicitly.** |
+
+### Differentiators (Competitive Advantage — Personal Store Edition)
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Audit metadata includes per-card "biggest movers"** | Operator can see "Wrath of God +$0.42, Cultist of the Absolute -$0.18" at a glance. Helpful for spotting spikes worth a manual price-check before tomorrow's friends arrive. | MEDIUM | Bound to top-5 movers (absolute Δ price) to stay under audit-row size cap. Optional — drop if it stretches Phase 2 of v1.4. |
+| **`/admin/health` shows "X cards updated, Y failed" from the most recent run** | One extra audit-row read; surfaces "last run was unhealthy" at a glance without going to `/admin/audit`. | LOW | Extend the health JSON shape with `lastPriceRefresh: { at, updated, unchanged, failed }`. |
+| **Manual refresh button disabled for 60s after a successful run** | Prevents operator from spamming Scryfall by repeatedly clicking. Soft-stop in the UI; rate limit is the hard-stop. | LOW | Client-side `lastRefreshAt` from the same audit query; disable button + show "Refreshed 12s ago" text. |
+| **Refresh button shows progress while running** | A 30-second wait with no feedback feels broken. NDJSON streaming (already used in v1.3 import) gives "Batch 14/170, 1,053 cards updated…" | MEDIUM | Reuses the v1.3 NDJSON pattern. **Recommended only if** the operator says the silent button feels broken in UAT. Otherwise defer. |
+
+### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
-|---|---|---|---|
-| **Separate "pick view" / printable pick list page** | Mental model from warehouse fulfillment ("you print the list, take it to the floor"). | Adds a screen with no new information — admin order detail already shows binder per line. Two views = two things to keep in sync. SortSwift validates this: their pick list IS the inventory list, just sorted by remark. | The existing admin order detail page, with lines sorted by binder and the unsorted group at the bottom. Keep one source of truth. |
-| **Per-binder buyer-facing display** ("In stock: 3 in A07, 2 in Bulk Drawers, 1 in lord of the rings") | "Transparency!" / "What if the buyer cares?" | Friends don't care about your binder taxonomy. Multilingual binder names are operator-private. Exposing binders is a low-grade information leak about the seller's organizational system. Universal pattern (TCGplayer, Shopify, SortSwift) hides bin info from buyers. | Aggregate the sum on storefront. Period. The locked decision already says this. |
-| **Drag-and-drop UI for moving cards between binders** | "It would be cool" / "feels like Trello." | Costs days to build, doesn't scale to 3576-card "Bulk Drawers" anyway, and the actual fulfillment workflow (consolidating A02 into A07) is a one-time bulk action better served by a checkbox + "Move to binder…" button. | Bulk-select + move-to-binder action (the differentiator above), or delete + re-import for the brave. |
-| **Configurable allocator strategy per-buyer or per-line** | "What if some lines should preserve depth?" | Complexity explosion for zero observed need. Friend-circle scale + bulk cards = no high-value items where strategy matters. | One strategy globally: smallest-first with lexicographic tiebreaker. Document it in admin help text. |
-| **Real-time stock display per binder in the cart** | "Buyer should know which binder their cards are in." | Same anti-feature as above — buyers don't care, and the allocator only runs at commit, so any per-binder display in the cart would be a stale guess. | Cart shows total qty available; the binder breakdown only exists in the admin order detail after commit. |
-| **Binder-name validation / regex enforcement** ("must be `[A-Z][0-9]{2}`") | "Consistency!" — feels right because some of the user's binders match this pattern. | Breaks the user's actual binder set: `Bulk Drawers`, `foundation box`, `lord of the rings`, `compré titán` would all fail. SortSwift's docs explicitly accept free-text. The user already gave the right answer here. | Free-text + trim + length cap. Show a "did you mean A07?" hint when a binder name within 1 char of an existing one appears at import time, but never block. |
-| **"Move all stock from binder X to binder Y" cascade button** in the binder picker | Looks helpful for consolidation. | Destructive at scale (one click can reorganize 3576 rows), no undo, ambiguous merge semantics in UI. Bulk-edit on a filtered table is the same operation with visual confirmation. | Filter inventory by binder, select all, "Move to binder…" — the differentiator above. |
-| **Per-binder reservation / hold for in-store pickup** | "What if a friend coming over Saturday wants to grab cards then?" | The whole product runs on email-to-pay-in-person; there's no "reserve" concept and adding one would touch every page. | Use the existing order workflow — order created with binder annotations, friend picks them up at the agreed time, admin marks shipped/fulfilled. No new mechanism needed. |
-| **Auto-detect binder from card data** (e.g., "always put set X in binder Y") | "Less manual work for the seller!" | Cards in `Bulk Drawers` and themed binders (`lord of the rings`, `foundation box`) follow no rule — they were sorted by hand for reasons specific to the operator. Heuristics would be wrong constantly. | Trust the Manabox export. The seller already organized once; the system just records it. |
-| **Foil-vs-non-foil-vs-etched as separate binder dimensions** in the schema | The new `etched` value might tempt a rethink of the composite key. | Foil/etched is already an attribute on the card (it's part of the existing finish enum). Same card, different finish = different SKU. Same SKU, different binder = the new dimension this milestone adds. Don't conflate them. | Composite key is `(scryfall_id, finish, condition, language, binder)` — same as today plus binder. |
+|---------|---------------|-----------------|-------------|
+| **Real-time price tickers / live updates on storefront** | "Friends should see fresh prices instantly!" | (1) Scryfall itself only refreshes prices once per 24h — a real-time ticker is theater, not signal. (2) Adds websocket infra or constant polling — violates "personal tool, not business platform" constraint. (3) Friends pay in person, so price drift between browse and checkout is a 5-second conversation, not a lawsuit. | DO NOT BUILD. Daily refresh is enough. Document in PROJECT.md "Out of Scope" if not already. |
+| **Per-card price-change emails to buyers** | "Tell buyers when a card on their wishlist drops!" | (1) There's no wishlist feature. (2) There are no user accounts (out-of-scope decision since v1.0). (3) Email cost (Resend) scales linearly with this. (4) Friends ≠ retail customers; the right channel is Discord/SMS. | DO NOT BUILD. If wishlists are ever requested, that's a v2.0 conversation. |
+| **Automated repricing based on margin / floor rules** | TCG Automation, TCG Sync, and TCGplayer Pro all offer this. | Viki's prices come straight from Scryfall ("market price" via TCGplayer affiliate). The operator isn't running margin strategy — they're listing bulk for friends at market. Repricing engines are for >$10k inventories where 2% margin matters. | DO NOT BUILD. Pass-through Scryfall pricing is the design. |
+| **Multi-source pricing (Scryfall + Cardmarket + JustTCG fallback)** | "What if Scryfall is down?" | Scryfall has been more reliable than the operator's own deploy. Multi-source pricing requires reconciliation logic, currency conversion (Cardmarket is EUR), and source-priority rules. For a friend store: if Scryfall is down on the 04:00 UTC run, prices stay stale one extra day. That's fine. | DO NOT BUILD. The audit row will record `failed > 0`; operator can retry manually tomorrow. |
+| **Price-history graphs on the storefront** | Looks cool. Lots of TCG tools have it. | Requires a `price_history` table, retention policy, chart library, mobile breakpoints. v1.4 is supposed to be 2 phases. | DO NOT BUILD in v1.4. Could be a future v1.5+ feature if the operator hears friends ask "how much was this last week?" — until then, no signal. |
+| **Cron run failure → Discord/email alert to operator** | "I want to know if the job failed." | The `/admin/health` page already exists. Operator can check it during normal admin sessions. Adding an alert channel = new env var, new Resend template, new failure mode (alert-on-alert). For a daily-frequency job that's allowed to skip a day: overengineered. | Surface `lastPriceRefreshAt` staleness on `/admin/health` (already required). If it's >36h old, render a yellow badge. Cheaper, no new vendor. |
+| **Price-drop notification banner on storefront** | "Show buyers what's on sale today!" | Implies a notion of "sale price" vs "list price" which doesn't exist in the data model. Adds noise — buyers want to browse, not be marketed to. Friend-store voice is conversational, not promotional. | DO NOT BUILD. |
+| **Refresh per-binder or per-set** | "What if I only want to refresh Modern cards?" | Scryfall batches by id, not by set. Per-binder refresh = same number of API calls, more complex UI. Daily-refresh-all is simpler and correct. | DO NOT BUILD. Manual "Refresh now" button refreshes everything; that's the operator's only escape hatch and that's enough. |
+| **Concurrent / parallel Scryfall fetches** | "Faster!" | Scryfall's documented rate limit is 10 req/s. v1.3.1 already batches 75 ids/call, so ~170 sequential calls fits inside the limit. Parallelism risks 429 + the 30s lockout, which would make every run unreliable. | Keep sequential batches with the existing 100ms+ delay (Scryfall's recommendation). |
+
+---
 
 ## Feature Dependencies
 
 ```
-[Manabox CSV parses Binder Name + Binder Type]
-    └──required-by──> [Composite key includes binder dimension]
-                          ├──required-by──> [Migration backfills 'unsorted']
-                          ├──required-by──> [Server-side allocator at checkout]
-                          │                     └──required-by──> [Allocator preview in admin]
-                          │                     └──required-by──> [Audit log records picked binders]
-                          ├──required-by──> [Admin order detail shows [binder] per line]
-                          ├──required-by──> [Admin inventory column + filter]
-                          │                     └──required-by──> [Bulk-edit binder + 'unsorted' filter chip]
-                          └──required-by──> [Storefront aggregates quantity]
+[Daily Cron Schedule] ──requires──> [Vercel Cron config in vercel.json]
+                                          └──requires──> [CRON_SECRET env var]
 
-[Import preview binder picker] ──depends-on──> [Manabox CSV parses Binder Name]
-[Import preview binder picker] ──depends-on──> [Composite key includes binder]  (so "include only A07" can be implemented as scoped replace)
+[Daily Cron Schedule] ──requires──> [Cron handler route]
+                                          └──requires──> [Idempotency guard (recent-audit-row check)]
+                                          └──requires──> [Existing batched Scryfall /cards/collection client]
 
-[etched finish enum value] ──independent──> (no dependencies — pure parser/display change)
+[Cron handler] ──writes──> [admin_audit_log row, kind='price_refresh']
+                                          └──surfaced by──> [/admin/health lastPriceRefreshAt]
+
+[Manual "Refresh now" button] ──reuses──> [Same cron handler logic, behind requireAdmin()]
+                                          └──gated by──> [Existing ADMIN_BULK rate limit]
+
+[Select-All / Deselect-All buttons] ──reads/writes──> [binder-picker.tsx selection Set]
+                                          └──interacts with──> [v1.3 two-stage NDJSON contract — unchanged]
+
+[Default = all deselected] ──conflicts with──> [v1.3 "remembered selection across imports"]
+                                          └──resolution──> [Drop cross-import memory; keep within-session only]
 ```
 
 ### Dependency Notes
 
-- **Composite key is the keystone.** Almost every other feature requires it. Build the schema migration first; everything else is a downstream of it.
-- **Migration backfill (`binder='unsorted'`) must run before the first binder-aware import**, otherwise the constraint creation fails. This is one transaction: alter table + backfill + add unique constraint.
-- **Allocator preview enhances allocator** — it's the same code in read-only mode. Build the allocator first; preview is ~30 minutes of UI on top.
-- **Bulk-edit depends on the inventory filter** because the workflow is "filter to the source binder, select all, move." Without the filter, bulk-edit is a needle in 19,661-row haystack.
-- **Import preview binder picker depends on the composite key** for the "scoped replace" semantics. With the old single-row-per-card model there's no way to express "replace only A07's rows."
-- **`etched` is fully independent** — can ship in any order, including before the schema migration if the team wants to land it as a warmup.
+- **Cron handler is shared between scheduled + manual triggers.** Single source of truth — the manual button POSTs to the same path/logic the cron uses (or to a thin wrapper that calls the same function). This is the single most load-bearing architectural decision for Feature 2.
+- **Idempotency guard runs BEFORE the Scryfall fetch.** If an audit row exists with `kind='price_refresh'` and `created_at > now() - interval '5 minutes'`, return early with 200 + a "skipped: recent run exists" payload. Prevents Vercel double-delivery from costing Scryfall traffic.
+- **`/admin/health` change is additive.** v1.2 Phase 15's "literals only" rule applies to *env config*. A timestamp + counts from the operator's own audit log is operator-visible data, not env state — adding it does not violate the rule. Keep the rule unchanged for env values.
+- **Drop the v1.3 cross-import memory.** Currently `binder-picker.tsx` persists selection across import sessions; this directly contradicts "default deselected." Resolution: remove the cross-session persistence layer (likely localStorage). Selection state lives only inside one import preview's React component tree.
 
-## MVP Definition
+---
 
-### Launch With (v1.3)
+## MVP Definition (v1.4 only)
 
-These are the locked decisions from the milestone description, restated as a checklist. This is the milestone — there is no separate "v1.3 MVP vs v1.3 full."
+### Launch With (v1.4)
 
-- [ ] Manabox CSV parser reads `Binder Name` + `Binder Type`; skips rows where `Binder Type != 'binder'` — without this, deck/list rows pollute inventory
-- [ ] `cards` composite key gains `binder` dimension; same card across multiple binders = multiple stock rows — schema foundation
-- [ ] Migration backfills existing rows with `binder='unsorted'` — keeps checkout working from the moment the schema lands
-- [ ] Import preview shows binder picker (every binder name + row count + checkbox; selection remembered between imports via localStorage) — operator UX
-- [ ] Replace semantics scoped to selected binders only — unselected binders left untouched on import
-- [ ] Storefront aggregates `SUM(quantity) GROUP BY card_id`; binder hidden on public pages — buyer experience unchanged
-- [ ] Server-side allocator at checkout commit picks binders using **smallest-quantity-first with lexicographic tiebreaker**; one buyer line → potentially multiple `order_items` rows — race-safe inside existing atomic transaction
-- [ ] Admin order detail shows `[binder]` annotation on every line — the entire milestone goal
-- [ ] Admin inventory table gains `Binder` column + filter — slicing-by-binder for daily ops
-- [ ] `etched` becomes valid `Foil` finish enum value — unblocks Manabox rows that already use this
+These are the operator's stated requirements. Nothing more.
 
-### Add After Validation (v1.3.x)
+- [ ] **Select All / Deselect All buttons on the binder picker** — explicit opt-in to break autopilot.
+- [ ] **Default selection = none** — every binder unchecked on every open.
+- [ ] **Vercel Cron daily price refresh at 04:00 UTC** — daily Scryfall refetch.
+- [ ] **`admin_audit_log` row per run** — `{updated, unchanged, failed}` counts + duration.
+- [ ] **`lastPriceRefreshAt` on `/admin/health`** — observability surface.
+- [ ] **Manual "Refresh now" button** in admin — escape hatch, rate-limited.
+- [ ] **Idempotency guard** — recent-audit-row check at handler top to absorb Vercel double-delivery.
+- [ ] **Partial-failure tolerance** — Scryfall 404s recorded in `failed` count, run continues.
 
-Useful but not required to ship the milestone. Add if the seller actually uses the system and asks for them.
+### Add After Validation (v1.4.x)
 
-- [ ] **Allocator preview in admin order detail** (read-only `[binder×qty]` next to each line before commit) — trigger: seller asks "did the algorithm pick the right binders?"
-- [ ] **Bulk-edit binder column** with merge-on-collision modal — trigger: seller does their first manual consolidation and complains about the inline-edit-per-row workflow
-- [ ] **`unsorted` filter chip** as a one-click shortcut on admin inventory — trigger: seller asks how to find unsorted rows quickly
-- [ ] **Audit log includes per-line allocated binder** — trigger: any single buyer dispute about what was sent vs ordered
-- [ ] **Did-you-mean hint at import time** for binder names within edit-distance 1 of an existing name — trigger: first observed typo (e.g., `A07` vs `A07 ` with trailing space)
+Only if operator finds them missing during UAT.
 
-### Future Consideration (v1.4+)
+- [ ] **Staleness badge on `/admin/health`** — yellow if `lastPriceRefreshAt > 36h` ago. Trigger: operator misses a failed run because the timestamp is just text.
+- [ ] **Top-5 movers in audit metadata** — surfaced on `/admin/audit`. Trigger: operator wants more signal than counts.
+- [ ] **Disabled-state semantics on manual refresh** — "Refreshed 12s ago" + 60s cooldown. Trigger: operator double-clicks during testing.
 
-Defer until clear signal that they're worth the build cost.
+### Future Consideration (v1.5+ or never)
 
-- [ ] **Configurable allocator strategy** (smallest-first vs largest-first vs FIFO) — defer because no observed scenario requires it; current design has one strategy that fits the user's workflow
-- [ ] **Drag-and-drop binder visualization** — defer because bulk-edit covers the same workflow at a fraction of the cost
-- [ ] **Per-binder capacity tracking** ("A07 has 800 cards in a 480-pocket binder") — defer because the seller knows their physical capacity; the system doesn't need to
-- [ ] **Mobile-friendly pick-mode UI** for fulfilling on-the-go — defer because the seller is at a desk with their binders; no mobile use case
-- [ ] **Binder transfer history** (audit trail of moves between binders) — defer because the existing audit log already captures bulk-edit operations at a coarser level
+Only if the friend-store nature shifts (and it probably won't).
 
-## Feature Prioritization Matrix
+- [ ] **NDJSON streaming progress for manual refresh** — visual feedback during 30s wait. Only if operator says the silent button feels broken.
+- [ ] **Smart Select: NEW only** — third button on the picker. Only if operator says NEW-sort isn't enough after 3 months.
+- [ ] **Price history table + storefront graphs** — separate milestone entirely; would only happen if friends ask "what was this last week?"
+
+### Out of Scope (Reaffirmed)
+
+Already out of scope in PROJECT.md; v1.4 does not change that.
+
+- [ ] **Real-time price tickers** — daily refresh is the contract.
+- [ ] **Buyer wishlists / price-drop emails** — no user accounts (v1.0 decision).
+- [ ] **Automated repricing** — pass-through Scryfall, no margin engine.
+- [ ] **Multi-source pricing fallback** — Scryfall is sufficient.
+- [ ] **Saved selection presets** — friend store, not a SaaS workflow.
+
+---
+
+## Feature Prioritization Matrix (v1.4 Items Only)
 
 | Feature | User Value | Implementation Cost | Priority |
-|---|---|---|---|
-| Composite key with binder dimension + migration | HIGH | MEDIUM | P1 |
-| Manabox parser reads Binder Name + Binder Type, skips non-binder rows | HIGH | LOW | P1 |
-| Server-side allocator (smallest-first + lex tiebreaker) at checkout commit | HIGH | MEDIUM | P1 |
-| Admin order detail shows `[binder]` per line | HIGH | LOW | P1 |
-| Storefront aggregates qty across binders | HIGH | LOW | P1 |
-| Import preview binder picker with remembered selection | HIGH | MEDIUM | P1 |
-| Replace-scoped-to-selected-binders semantics | HIGH | MEDIUM | P1 |
-| Admin inventory `Binder` column + filter | MEDIUM | LOW | P1 |
-| Migration backfill `unsorted` | HIGH | LOW | P1 (blocker) |
-| `etched` foil enum value | MEDIUM | TRIVIAL | P1 (cheap, unblocks rows) |
-| Allocator preview in admin order detail | MEDIUM | LOW | P2 |
-| Bulk-edit binder column with merge | MEDIUM | MEDIUM | P2 |
-| `unsorted` filter chip | LOW | TRIVIAL | P2 |
-| Audit log per-line binder | MEDIUM | LOW | P2 |
-| Did-you-mean import hint | LOW | LOW | P2 |
-| Configurable allocator strategy | LOW | MEDIUM | P3 |
-| Drag-and-drop binder UI | LOW | HIGH | P3 |
-| Per-binder buyer display | NEGATIVE | LOW | **P0 anti-feature — explicitly do not build** |
-| Separate pick view page | NEGATIVE | MEDIUM | **P0 anti-feature — explicitly do not build** |
-| Binder name regex validation | NEGATIVE | LOW | **P0 anti-feature — explicitly do not build** |
+|---------|------------|---------------------|----------|
+| Default = all binders deselected | HIGH (operator's stated #1 motivation) | LOW (flip one initial state) | P1 |
+| Select All / Deselect All buttons | HIGH (counterbalances deselect-default) | LOW (two buttons + counter) | P1 |
+| Daily Vercel Cron refresh | HIGH (operator's stated #2 motivation) | MEDIUM (cron config + handler + idempotency) | P1 |
+| `admin_audit_log` row per run | HIGH (observability + operator requirement) | LOW (existing audit infra) | P1 |
+| `lastPriceRefreshAt` on `/admin/health` | HIGH (operator requirement) | LOW (one MAX query) | P1 |
+| Manual "Refresh now" button | MEDIUM (escape hatch, low frequency) | LOW (reuse cron handler) | P1 |
+| Idempotency guard | HIGH (correctness; Vercel double-delivery is documented behavior) | LOW (one audit-row check) | P1 |
+| Partial-failure tolerance | HIGH (Scryfall 404s happen) | LOW (existing batch returns `not_found`) | P1 |
+| Drop cross-import selection memory | MEDIUM (consistency with new default) | LOW (remove localStorage hook) | P1 |
+| Staleness badge on `/admin/health` | MEDIUM | LOW | P2 |
+| Top-5 movers in audit | LOW (nice-to-have) | MEDIUM | P3 |
+| Manual-refresh cooldown UI | LOW (defensive UX) | LOW | P3 |
+| NDJSON streaming progress | LOW (no signal it's needed) | MEDIUM | P3 |
 
 **Priority key:**
-- P1: Must ship as part of v1.3 milestone
-- P2: Add after v1.3 lands and seller signals demand (within v1.3.x)
-- P3: Defer to v1.4 or beyond, possibly never
-- P0 anti-feature: Explicitly NOT to be built; documented to prevent accidental scope creep
+- P1: Must have for v1.4 launch
+- P2: Should have, fold in if Phase 2 has slack
+- P3: Nice to have, defer to v1.4.x or never
 
-## Competitor Feature Analysis
+---
 
-| Feature | TCGplayer Pro | SortSwift (Shopify TCG app) | Mana Pool / ShipStation | Our Approach (v1.3) |
-|---|---|---|---|---|
-| Binder/location field per stock row | "Custom Label" SKU field (free-form, hack-y) | "Remarks" — free-text bin label, first-class column | SKU field, delegated to ShipStation | First-class `binder` column on `cards` table, free-text |
-| Multi-binder for same card | Multiple listings (one per condition/printing only) | Multiple stock rows per card, grouped on view | Per-listing | Composite key `(scryfall_id, finish, condition, language, binder)` — multiple rows allowed |
-| Pick list UI | Separate Pick List doc, no photos | Single inventory view sorted by remark, with images | Delegated to ShipStation | Admin order detail with binder annotation per line, sorted by binder |
-| Allocator strategy | N/A (one listing per copy) | Not documented (likely FIFO) | Per-listing | **Smallest-first + lex tiebreaker** (deliberately chosen for consolidation force) |
-| Buyer-facing aggregation | Aggregates across sellers, not bins | Aggregated total | Per-listing visible | Sum across binders, binder hidden |
-| Bulk-move between bins | Via CSV re-import | Bulk-edit + transfer with capacity warnings | Via CSV | v1.3: inline edit (floor); v1.3.x: bulk-edit with merge (planned) |
-| Binder name validation | None (free-text in SKU) | None — accepts any string, sorts blanks last | Delegated | None — free-text, length cap, optional did-you-mean hint |
-| Binder picker on import | No | Documented for advanced location mode | No | **Yes — distinguishing v1.3 feature** |
+## Reference Patterns (How Larger Players Do This — For Calibration Only)
 
-The **closest comparable system is SortSwift** (TCG-specific, Shopify-integrated, used by real card shops). Our v1.3 design tracks SortSwift's patterns almost exactly:
+| Feature | Shopify | TCGplayer Pro / TCG Sync | Viki's Approach |
+|---------|---------|--------------------------|-----------------|
+| Bulk price update scheduling | Shopify Flow scheduled trigger (≥10min granularity); bulk price-edit apps for cross-product runs | Continuous repricing with margin rules per category | Daily cron, Scryfall pass-through, no margin logic |
+| Manual trigger | Admin runs "Now" on a Flow workflow; apps add explicit "Run job" buttons | One-click "reprice all" | Single admin button on `/admin/health` or `/admin` |
+| Job audit / run history | Shopify Flow has a "runs" page with per-run status + duration; bulk-edit apps show job tables | Per-job run logs with item counts | Reuse `admin_audit_log` (single row per run); browse via `/admin/audit` |
+| Failure alerting | Shopify Flow surfaces failed runs in admin; some apps email on failure | In-app dashboards; some email | Staleness badge on `/admin/health` (no email alerts) |
+| Price-history retention | Apps offer history + rollback | Yes, weeks-to-months retention | Not built. Audit log captures `updated` count per day — coarse-grained but sufficient |
 
-- Free-text bin labels (their "Remarks" = our `binder`)
-- Group-by-bin on the pick view (their picklist sort = our admin order detail sort)
-- Aggregate quantity, hide bin from buyer (universal)
-- Bulk-edit / transfer between bins (our v1.3.x plan)
+The pattern across all of these: scheduled job + run history table + manual trigger + observability surface. Viki implements exactly that shape, at the smallest scale the operator's requirements support. Anything else from these tools is enterprise functionality for businesses, not friend stores.
 
-Where we **deviate intentionally** is the binder picker on import — SortSwift's import is per-card-record, so the question doesn't arise. Ours is full-CSV-replace, so per-binder scoping is the user's locked design choice and a real workflow win for the "import only the binder I changed today" pattern.
+---
 
 ## Sources
 
-### Direct competitor evidence (HIGH confidence)
-- [SortSwift — Picklist Location Grouping docs](https://sortswift.com/docs/inventory/picklist/location-grouping) — primary source for free-text bin labels, sort-by-bin pick UX, "items without remarks at end" pattern
-- [SortSwift — Location Summary docs](https://sortswift.com/docs/inventory/location-summary) — multi-bin same-card aggregation, transfer between locations, capacity warnings
-- [SortSwift — Picklist Generating docs](https://sortswift.com/docs/inventory/picklist/generating-picklists) — bulk picking workflow
-- [SortSwift Inventory Management feature page](https://sortswift.com/features/inventory) — "tag any stock with a bin or location, see per-bin capacity warnings"
-- [TCGplayer — Selling from Multiple Physical Stores](https://help.tcgplayer.com/hc/en-us/articles/115005291707-Selling-from-Multiple-Physical-Stores) — "Total Qty" field semantics
-- [Mana Pool — third-party seller tools](https://support.manapool.com/hc/en-us/articles/33523814988311-ShipStation-fulfill-your-Mana-Pool-orders-from-the-ShipStation-dashboard) — fulfillment is delegated to ShipStation; per-listing only
-
-### Allocator strategy literature (HIGH confidence)
-- [SAP Bin Location optimization](https://blogs.sap.com/2016/06/09/optimizing-bin-location-warehouse-storage-or-numbers-of-picks/) — explicit smallest-first vs largest-first toggle and named consequences
-- [Extensiv — Understanding Allocation Logic](https://help.extensiv.com/3pl-warehouse-manager-inventory-management/understanding-allocation-logic) — production WMS allocation rules
-- [Cadre Tech — FIFO vs LIFO vs FEFO comparison](https://www.cadretech.com/warehouse-order-picking-evaluation/) — multi-location FIFO trade-offs
-- [Shopify — Smart Order Routing](https://www.shopify.com/blog/smart-order-routing) — ranked location prioritization, minimize-split-fulfillment
-- [Shopify Help — Setting up order fulfillment for locations](https://help.shopify.com/en/manual/fulfillment/setup/locations/fulfillment) — order routing rules
-
-### Manabox CSV format (HIGH for binder/deck/list enum; MEDIUM for full column list)
-- [Manabox — Import and export the collection](https://www.manabox.app/guides/collection/import-export/) — "exported file will include all card properties as well as the binder/list name"
-- [Manabox — Collection FAQ](https://www.manabox.app/guides/collection/faq/) — three container types (binder, deck, list)
-- [Manabox — Decks FAQ](https://www.manabox.app/guides/decks/faq/) — deck-vs-collection-binder distinction
-- [Mana Pool — CSV Inventory Export ManaBox Format](https://support.manapool.com/hc/en-us/articles/26131255560855-CSV-Inventory-Export-ManaBox-Format) — third-party confirmation of column shape
-
-### eBay seller anti-pattern reference (MEDIUM confidence — community forum data)
-- [eBay community — Item Location](https://community.ebay.com/t5/Selling/Item-Location/td-p/34113773) — sellers stuffing bin into Custom Label (SKU)
-- [eBay community — Pick List Document](https://community.ebay.com/t5/Seller-Tools/quot-Pick-List-quot-Document/td-p/32157980) — eBay pick list lacks photos (anti-pattern observation)
-
-### Stock display / urgency tactics (HIGH confidence — Magento/BigCommerce widely documented)
-- [Adobe Commerce — Catalog Inventory](https://experienceleague.adobe.com/docs/commerce-admin/config/catalog/inventory.html) — "Only X left" threshold mechanics
-- [Econsultancy — How 11 ecommerce sites use stock levels to create buyer urgency](https://econsultancy.com/how-11-ecommerce-sites-use-stock-levels-to-create-buyer-urgency/) — confirmation that low-stock urgency is a sales tactic, not a baseline expectation
-
-### Bulk move / bin-to-bin transfer (HIGH confidence)
-- [SKUSavvy — Bin to Bin Transfer](https://www.skusavvy.com/docs/guides/warehouse/bin-to-bin-inventory-transfer) — UI pattern for moving stock between bins
-- [Microsoft Dynamics 365 — Transfer items between warehouse locations](https://learn.microsoft.com/en-us/dynamics365/business-central/inventory-how-transfer-between-locations) — Item Reclassification Journals as the enterprise pattern (cited as the "ceiling we won't build")
+- [PatternFly — Bulk selection pattern](https://www.patternfly.org/patterns/bulk-selection/) — buttons + counter convention for bulk-action lists
+- [Helios Design System (HashiCorp) — Table multi-select](https://helios.hashicorp.design/patterns/table-multi-select) — master checkbox + indeterminate state in tables
+- [GitLab Pajamas — Destructive actions](https://design.gitlab.com/patterns/destructive-actions/) — confirmation + reversibility patterns
+- [Nielsen Norman Group — Checkboxes: Design Guidelines](https://www.nngroup.com/articles/checkboxes-design-guidelines/) — indeterminate state semantics
+- [Nielsen Norman Group — Dangerous UX: Consequential Options Close to Benign Options](https://www.nngroup.com/articles/proximity-consequential-options/) — Fitts' Law applied to destructive actions
+- [Eleken — Checkbox UX best practices](https://www.eleken.co/blog-posts/checkbox-ux) — keep checkbox UI simple, master-checkbox patterns
+- [Eleken — Bulk action UX: 8 design guidelines](https://www.eleken.co/blog-posts/bulk-actions-ux) — destructive bulk-action confirmation patterns
+- [eBay Playbook — Bulk Editing pattern](https://playbook.ebay.com/design-system/patterns/bulk-editing) — destructive bulk-edit confirmation conventions
+- [Vercel — Cron Jobs documentation](https://vercel.com/docs/cron-jobs) — cron schedule syntax, free-tier daily limit
+- [Vercel — Managing Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs) — idempotency requirement, double-delivery warning, retry guidance
+- [Vercel — Troubleshooting Vercel Cron Jobs](https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs) — timeout limits per plan (10s Hobby / 300s Pro)
+- [Scryfall API — Rate Limits](https://scryfall.com/docs/api/rate-limits) — 10 req/s, 30s lockout on 429
+- [Scryfall API — Bulk Data Files](https://scryfall.com/docs/api/bulk-data) — "prices are dangerously stale after 24h"
+- [Scryfall FAQs — Where do Scryfall prices come from?](https://scryfall.com/docs/faqs/where-do-scryfall-prices-come-from-7) — 24h affiliate-sync model
+- [AppMaster — Audit logging for internal tools](https://appmaster.io/blog/audit-logging-internal-tools-activity-feed) — scheduled jobs as a common audit-gap surface
+- [Shopify Help Center — Scheduled time trigger](https://help.shopify.com/en/manual/shopify-flow/reference/triggers/scheduled-time) — calibration point for scheduled-job patterns at scale
+- [TCG Automation](https://www.tcg-automation.com/products/tcg-automation-landing-page) — calibration for what "automated repricing" looks like at scale (and why Viki shouldn't do it)
+- [TCG Sync — Storefront Pro](https://tcgsync.com/) — same calibration point
 
 ---
-*Feature research for: binder-aware MTG inventory + multi-source pick workflow*
-*Researched: 2026-05-10*
+
+*Feature research for: v1.4 Import UX & Price Refresh (subsequent-milestone scoping)*
+*Researched: 2026-05-20*

@@ -1,234 +1,197 @@
-# Project Research Summary
+# Project Research Summary — v1.4 Import UX & Price Refresh
 
 **Project:** Viki — MTG Bulk Store
-**Milestone:** v1.3 Binder-Aware Inventory & Pick Workflow
-**Domain:** Pure data-model + business-logic extension to an existing Next.js + Drizzle + Neon-HTTP storefront (~19,661 LOC TypeScript, 12,749 inventory rows, 28 passing test files, 272 tests). Adds a per-binder dimension to `cards`, a multi-source allocator on checkout, and the new `etched` finish.
-**Researched:** 2026-05-11
+**Milestone:** v1.4 Import UX & Price Refresh
+**Domain:** Personal-scale e-commerce; Next.js 16 App Router + Neon (drizzle/neon-http) on Vercel Hobby
+**Researched:** 2026-05-20
 **Confidence:** HIGH
 
 ## Executive Summary
 
-v1.3 is a **schema + algorithm milestone**, not a stack milestone. Every target feature — binder-tagged composite PK, per-binder selective replace, server-side allocator, `[binder]` annotation on order detail, `etched` finish — is achievable with the **already-pinned versions** of `drizzle-orm@0.45.2`, `papaparse@5.5.3`, `next@16.2.2`, `react@19.2.4`, `zustand@5.0.12`, `vitest@4.1.4`, and Tailwind v4. **No new dependencies, no version bumps, no new tooling.** The roadmap should not include a stack-setup phase. SortSwift (a TCG-specific Shopify app) validates almost every UX decision the user has locked: free-text bin labels, group-by-bin on the pick view, aggregate quantity hiding the bin from buyers, bulk-edit between bins. Where v1.3 deviates from SortSwift is the **binder picker on import**, which is the user's locked design and a real workflow win.
+v1.4 is two small, fully-independent features bolted onto a mature v1.3 codebase:
 
-The recommended approach is to **lock the schema and the allocator early** (Phases 16 and 18), let the **read-side aggregation and the cart-key migration land in parallel** with the importer's selective replace (Phases 19 and 20 can develop independently of each other after the schema is in), and **finish with hardening**. The allocator MUST be a **single SQL CTE chain** because `neon-http` has no interactive transactions — pre-computing a pick plan in JavaScript then locking just the chosen rows is the **biggest correctness trap** in this milestone and the reason Pitfall 1 is the load-bearing pitfall. Lock by `logical_id`, not by chosen rows; allocate inside the same CTE with a window function; add `CHECK (quantity >= 0)` as the belt-and-suspenders.
+1. Select All / Deselect All buttons on the existing binder picker, with a default-deselected initial state.
+2. A daily Vercel Cron that refetches Scryfall prices, writes one `admin_audit_log` row per run, exposes `lastPriceRefreshAt` on `/admin/health`, and adds a manual "Refresh now" escape hatch.
 
-The key risks are: (1) the schema migration is destructive (12,749 PKs are being rewritten in place) and must be dry-run on a Neon branch before merge; (2) the `etched` finish is a **latent v1.2 bug at `csv-parser.ts:87`** — every etched card the seller owns is silently treated as `normal`, mis-priced and PK-collided with its non-foil twin; v1.3 is the natural moment to fix this and skipping it grows the cost with every future import; (3) the cart-key transition has to live in the existing Phase 10-03 silent-reconciliation effect, NOT as a Zustand `migrate` hook (the reconciler is the only place that sees both the persisted state and the live `cardMap`); (4) the binder name is a **physical-world identifier** ("top shelf, red box, A02") and must not leak via storefront SSR, stock_conflict payloads, confirmation emails, or structured logs — a `PublicCard`/`AdminCard` type split keeps TypeScript honest about this at compile time.
+Research across STACK, FEATURES, ARCHITECTURE, and PITFALLS converges on the same opinion: **zero new dependencies, zero schema changes, no migrations**. The only new artifacts are a root `vercel.json`, a `CRON_SECRET` env var, two new route handlers, one shared service (`src/lib/price-refresh.ts`), one client button component, and small diffs to the picker, the import-client parent, and the health snapshot.
+
+The recommended approach is a **shared service called by two thin route handlers**: cron (`GET /api/cron/refresh-prices`, Bearer-token auth) and manual (`POST /api/admin/prices/refresh`, `requireAdmin()` + `ADMIN_BULK` rate-limit) both call `runPriceRefresh({ trigger, actorEmail? })`. The service reuses the v1.3.1-hardened `fetchCardsByScryfallIds()` batcher, computes price **per-row, per-finish** through the existing `getPrice(prices, finish)` ladder, and bulk-UPDATEs by the 5-segment composite `cards.id` (NEVER by `scryfall_id`). This last point is load-bearing: the v1.2 etched-mispricing bug would re-emerge if the refresh blindly UPDATE-by-scryfall_id.
+
+The biggest risks are silent regressions, not novel engineering:
+- (a) env-gated tests skipping in CI (the exact v1.3.5 hotfix failure mode) — must write a default-run, NOT env-gated handler test with `vi.stubEnv`
+- (b) breaking the existing `defaultCheckedFor` memory contract in `binder-import-store.ts:53-58` without explicitly choosing a replacement policy
+- (c) writing `price = NULL` for cards Scryfall returned as `not_found` — the refresh must SKIP, not overwrite
+
+Vercel-side gotchas (Hobby once-per-day, ±59 min drift, no retries, may double-deliver events, 300s max duration) are well-documented and mitigated through idempotency. Operator's earlier mental model of "Hobby = 10s/60s timeout" is **outdated as of 2026** — Hobby with fluid compute is 300s default = max. There is 11× headroom for the ~26s cold-cache refresh.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Nothing to add. v1.3 is a pure data-model + business-logic extension to the existing stack. The migration is one custom Drizzle SQL file (cannot be auto-generated because the `id`-format rewrite isn't inferrable). The allocator is ~30 lines of TypeScript wrapping one SQL CTE. The binder picker UI is a hand-rolled `<input type="checkbox">` list mirroring the established `filter-rail.tsx` pattern (used in 4 places already). Selection persistence reuses `zustand@5.0.12 persist` middleware (already pinned).
+Zero new runtime deps, zero dev deps, zero schema changes. Every infrastructure surface the spec needs — Scryfall batcher with 429 backoff, `admin_audit_log` table, `/admin/health` endpoint, `requireAdmin()` middleware, sliding-window rate limiter, structured logger, controlled binder-picker component — is already shipped from v1.2/v1.3 and used as-is.
 
-**Core technologies (unchanged):**
-- **drizzle-orm@0.45.2 + drizzle-kit@0.31.10** — schema, queries, atomic batch writes. Migration MUST use `drizzle-kit generate --custom` (drizzle-kit cannot infer the `id ||= '-' || binder` data rewrite, and known PK-migration bugs #3496/#3117 make auto-gen risky).
-- **papaparse@5.5.3** — extend existing `ManaboxRow` type with two new optional headers (`Binder Name`, `Binder Type`). Two new SkippedRow reasons (`non-binder row`, `zero quantity`).
-- **@neondatabase/serverless@1.0.2** — `db.batch([...])` is the ONLY atomic path. `neon-http` driver throws on interactive transactions (`src/db/queries.ts:801` comment). Allocator MUST be one CTE in one `db.execute()`; the existing `placeCheckoutOrder` already proves the pattern.
-- **next@16.2.2 + react@19.2.4** — no new APIs needed.
-- **zustand@5.0.12** — existing cart store + new `useBinderImportStore` slice with `persist` middleware for "selection remembered between imports."
-- **vitest@4.1.4** — allocator is a pure-function unit-test surface; the CTE pinning lives in `src/db/__tests__/orders.test.ts` extension.
-- **Existing infra reused:** `RATE_LIMIT_BUCKETS.ADMIN_BULK` (already covers `/api/admin/import/commit`), `admin_audit_log.metadata jsonb`, `import_history.metadata jsonb`, `logEvent` structured logger, `requireAdmin()` Auth.js v5 gate, native `<input type="checkbox">` + Tailwind pattern.
+**Core technologies (all already shipped):**
+- `next@16.2.2` — Route handlers; `export const maxDuration = 300` per Vercel Hobby cap. AGENTS.md warns this is NOT training-data Next.js; verify route handler syntax in `node_modules/next/dist/docs/` before authoring.
+- `react@19.2.4` — Binder picker is already a controlled `"use client"` component; Select/Deselect All is two `<button>` elements wired to existing `onToggle`/new `onBulkSet` callback.
+- `drizzle-orm@^0.45.2` — Per-row UPDATE on `cards.id` (chunked 500/batch via `FROM (VALUES …)` join); single INSERT into `admin_audit_log` per run.
+- `@neondatabase/serverless@^1.0.2` — Same constraint as v1.3: no interactive transactions on `neon-http`. Chunked autocommitted UPDATEs are the right shape.
+- Existing `src/lib/scryfall.ts` — `fetchCardsByScryfallIds(ids)` is the reused entrypoint; gate at ~4 req/sec; exponential backoff with Retry-After already implemented.
 
-**Critical version notes:**
-- Drizzle migration MUST be `--custom` (auto-gen is broken for PK changes per known issues, and cannot express the `id` data rewrite).
-- The hidden scope item: `foil: boolean` → `finish text` enum (normal/foil/etched) belongs in the SAME migration. Don't ship binder without etched.
+**New infrastructure surface:**
+- `vercel.json` at repo root (file does NOT currently exist; verified). `crons[]` array with `path: /api/cron/refresh-prices`, `schedule: 0 9 * * *` (or operator-chosen off-peak UTC hour).
+- `CRON_SECRET` env var (≥32 chars, generated via `openssl rand -hex 32`). Vercel auto-injects as `Authorization: Bearer ${CRON_SECRET}`.
+- `export const maxDuration = 300;` on the cron route.
+
+**Stack corrections vs. milestone bootstrap notes:**
+- Hobby allows **100 cron jobs/project** (not 2). Constraint that matters is **once-per-day** + **±59 min drift**.
+- Hobby `maxDuration` is **300s** with fluid compute (not 10s/60s). Operator's timeout concern is unfounded; there's 11× headroom.
 
 ### Expected Features
 
-**Must have (P1 — locked v1.3 scope, 10 features):**
-- Manabox CSV parser ingests `Binder Name` + `Binder Type`; skips rows where `Binder Type != 'binder'` (deck/list rows aren't physical stock).
-- `cards` composite ID gains `binder` dimension — schema foundation.
-- Migration backfills existing rows with `binder = 'unsorted'` so cart/checkout keep working from the moment the schema lands.
-- Import preview shows binder picker (every binder name + row count + checkbox + remembered selection via zustand persist).
-- Replace semantics scoped to selected binders only; unselected binders untouched.
-- Storefront aggregates `SUM(quantity) GROUP BY (set_code, collector_number, foil, condition)`; binder hidden from public pages.
-- Server-side allocator at checkout commit: **smallest-quantity-first with lexicographic tiebreaker**, as a SQL CTE inside the existing `placeCheckoutOrder` chain. One buyer line → potentially multiple `order_items` rows.
-- Admin order detail shows `[binder]` annotation per line item (read from `order_items.binder` snapshot, NOT joined to live `cards`).
-- Admin inventory table gains `Binder` column + filter.
-- `etched` becomes a valid `Foil` finish enum value (fixes a latent v1.2 bug — see Pitfall 7).
+**Must have (table stakes — all P1 for v1.4 launch):**
+- Select All / Deselect All buttons on the binder picker — explicit opt-in affordance
+- Default selection = all binders unchecked on every picker open
+- Daily Vercel Cron at off-peak UTC (recommend `0 9 * * *`) refetching all card prices
+- One `admin_audit_log` row per run: `{trigger, updated, unchanged, failed, durationMs}` in metadata
+- `lastPriceRefreshAt` on `/admin/health` (computed via `MAX(created_at) FROM admin_audit_log WHERE action='price_refresh'`)
+- Manual "Refresh now" admin button gated by `requireAdmin()` + `ADMIN_BULK` rate-limit (20/min, already shipped)
+- Idempotency guard — Postgres advisory lock to absorb Vercel double-delivery + cron-vs-manual race
+- Partial-failure tolerance — Scryfall 404s recorded in `failed` count; run continues; prices SKIPPED (never written to NULL)
+- "X of Y selected" counter near the picker buttons; Continue button disabled when `selectedCount === 0`
 
-**Should have (P2 — v1.3.x add-after-validation):**
-- Allocator preview in admin order detail (read-only `[binder × qty]` next to each line before commit).
-- Bulk-edit binder column with merge-on-collision modal (covers the user's stated "consolidate A02 into A07" workflow).
-- `unsorted` filter chip on admin inventory.
-- Audit log includes per-line allocated binder.
-- Did-you-mean hint at import time for binder names within edit-distance 1.
+**Should have (defer if Phase has no slack):**
+- Staleness badge on `/admin/health` (yellow when `lastPriceRefreshAt > 36h` ago)
+- 60s cooldown UI + "Refreshed Ns ago" text on the manual refresh button
 
-**Defer (P3 — v1.4+):**
-- Configurable allocator strategy.
-- Drag-and-drop binder visualization.
-- Per-binder capacity tracking.
-- Mobile pick-mode UI.
-- Binder transfer history.
+**Defer (v1.4.x or never):**
+- NDJSON streaming progress during manual refresh
+- "Smart Select: NEW only" third button (NEW binders already sort to top with green pill in v1.3)
+- Saved selection presets, multi-source pricing, automated repricing, real-time tickers, price-history graphs, per-card price-drop emails
 
-**Anti-features (P0 — explicitly DO NOT build, prevent scope creep):**
-- Separate "pick view" / printable pick list page — admin order detail IS the pick view (validated by SortSwift's docs).
-- Per-binder buyer-facing display — friends don't care, leaks physical organization.
-- Binder-name regex validation — breaks the user's real binder set (`Bulk Drawers`, `lord of the rings`, `compré titán`); SortSwift accepts free-text.
+**Explicit anti-features (do NOT build):**
+- Real-time price tickers on storefront — Scryfall itself refreshes once/24h
+- Multi-source pricing fallback — Scryfall is more reliable than operator's own deploys
+- Automated repricing with margin rules — operator runs pass-through pricing
+- Cron failure → Discord/email alerts — `/admin/health` is the surface; adding a vendor for one daily job is overengineered
+- Keyboard shortcut `Cmd-A` / `Ctrl-A` — conflicts with browser native
 
 ### Architecture Approach
 
-Pure SQL allocator inside the existing CTE-chain checkout, plus a one-shot custom Drizzle migration for the binder column + PK rewrite + `finish` enum, plus a new aggregated read path for the storefront and a two-line extension to the existing cart-reconciliation effect. ONE new physical column lands on `order_items` (`binder text NOT NULL DEFAULT 'unsorted'`) as a denormalized snapshot — every other v1.3 datum lives in existing JSONB metadata columns.
+Two route handlers (cron + manual) are thin auth/rate-limit wrappers over **one** shared service `src/lib/price-refresh.ts` exporting `runPriceRefresh({ trigger, actorEmail? })`. The service performs five steps:
+
+1. SELECT every `(id, scryfallId, finish, price)` tuple from `cards`
+2. De-dup Scryfall IDs and call `fetchCardsByScryfallIds(uniqueIds)`
+3. Compute `Math.round(getPrice(card.prices, row.finish) * 100)` **per row** because the same `scryfall_id` maps to N rows under the 5-segment PK with different finishes
+4. Chunked bulk UPDATE by `cards.id` (500 rows/chunk via `FROM (VALUES …)` join)
+5. Single INSERT into `admin_audit_log`
+
+The health snapshot adds a fourth parallel `MAX(created_at) WHERE action='price_refresh'` to `getAdminHealthSnapshot()`.
 
 **Major components:**
-1. **Schema migration script (`scripts/migrate-binder.ts`)** — one-shot, runs once before deploy. Single `db.batch([sql\`ADD COLUMN binder text NOT NULL DEFAULT 'unsorted'\`, sql\`DROP CONSTRAINT cards_pkey\`, sql\`UPDATE cards SET id = id || '-' || binder\`, sql\`ADD CONSTRAINT cards_pkey PRIMARY KEY (id)\`])`. Drives the `finish` enum addition in the same batch. Dry-run on a Neon branch first.
-2. **`parseManaboxCsvContents` extension** — two new optional headers (`Binder Name`, `Binder Type`); normalize binder at parse time (`trim().toLowerCase().replace(/\s+/g, ' ')` AND replace `-` with `_` to avoid breaking the cart-key segment-strip migration); skip `Binder Type != 'binder'` rows with `SkippedRow.reason = 'non-binder row'`; skip `Quantity === 0` with `'zero quantity'` reason; new 5-segment composite id `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`.
-3. **`replaceCardsForBinders(cards, selectedBinders, audit)`** — replaces `replaceAllCards`. `db.batch([delete WHERE binder IN (...), insert, audit, importHistory])`. Audit + import_history metadata gain `selectedBinders`, `binderRowCounts`, `replaceMode`, etc. (bounded ScopedImportAuditMetadata shape, fits ~1.5KB under the 4KB cap).
-4. **`getCardsAggregated()`** — new query on `src/db/queries.ts`. Plain `SELECT … SUM(quantity) … GROUP BY (set_code, collector_number, foil, condition)` returning `AggregatedCard[]`. NO materialized view (12,749 rows × hash-aggregate completes sub-50ms; verify with EXPLAIN ANALYZE). `app/page.tsx` swaps `getCards()` → `getCardsAggregated()`. `getCards()` is kept for cart/checkout disaggregated views.
-5. **Cart-key migration loop (`src/app/cart/cart-page-client.tsx`)** — 2-line extension to the Phase 10-03 silent-reconciliation `useEffect`. Strip the trailing `-{binder}` segment; if the aggregated candidate is in `cardMap`, transfer quantity; else fall through to existing silent-removal.
-6. **Allocator CTE inside `placeCheckoutOrder`** — extend the existing CTE chain. `locked_rows` joins on `(set_code, collector_number, foil, condition)` with `FOR UPDATE` (locks ALL binder rows for the requested logical card, not pre-chosen rows). Window function computes running supply. `LEAST(quantity, GREATEST(0, requested - prior_running_supply))` decides take_qty. UPDATEs decrement. INSERTs one `order_items` row per non-zero binder source, with `binder` snapshotted.
-7. **Binder picker component (`src/app/admin/import/_components/binder-picker.tsx`)** — hand-rolled `<input type="checkbox">` list mirroring `filter-rail.tsx`. Two-stage NDJSON contract: `{ type: 'binders', binders: [...] }` fires after parse (<2s), then enrichment runs on the selected subset only. Selection persisted via `useBinderImportStore` zustand slice (localStorage).
-8. **`PublicCard`/`AdminCard` type split** — TypeScript guarantees binder names never reach the storefront. Per-route invariant test: `JSON.stringify(response).includes('binder') === false` for `GET /`, `GET /cart`, `POST /api/checkout`.
 
-**Build order:** A (Schema/Migration/Parser) → (B Importer scoped-replace || C Storefront aggregation + Cart migration) → D (Allocator integration in checkout) → E (Admin visibility + audit metadata) → F (Hardening + UAT). B and C are independent after A lands.
+1. `src/lib/price-refresh.ts` (NEW) — Shared service, `"server-only"`, unit-testable against in-memory mocks; auth-agnostic.
+2. `src/app/api/cron/refresh-prices/route.ts` (NEW) — `GET`, `runtime = "nodejs"`, `maxDuration = 300`; verifies `Authorization: Bearer ${CRON_SECRET}` with fail-CLOSED when env missing; returns 401 otherwise.
+3. `src/app/api/admin/prices/refresh/route.ts` (NEW) — `POST`, mirrors `bulk-delete/route.ts` shape; `requireAdmin()` + `enforceRateLimit(ADMIN_BULK)` + same service call.
+4. `src/app/admin/health/_components/refresh-prices-button.tsx` (NEW) — Client component POSTing to the manual route; `router.refresh()` on success.
+5. `src/app/admin/import/_components/binder-picker.tsx` (MODIFY) — Add Select All / Deselect All buttons in `<header>` block (~lines 73-80) wired to a new `onBulkSet(names, checked)` callback prop. **Path correction: this file lives under `_components/`, NOT directly under `import/`.**
+6. `src/app/admin/import/_components/import-client.tsx` (MODIFY, line ~246) — Replace `initialSelection[b.name] = defaultCheckedFor(b)` with the chosen v1.4 default policy.
+7. `src/db/admin-health.ts` + `src/app/api/admin/health/route.ts` + `src/app/admin/health/page.tsx` — Add `lastPriceRefreshAt` field to interface, response, and 4th tile.
+8. `src/lib/enrichment.ts` — Export the currently-file-private `getPrice(prices, finish)` ladder so the service has a single source of truth.
+
+**Health page tile decision (OPEN — operator must resolve in requirements):** Replace the dead `notificationFailuresLast24h` placeholder tile with `lastPriceRefreshAt`, OR add a 5th tile (`lg:grid-cols-5`). Architecture research recommends **replace** since the notification-failures tile is logged in PROJECT.md as "⚠️ Revisit when log drain lands" and renders as a permanent "Unknown."
 
 ### Critical Pitfalls
 
-The pitfall research enumerated **17 pitfalls** (13 critical, 4 moderate). The five load-bearing ones every roadmap phase must keep in mind:
+1. **Env-gated test skipping in CI (HIGH — v1.3.5 repeat).** The Phase 18 → v1.3.5 hotfix happened because `orders.concurrent.test.ts` gates on `TEST_DATABASE_URL`, so it never ran in CI. The cron handler test MUST be a default-run unit test using `vi.stubEnv("CRON_SECRET", …)` + mocked Scryfall fetcher + mocked DB, with a file-header comment explicitly saying "NOT env-gated."
 
-1. **Allocator double-decrement under concurrent checkout (Pitfall 1, Phase 18).** `neon-http` has NO interactive transactions; `FOR UPDATE` outside a transaction releases the lock when the SELECT returns. The CTE MUST lock every row for the requested `logical_id` (`set_code, collector_number, foil, condition`), NOT just the rows the allocator pre-picked. Pre-computing a pick plan in JS then locking by `id IN (...)` is the load-bearing bug. Add `CHECK (quantity >= 0)` on `cards` as the schema-level safety net; over-decrement becomes a 503, not a silent oversell. Extend the Phase 11 concurrent-proof harness to a multi-binder scenario.
-2. **`etched` finish silently treated as `normal` (Pitfall 7, Phase 17).** Latent v1.2 bug at `csv-parser.ts:87`: `const foil = row.Foil === "foil"`. Anything not literally `"foil"` becomes `false` — etched cards become non-foil with wrong price (`usd` vs `usd_etched`, often $0.50 vs $25) AND collide on PK with normal printings of the same collector number. Fix as a third finish enum value in the SAME v1.3 migration. Verify Manabox emits the literal string `"etched"` in the Foil column early (manual export inspection — Stack Q4 flagged this as MEDIUM-confidence).
-3. **Migration corruption from non-idempotent backfill (Pitfall 4, Phase 16).** Re-running `UPDATE cards SET id = id || '-unsorted'` appends twice → 5-segment ids become 6-segment, every `order_items.cardId` snapshot mismatches. Pre-flight assertions in the migration script: (a) no row already has the `-unsorted` suffix, (b) no `binder` column yet exists, (c) capture `order_items.cardId` distribution before/after to verify zero new mismatches. Dry-run on a Neon branch FIRST; `pg_dump` to `.planning/migrations/v1.3/backups/` before merge.
-4. **Cart-key migration silent empty after deploy (Pitfall 5, Phase 20).** v1.2 cart keys are 4 segments (`setCode-collectorNumber-foil-condition`); v1.3 aggregated keys remain 4 segments at the storefront/cart boundary (the allocator does the split server-side). The reconciliation effect at `cart-page-client.tsx:40-47` must extend, not replace, the existing D-13 pattern. Zustand `migrate` hooks can't see `cardMap` and won't work here. Normalize binder names by replacing `-` with `_` at parse time so the segment-strip migration is safe.
-5. **Binder-name leak via API responses, emails, structured logs (Pitfall 6, Phase 20/22).** Binder is a physical-world identifier. Split `Card` into `PublicCard` (no binder) and `AdminCard` (has binder); TypeScript catches the leak at compile time. Pin per-route invariant tests asserting `JSON.stringify(response)` never contains `binder` on `GET /`, `GET /cart`, `POST /api/checkout`. STRIDE delta adds I-DISC-05 (binder name privacy). Allocator returns aggregated `available` in stock_conflict — never per-binder breakdown.
+2. **Picker memory contract regression (HIGH).** `binder-import-store.ts:53-58` implements a non-obvious Phase 19 invariant: prior selection wins, NEW binders default ON, `unsorted` always OFF (D-08/D-09/D-10). Will-delete is default-CHECKED at `import-client.tsx:255-256` *because the memory exists*. A naive hard-reset to `{}` silently drops the memory feature, breaks NEW-binders-default-on, and inherits a now-stale will-delete-default-CHECKED premise. Requirements MUST pick one explicit option:
+   - **(A — recommended by FEATURES)** Drop `defaultCheckedFor` memory entirely; Select All / Deselect All are the only affordances.
+   - **(B)** Keep memory; default-checked behavior unchanged; Select/Deselect All purely additive.
+   - **(C)** Memory persists as `lastSelection`, surfaced as a "last imported" badge on each binder row; picker opens all-unchecked regardless; operator clicks Select All to recover.
 
-Also load-bearing but second-tier:
-- **Pitfall 2** (partial allocation contract break — keep all-or-nothing, same `StockConflict` shape with aggregated `available`).
-- **Pitfall 10** (binder name typos `"A02"` vs `"A02 "` vs `"a02"` — normalize at parse time).
-- **Pitfall 12** (multi-CSV merge collapsing the binder dimension — fixed by including binder in the composite id).
-- **Pitfall 13** (audit metadata bounded shape `ScopedImportAuditMetadata` fits ~1.5KB under the 4KB cap).
-- **Pitfall 17** (order detail `[binder]` annotation MUST read from `order_items.binder` snapshot, not join to live `cards`).
+3. **Writing `price = NULL` for Scryfall `not_found` cards (HIGH).** Same bug class as Phase 17 etched mispricing. The naive `card.price = scryfallMap.get(id)?.prices.usd ?? null` loop will nuke previously-good prices for ~12 known etched/obscure cards every day. The refresh MUST: skip rows with no `scryfallId`; skip rows where `scryfallMap.get(id)` returns undefined (preserve prior price); only write `NULL` when Scryfall explicitly returned `prices.usd === null`. Audit metadata distinguishes `updated / unchanged / failed (Scryfall not_found) / skipped (no scryfall_id)`.
+
+4. **Cron + Manual race → audit log liar (MEDIUM).** Vercel may deliver the same cron event twice; cron may also overlap a manual click. Mitigation: Postgres advisory lock via `pg_try_advisory_lock(hashtext('cron.refresh_prices'))` (non-blocking; bail with 409 if held).
+
+5. **Price unit conversion (MEDIUM, easy to forget).** `cards.price` is `integer` storing **cents** (`schema.ts:43`, `seed.ts:26`, `queries.ts:858`; read paths divide by 100). Scryfall returns USD strings (`"1.27"`). MUST use `Math.round(parseFloat(usd) * 100)`.
+
+6. **`CRON_SECRET` silently missing in Vercel env (MEDIUM).** Vercel cron dashboard reports HTTP-level success; a 401 looks identical to a 200 from above. Mitigation: extend `envChecks()` with `cronSecret: isPresent(process.env.CRON_SECRET) ? "configured" : "missing"` literal; flip top-level `ok` to false when missing. NEVER log the actual secret value.
+
+7. **`next dev` runs no cron (MEDIUM).** Vercel docs explicit: no support for `vercel dev` / `next dev` for cron scheduling. Local workflow is hand-rolled `curl -H "Authorization: Bearer $CRON_SECRET"`. Phase VERIFICATION.md must require operator-verified live cron invocation post-deploy.
 
 ## Implications for Roadmap
 
-Based on combined research, the natural decomposition is **7 phases (16-22)**. Phases B and C (19 and 20) are independent after the schema lands in Phase 16; ship the lower-risk read-side first if the team prefers.
+The two features are **fully independent** (no shared files, no shared state, no shared types).
 
-### Phase 16: Schema & Migration
-**Rationale:** Foundation phase. Every other v1.3 feature depends on the binder column + the new 5-segment composite id + the `finish` enum. The migration is destructive (12,749 PKs rewritten in place) and must be dry-run on a Neon branch before merge.
-**Delivers:** Custom Drizzle SQL migration adding `binder text NOT NULL DEFAULT 'unsorted'`, dropping/recomputing/re-adding `cards_pkey`, adding `finish text` (or `pgEnum('finish', ['normal','foil','etched'])`) with backfill from existing `foil` boolean, adding `CHECK (quantity >= 0)` constraint, adding `order_items.binder text NOT NULL DEFAULT 'unsorted'`. Migration script (`scripts/migrate-v1.3-binder.ts`) with three pre-flight assertions. `pg_dump` backups. Neon-branch dry-run gate.
-**Addresses:** P1 features "composite key includes binder," "migration backfills unsorted," "etched becomes finish enum value." Lays the schema floor for the importer (Phase 19), aggregation (Phase 20), and allocator (Phase 18).
-**Avoids:** Pitfall 4 (migration corruption — idempotency pre-flight), Pitfall 1 (CHECK constraint safety net for allocator), Pitfall 7 (etched in the same migration).
+### Recommended: Phase 23 with two plans
 
-### Phase 17: Parser & Etched
-**Rationale:** Once the schema accepts binder + finish, the parser must populate them. This phase is where the Manabox column ingest lives, plus the `etched` finish coercion and the binder-name normalization. Co-located because all three are CSV-side concerns.
-**Delivers:** `ManaboxRow` interface extended with `"Binder Name"?: string`, `"Binder Type"?: string`. `rowToCardOrSkip` normalizes binder name (`trim().toLowerCase().replace(/\s+/g, ' ')` AND `replace(/-/g, '_')`), skips `Binder Type != 'binder'` rows with `SkippedRow.reason = 'non-binder row'`, skips `Quantity === 0` with `'zero quantity'` reason, sets `finish` from `row.Foil` (with verified handling of the literal `"etched"` string — manual test early), defaults missing `Binder Name` to `"unsorted"`. Composite id becomes `${setCode}-${collectorNumber}-${finish}-${condition}-${binder}`. Display layer (cart-item.tsx, card-modal.tsx) reads `finish` instead of `foil`. Parser test fixtures for the cross-binder same-card case, etched-distinct-from-normal case, and the trim/case normalization case.
-**Addresses:** P1 features "parser reads Binder Name + Binder Type," "etched finish enum value." Eliminates the v1.2 latent etched bug.
-**Avoids:** Pitfall 7 (etched silent mishandle), Pitfall 10 (binder name typo), Pitfall 12 (multi-CSV merge collapsing binder dimension), Pitfall 15 (zero-quantity rows persisting).
+#### Phase 23 — Plan 01: Daily Price Refresh
 
-### Phase 18: Allocator
-**Rationale:** Highest-risk phase. The CTE-chain rewrite of `placeCheckoutOrder` is non-trivial; the concurrent-checkout invariant is load-bearing. Standalone phase to give the unit-test fixture matrix and the multi-binder concurrent-proof harness adequate time.
-**Delivers:** Extended CTE in `src/db/orders.ts`: `requested` → `locked_rows` (with `ROW_NUMBER()` and running `SUM()` window functions) → `conflicts` (aggregated `available`) → `can_fulfill` → `allocations` (`LEAST(quantity, GREATEST(0, requested - prior_running_supply))`) → `stock_write` → `inserted_order` → `inserted_items` (one row per non-zero binder source, capturing `binder` into the snapshot). `StockConflict` semantics: `cardId` shifts from per-row id to aggregated id; payload still `{cardId, name, requested, available}` (no per-binder breakdown). `placeCheckoutOrder` input shape unchanged. Pick order: `ORDER BY binder ASC` (deterministic, matches operator's "alphabetically first binder first" mental model). Unit test fixtures: `(2,2,2)×3 = [2,1,0]`, `(2,2,2)×5 = [2,2,1]`, `(2,2,2)×6 = [2,2,2]`, `(2,2,2)×7 = conflict`. Extended concurrent-proof harness.
-**Addresses:** P1 features "server-side allocator," "one buyer line → multiple order_items rows."
-**Avoids:** Pitfall 1 (lock by logical_id, not chosen rows; CHECK quantity >= 0), Pitfall 2 (all-or-nothing semantics preserved), Pitfall 14 (deterministic pick order pinned), Pitfall 17 (binder snapshotted into order_items at insert time).
-**Uses stack elements:** `db.execute(sql\`...\`)` single CTE (the only atomic path on neon-http).
+**Rationale:** Higher-risk, write-side feature; touches DB, external service (Scryfall), new env var, new infrastructure (`vercel.json`).
 
-### Phase 19: Import Preview & Picker
-**Rationale:** Operator UX phase. The two-stage NDJSON streaming protocol, the binder picker component, the selective replace semantics, and the bounded audit-metadata shape all live here. Can be developed in parallel with Phase 20 after Phase 16 lands.
-**Delivers:** New NDJSON message kind `{ type: 'binders', binders: BinderSummary[] }` fires after parse (<2s), before enrichment. `binder-picker.tsx` hand-rolled `<input type="checkbox">` component (mirrors `filter-rail.tsx`). `useBinderImportStore` zustand slice persists selection in localStorage. Default-on for new binders (highlighted "NEW"), default-shown for missing-from-export binders in a separate "Will delete" panel (Pitfall 9 — operator must explicitly uncheck). Confirmation modal with per-binder ADD/REPLACE/DELETE breakdown. `replaceAllCards` → `replaceCardsForBinders(cards, selectedBinders, audit)` with `db.batch([delete WHERE binder IN (selectedBinders), insert, audit, importHistory])`. Audit metadata follows the `ScopedImportAuditMetadata` shape (selectedBinders, totalBindersInExport, scopedReplaceCounts.before/after, deletedFromUnselected: 0 literal, totalCardsAfterImport, newBindersInExport, missingBindersFromExport). Two-call flow (binders-then-enrichment) preferred over hold-and-resume.
-**Addresses:** P1 features "import preview shows binder picker," "selection remembered between imports," "replace semantics scoped to selected binders only."
-**Avoids:** Pitfall 8 (picker latency — parse-first/enrich-after streaming), Pitfall 9 (remembered selection silently drops new binders — confirmation modal catches autopilot), Pitfall 13 (audit metadata bounded under 4KB).
-**Uses stack elements:** Existing NDJSON streaming pattern in `/api/admin/import/preview/route.ts`. `RATE_LIMIT_BUCKETS.ADMIN_BULK` reused for the selective commit. Existing `requireAdmin()` gate.
+**Delivers:**
+- `src/lib/price-refresh.ts` shared service (export `getPrice` from `enrichment.ts` first)
+- `GET /api/cron/refresh-prices` route with Bearer-token auth + `maxDuration = 300`
+- `POST /api/admin/prices/refresh` route mirroring `bulk-delete/route.ts` shape
+- `vercel.json` at root with `crons[]` entry
+- `lastPriceRefreshAt` in `getAdminHealthSnapshot()` + `/admin/health` JSON + 4th tile on `/admin/health` page
+- `cronSecret` literal-only check in `envChecks()`
+- `<RefreshPricesButton />` client component next to the new tile
+- Postgres advisory lock single-flight
+- Operator runbook update for `CRON_SECRET` setup + post-deploy live cron verification
 
-### Phase 20: Storefront Aggregation & Cart Migration
-**Rationale:** Read-side change. Lower risk than write-side; can ship before Phase 19 if the team prefers reversibility. Includes the cart-key reconciliation extension and the `PublicCard`/`AdminCard` type split.
-**Delivers:** `getCardsAggregated()` in `src/db/queries.ts`: plain `SELECT … SUM(quantity) … GROUP BY (set_code, collector_number, foil, condition)`. Aggregated id construction: `set_code || '-' || collector_number || '-' || (CASE WHEN foil THEN 'foil' ELSE 'normal' END) || '-' || condition`. `app/page.tsx` swaps `getCards()` → `getCardsAggregated()`. `app/cart/page.tsx` and `app/checkout/page.tsx` keep `getCards()` (still need disaggregated rows). Cart reconciliation extension (`src/app/cart/cart-page-client.tsx:40-47`): segment-count guard + last-`-{binder}`-segment strip + transfer-quantity-into-aggregated-candidate + clamp-to-current-stock. Optional one-time toast on first v1.3 visit (`viki-cart-version: '1.3'` sentinel). `PublicCard`/`AdminCard` type split in `src/lib/types.ts` — `binder` lives ONLY on `AdminCard`. Per-route invariant tests for `GET /`, `GET /cart`, `POST /api/checkout`.
-**Addresses:** P1 features "storefront aggregates qty across binders," "binder hidden from public pages."
-**Avoids:** Pitfall 5 (cart-key migration silent empty — reconciliation extension), Pitfall 6 (binder leak — type split + invariant tests), Pitfall 11 (stock changes mid-cart — clamp to current).
-**Uses stack elements:** Existing Phase 10-03 silent-reconciliation contract. Existing zustand persistence with custom Map serializer.
+**Risk level:** MEDIUM (write-side; first cron run hits production DB; needs explicit operator UAT post-deploy).
 
-### Phase 21: Admin Visibility & Audit
-**Rationale:** Admin-facing reads. Adds the binder column to inventory table, filter, and the `[binder]` annotation on order detail. Reads `order_items.binder` snapshot (NOT joined to live `cards`).
-**Delivers:** Admin inventory table at `getAdminCards()` adds binder filter (`if (binder) conditions.push(eq(cards.binder, binder))`). New `Binder` column + filter dropdown populated from `SELECT DISTINCT binder`. Admin dashboard `AdminDashboardStats.byBinder` breakdown. Admin order detail page renders `[binder]` per `order_items` row from the snapshot column. Audit log page renders the new ScopedImportAuditMetadata fields. Optionally: `unsorted` filter chip (P2).
-**Addresses:** P1 features "admin order detail shows [binder] annotation," "admin inventory table gains Binder column + filter."
-**Avoids:** Pitfall 17 (snapshot column, not live join), Pitfall 3 (graceful degradation for missing `cards` row).
+#### Phase 23 — Plan 02: Import Picker UX
 
-### Phase 22: Hardening & UAT
-**Rationale:** Closing phase. STRIDE delta document (I-DISC-05 binder leak; D-DOS-01 amplification on import preview rate-limit). Multi-binder concurrent-proof harness. Performance pins. Operator UAT.
-**Delivers:** STRIDE delta in `.planning/phases/22-hardening/22-SECURITY-REVIEW.md` adding I-DISC-05 and the resolved mitigations. Multi-binder concurrent-checkout proof in `src/db/__tests__/orders.test.ts` extending the Phase 11 baseline. Apply the deferred D-DOS-01 fix (rate-limit on `/api/admin/import/preview` — Phase 15 deferred Medium; v1.3 amplifies the per-call cost). Perf pin: `parseManaboxCsvContents(12_749) < 2000ms`. Playwright test: picker renders within 3s of upload. UAT scenarios from the Pitfall research checklist (operator-on-autopilot binder picker; v1.2 → v1.3 cart hydration; over-decrement detection via CHECK constraint; binder leak grep).
-**Addresses:** Production readiness.
-**Avoids:** Pitfall 8 (perf pin), Pitfall 9 (UAT catches autopilot), Pitfall 6 (STRIDE delta finalizes the type-split contract).
+**Rationale:** Pure UI; can land independently or interleave with Plan 01.
 
-### Phase Ordering Rationale
+**Delivers:**
+- Select All / Deselect All buttons in `binder-picker.tsx` header (`onBulkSet(names[], checked)` callback to avoid N renders)
+- "X of Y selected" counter inline with the buttons
+- `import-client.tsx:246` initial-selection diff per chosen Option A/B/C
+- Empty-state helper text + disabled Continue button when `selectedCount === 0 && willDeleteCount === 0`
+- Picker tests: fresh-operator (no localStorage) opens all-unchecked; tab-order assertion
 
-- **Phase 16 must come first** — it's the schema floor; everything else writes-against or reads-against the new shape.
-- **Phase 17 must follow 16** — parser populates the new column; can't run before the column exists.
-- **Phase 18 can run in parallel with 19+20** in principle, but it's the highest-risk phase and benefits from being a focused standalone phase. Recommend after the parser is solid (Phase 17) and after Phase 20's aggregated read shape is locked (so the allocator's input shape is final).
-- **Phase 19 and Phase 20 are independent after Phase 16.** Phase 19 is write-side (importer); Phase 20 is read-side (storefront + cart). Recommend Phase 20 first because read-side changes are more reversible — if the aggregation has a bug, no data corruption; if the importer has a bug, history is corrupted.
-- **Phase 21 needs Phase 18's `order_items.binder` snapshot column** to be populated, and needs Phase 16's binder column for the inventory filter.
-- **Phase 22 is closing.** Multi-binder concurrent-proof needs the allocator (18); STRIDE delta needs the type split (20); perf pins need the importer (19).
+**Risk level:** LOW (UI-only; existing test patterns extend cleanly).
 
-Suggested execution: 16 → 17 → 20 → 19 → 18 → 21 → 22. Phases 19 and 20 can interleave after 17.
+### Open Decisions for Requirements
 
-### Research Flags
-
-Phases likely needing deeper research during planning:
-
-- **Phase 18 (Allocator):** The CTE shape needs careful validation. The `LEAST(quantity, GREATEST(0, requested - prior_running_supply))` arithmetic is correct but non-obvious. Recommend a `/gsd-research-phase` for the unit-test fixture matrix and the concurrent-proof harness extension. Verify that `FOR UPDATE OF cards` (explicit table reference) is required when the CTE has multiple joined tables.
-- **Phase 16 (Schema):** Verify on a Neon branch BEFORE roadmap approval that the `db.batch([sql\`ALTER…\`, sql\`UPDATE…\`])` shape actually compiles against drizzle-orm@0.45.2's TypeScript. The Architecture research flagged a NOTE that batch typings may reject `db.execute(sql\`...\`)` calls inside a batch; fall back to one multi-statement raw SQL (`db.execute(sql\`BEGIN; ALTER…; COMMIT;\`)`) if so. This is a 30-minute spike, not a phase.
-- **Phase 19 (Import Preview):** Two-stage NDJSON contract design needs to be reviewed against the existing `ImportStreamMessage` type and the client reader at `import-client.tsx:101-145`. Recommend a `/gsd-research-phase` if the two-call vs hold-and-resume choice isn't clear from the existing patterns.
-
-Phases with standard patterns (skip research-phase):
-
-- **Phase 17 (Parser):** Established `rowToCardOrSkip` pattern. Just extend.
-- **Phase 20 (Storefront aggregation):** Plain `GROUP BY`. The cart-key migration is a 2-line extension to an existing effect. Type split is mechanical.
-- **Phase 21 (Admin visibility):** Pure UI + existing query extension patterns.
+1. **Memory contract handling (Pitfall 3).** Pick A/B/C (recommend A — drop memory).
+2. **Health tile placement.** Replace dead `notificationFailuresLast24h` placeholder OR add a 5th tile (recommend replace).
+3. **Cron UTC hour.** Recommend `0 9 * * *` UTC (= 02:00 PT, 04:00 CT, 05:00 ET).
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Verified against installed `package.json`, `node_modules/drizzle-orm/package.json` (0.45.2), `node_modules/drizzle-kit/package.json` (0.31.10). Zero new dependencies needed. WebSearch exhaustively confirmed no published Manabox parser exists. Drizzle PK-migration bugs #3496/#3117 are MEDIUM-confidence on whether they're fixed in 0.31.10 — mitigated by using `--custom` migration. Manabox emitting the literal `"etched"` string is MEDIUM — needs manual verification early. |
-| Features | HIGH | SortSwift (TCG-specific Shopify app) is a direct competitor with documented patterns matching v1.3's locked decisions. 10 P1 features map cleanly to the user's locked spec. 3 P0 anti-features documented to prevent scope creep. Multi-platform validation (TCGplayer, Shopify, BigCommerce, Magento) confirms sum-the-quantities buyer aggregation is universal. Allocator strategy choice (smallest-first + lex tiebreaker) grounded in SAP / Extensiv WMS literature. |
-| Architecture | HIGH | Every claim verified against `src/db/schema.ts`, `src/db/queries.ts`, `src/db/orders.ts`, `src/lib/csv-parser.ts`, `src/lib/store/cart-store.ts`, `src/app/cart/cart-page-client.tsx`, and the git history of phases 13/14/15. The single-`db.batch` migration pattern mirrors the existing `replaceAllCards`. The CTE-allocator pattern extends the existing `placeCheckoutOrder`. The cart-reconciliation extension fits the established D-13 contract. MEDIUM only for the suggested phase order — team may prefer ship-D-first behind a feature flag. |
-| Pitfalls | HIGH | 17 pitfalls each grounded in a specific file:line or documented Phase 11/14/15 invariant. The five critical pitfalls (1, 4, 5, 6, 7) are the load-bearing ones; Pitfall 1 (lock by logical_id, not chosen rows) is the single most important correctness invariant. STRIDE delta is bounded (one new Medium, one amplification of an existing Medium). |
+| Stack | HIGH | Vercel docs verified against current canonical URLs; on-disk files read directly. |
+| Features | MEDIUM-HIGH | Bulk-action UX backed by PatternFly + Helios + NN/g + Eleken + eBay. Memory-contract option pick is operator preference. |
+| Architecture | HIGH | All integration points verified against on-disk source; line-level pointers given for every modified file. |
+| Pitfalls | HIGH | Every cited line read directly. v1.3.5 incident referenced from RETROSPECTIVE.md and pending todo. |
 
-**Overall confidence:** HIGH.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Manabox `"etched"` literal string verification.** Stack research flagged MEDIUM-confidence that Manabox emits `Foil="etched"` (not `Foil="Etched Foil"` or `Foil="foil-etched"` or similar). Recommend a 5-minute manual export inspection early in Phase 17 — have the operator export one binder containing a known etched-foil card and grep the CSV. Resolve before the parser test fixtures are written.
-- **Drizzle `db.batch([sql\`...\`])` type compatibility.** Architecture research flagged a NOTE that batch typings may reject raw `sql` calls inside a batch. 30-minute spike during Phase 16 planning; fall back to `db.execute(sql\`BEGIN; …; COMMIT;\`)` if needed.
-- **Two-stage NDJSON protocol vs hold-and-resume.** Architecture recommends two-call (stateless, simpler). Phase 19 planning should validate against the existing `import-client.tsx` reader and decide before implementation starts.
-- **`order_items.binder` for historical (pre-v1.3) orders.** Will be NULL after migration. Admin order detail UI must render gracefully (show `[unsorted]` or omit the annotation for `binder IS NULL`).
-- **Migration dry-run on Neon branch.** Schedule this as a gate before merging Phase 16 to main. Use `pg_dump` + the three pre-flight assertions from Pitfall 4.
+- Open decision A (memory contract) — pick A/B/C in requirements.
+- Open decision B (health tile placement) — pick replace-vs-add in requirements.
+- Cron UTC hour — pin in requirements.
+- Tier 2 live-DB integration test — opt-in/skip decision during planning.
+- `CRON_SECRET` rotation policy — operator runbook doc.
 
 ## Sources
 
 ### Primary (HIGH confidence)
+- Vercel Cron Jobs docs (cron schema, auth pattern, double-delivery, no retry, GET-only)
+- Vercel Function Duration docs (Hobby = 300s default = max with fluid compute)
+- Vercel Cron Usage and Pricing (Hobby = 100 crons/project, once-per-day min, ±59 min drift)
+- Scryfall API docs (10 req/s, 30s 429 lockout, ~24h price refresh upstream)
+- In-repo source files read directly 2026-05-20: `package.json`, `src/db/schema.ts`, `src/lib/scryfall.ts`, `src/lib/enrichment.ts`, `src/app/admin/import/_components/binder-picker.tsx`, `src/app/admin/import/_components/import-client.tsx`, `src/lib/store/binder-import-store.ts`, `src/db/admin-health.ts`, `src/app/api/admin/health/route.ts`, `src/app/admin/health/page.tsx`, `.planning/PROJECT.md`, `.planning/RETROSPECTIVE.md`, `.planning/todos/pending/01-phase-18-concurrent-proof.md`.
 
-- **Existing repo (direct file reads):** `src/db/schema.ts`, `src/db/queries.ts`, `src/db/orders.ts`, `src/lib/csv-parser.ts`, `src/lib/types.ts`, `src/lib/import-contract.ts`, `src/app/cart/cart-page-client.tsx`, `src/app/api/admin/import/{preview,commit}/route.ts`, `src/components/filter-rail.tsx`, `src/components/cart-item.tsx`, `package.json`, `drizzle.config.ts`, `node_modules/drizzle-orm/package.json`, `node_modules/drizzle-kit/package.json`.
-- **Existing phase documents:** `.planning/PROJECT.md`, `.planning/phases/15-production-hardening/15-SECURITY-REVIEW.md`, `.planning/phases/11-checkout-upgrade-order-history/11-01-SUMMARY.md`, `.planning/phases/{13,14}/SUMMARY.md`. Git commits `dec5dbe` (Phase 10-03 silent reconciliation), `87cf95d` (Phase 13 schema diff), `f04fc7b` (Phase 14 schema diff).
-- **Drizzle ORM:**
-  - [Drizzle Custom Migrations](https://orm.drizzle.team/docs/kit-custom-migrations) — workaround pattern for the unsupported `id`-rewrite DDL.
-  - [Drizzle Batch API](https://orm.drizzle.team/docs/batch-api) — atomic batched DELETE+INSERT with neon-http.
-  - [Drizzle Migrations overview](https://orm.drizzle.team/docs/migrations) — `drizzle-kit generate --custom` flow.
-- **SortSwift (TCG-specific Shopify app, the closest competitor):**
-  - [Picklist Location Grouping](https://sortswift.com/docs/inventory/picklist/location-grouping) — free-text bin labels, sort-by-bin pick UX, "items without remarks at end" pattern.
-  - [Location Summary](https://sortswift.com/docs/inventory/location-summary) — multi-bin same-card aggregation, transfer between locations.
-  - [Inventory Management feature page](https://sortswift.com/features/inventory).
-- **Allocator strategy literature:**
-  - [SAP Bin Location optimization](https://blogs.sap.com/2016/06/09/optimizing-bin-location-warehouse-storage-or-numbers-of-picks/) — smallest-first vs largest-first toggle with named consequences.
-  - [Extensiv 3PL Allocation Logic](https://help.extensiv.com/3pl-warehouse-manager-inventory-management/understanding-allocation-logic).
-  - [Shopify Smart Order Routing](https://www.shopify.com/blog/smart-order-routing) — ranked location prioritization.
-- **Manabox format:**
-  - [Manabox Import/Export Guide](https://www.manabox.app/guides/collection/import-export/) — confirms `binder/deck/list` enum on `Binder Type`.
-  - [Manabox Collection FAQ](https://www.manabox.app/guides/collection/faq/) — three container types.
-
-### Secondary (MEDIUM confidence)
-
-- [Drizzle ORM GitHub Issue #3496 — PK migration codegen bug](https://github.com/drizzle-team/drizzle-orm/issues/3496) — known PK-change codegen issue; fix status not confirmed for 0.31.10. Mitigated by `--custom` migration.
-- [Drizzle ORM GitHub Issue #3117 — adding column-as-PK generates broken migration](https://github.com/drizzle-team/drizzle-orm/issues/3117) — second PK-related bug class. Same mitigation.
-- Manabox emitting the literal string `"etched"` in the `Foil` column for etched-foil cards — column names not formally specified in public docs. Recommend manual verification early in Phase 17.
-- [TCGplayer — Selling from Multiple Physical Stores](https://help.tcgplayer.com/hc/en-us/articles/115005291707-Selling-from-Multiple-Physical-Stores) — confirms "Total Qty" aggregation semantics.
-- [Mana Pool — CSV Inventory Export ManaBox Format](https://support.manapool.com/hc/en-us/articles/26131255560855-CSV-Inventory-Export-ManaBox-Format) — third-party confirmation of Manabox column shape.
-
-### Tertiary (LOW confidence)
-
-- eBay seller anti-pattern references (community forum data) — supports the "don't stuff bin into SKU" anti-feature; not a load-bearing source.
-- Stock display urgency tactics (Magento / BigCommerce) — supports the anti-feature "don't show low-stock thresholds to buyers"; not load-bearing.
+### Secondary (MEDIUM confidence — UX consensus)
+- PatternFly Bulk selection; Helios Table multi-select; NN/g Checkboxes + Dangerous UX; GitLab Pajamas Destructive actions; Eleken Bulk action UX; eBay Playbook Bulk Editing.
 
 ---
 
-*Research completed: 2026-05-11*
-*Ready for roadmap: yes*
-*Detail documents: `STACK.md` (309 lines), `FEATURES.md` (294 lines), `ARCHITECTURE.md` (744 lines), `PITFALLS.md` (880 lines).*
+*Synthesized 2026-05-20 by orchestrator from STACK / FEATURES / ARCHITECTURE / PITFALLS research files. Ready for requirements definition.*
