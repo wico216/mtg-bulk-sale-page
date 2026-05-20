@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
 status: planning
-last_updated: "2026-05-20T17:34:47.354Z"
+last_updated: "2026-05-20T18:00:00.000Z"
 last_activity: 2026-05-20
 progress:
-  total_phases: 0
+  total_phases: 1
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -20,19 +20,55 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** Planning next milestone (`/gsd:new-milestone`)
+**Current focus:** v1.4 Import UX & Price Refresh — Phase 23 (Plan 23-01 Daily Price Refresh → Plan 23-02 Import Picker UX)
+
+## Current Position
+
+Phase: **23 — Import UX & Price Refresh** (not started)
+Plan: **23-01 Daily Price Refresh** (next — write-side; ships first because operator UAT happens against the deployed cron)
+Status: Roadmap defined, plan TBD (next: `/gsd:plan-phase 23`)
+Last activity: 2026-05-20 — v1.4 ROADMAP.md appended with Phase 23 (2 plans, 16 requirements, 100% coverage)
+
+## v1.4 Phase Sequence
+
+Single phase, two plans. Plans are fully independent (no shared files, no shared state), so plan order is risk-driven:
+
+1. **Plan 23-01 — Daily Price Refresh** (PRICE-REFRESH-01..11) — write-side; MEDIUM risk; needs operator UAT against deployed cron + `CRON_SECRET` env setup
+2. **Plan 23-02 — Import Picker UX** (IMPORT-UX-01..05) — UI-only; LOW risk; can interleave or follow
+
+## Cross-Cutting Constraints (from research)
+
+These constraints apply across the v1.4 plans and MUST be honored during planning and implementation:
+
+- **NO env-gated test for the cron handler.** The v1.3.5 incident pattern was an env-gated test silently skipping in CI. The cron handler test MUST be a default-run unit test using `vi.stubEnv("CRON_SECRET", …)` + mocked Scryfall fetcher + mocked DB; file-header comment must say "NOT env-gated."
+- **`runPriceRefresh` is a shared service called by two thin route handlers.** `GET /api/cron/refresh-prices` (Bearer-token auth) and `POST /api/admin/prices/refresh` (`requireAdmin()` + `ADMIN_BULK` rate-limit) both call `runPriceRefresh({ trigger, actorEmail? })`. The service is `"server-only"` and auth-agnostic; auth happens at the route boundary only. No HTTP between the two routes.
+- **UPDATE by `cards.id` (5-segment), NEVER by `scryfall_id`.** Same Scryfall card maps to N rows (one per finish × condition × binder). The refresh applies the existing `getPrice(prices, finish)` ladder PER ROW. UPDATE-by-scryfall_id would re-introduce the v1.2 etched-mispricing bug fixed in Phase 17 FIN-01.
+- **NEVER write `price = NULL` for Scryfall `not_found`.** Skip rows with no `scryfallId`; preserve existing price when `scryfallMap.get(id)` is undefined (Scryfall `not_found`); only write `NULL` when Scryfall explicitly returned `prices.usd === null`. Audit metadata distinguishes `updated / unchanged / failed (not_found) / skipped (no scryfallId)`.
+- **Cents, not dollars.** `cards.price` is `integer` storing cents. `Math.round(parseFloat(usd) * 100)` matches the existing convention.
+- **Postgres advisory lock single-flight.** `pg_try_advisory_lock(hashtext('cron.refresh_prices'))` is non-blocking and auto-releases on connection close. Second caller (cron-vs-manual or double-delivery) returns HTTP 409.
+- **`cronSecret` literal-only in `/admin/health`.** Extend `envChecks()` with `cronSecret: isPresent(CRON_SECRET) ? "configured" : "missing"`. Flip top-level `ok=false` when missing. NEVER log the secret value.
+- **Replace dead `notificationFailuresLast24h` tile, not add a 5th.** Grid stays `lg:grid-cols-4`. PROJECT.md decision row "⚠️ Revisit when log drain lands" is obsoleted.
+- **Drop `defaultCheckedFor` memory entirely (Option A).** Picker opens all-unchecked on every session; Select All is the recovery affordance. Will-delete amber panel default-checked behavior is unaffected (lives in `import-client.tsx` separately).
+- **Pure UI picker contract preserved.** Picker remains a controlled component; Select All / Deselect All call `onToggle` per binder OR a new `onBulkSet(names[], checked)` callback to avoid N renders.
+- **No schema change, no migration.** `cards.price` already exists; `admin_audit_log.action` is `text` so `'price_refresh'` literal works as-is.
+- **Vercel Hobby = 300s `maxDuration` with fluid compute (2026 default).** Operator's earlier "10s/60s" mental model is outdated. The ~26s cold-cache refresh has 11× headroom.
+
+## Open Decisions Carried to Planning
+
+- **Tier 2 live-DB integration test** for cron + advisory lock: opt-in (`TEST_DATABASE_URL`-gated, mirrors Phase 18 pattern) or skip and rely on Tier 1 unit test only. Resolve in Plan 23-01 PLAN.md.
+- **`CRON_SECRET` rotation policy** documentation in operator runbook (no code impact). Resolve in Plan 23-01 SUMMARY.md.
 
 ## Deferred Items
 
-Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
+Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried forward into v1.4 context):
 
 | Category | Item | Status |
 |----------|------|--------|
 | operator_handoff | Phase 16 production migration cutover | `npm run migrate:v1.3:dry-run` then `npm run migrate:v1.3` against prod DATABASE_URL; runbook in 16-01-SUMMARY.md |
 | operator_handoff | Phase 22 5-scenario live-deployment UAT | Operator-on-autopilot picker, v1.2→v1.3 cart hydration, CHECK trip detection, public-page binder leak grep, multi-binder concurrent checkout — runbook in 22-HUMAN-UAT.md |
-| ~~deferred~~ → **active** | ~~Phase 18 concurrent-proof~~ | **PROMOTED 2026-05-13 to Operator Next Steps** — see todo `.planning/todos/pending/01-phase-18-concurrent-proof.md`. Reason: the same harness that would have caught the v1.3.5 `FOR UPDATE`+window-function regression remains env-gated. Two prod incidents within 48h justify provisioning. |
+| operator_next_step | Phase 18 concurrent-proof (TEST_DATABASE_URL provisioning) | PROMOTED 2026-05-13 to Operator Next Steps — see `.planning/todos/pending/01-phase-18-concurrent-proof.md`. v1.3.5 hotfix exposed env-gated test gap. |
 | process_artifact | Phase 22 missing canonical VERIFICATION.md aggregator | Work captured in 22-SECURITY-REVIEW.md + 22-HUMAN-UAT.md + per-plan SUMMARYs; aggregator file absent |
-| verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical, never closed via /gsd:complete-milestone) |
+| verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical) |
 | verification_gap | 04-VERIFICATION.md | human_needed (v1.0 historical) |
 | verification_gap | 05-VERIFICATION.md | human_needed (v1.0 historical) |
 | verification_gap | 08-VERIFICATION.md | human_needed (v1.1 historical) |
@@ -40,100 +76,34 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
 | security_followup | S-01 (case-sensitive admin email) | acknowledged in 15-SECURITY-REVIEW.md |
 | security_followup | D-DOS-02 (rate-limit table maintenance) | acknowledged in 15-SECURITY-REVIEW.md |
 | security_followup | D-DOS-03 (header-trust IP source) | acknowledged in 15-SECURITY-REVIEW.md |
-| security_followup | I-DISC-03 (notification-failure queryability) | acknowledged in 15-SECURITY-REVIEW.md |
+| security_followup | I-DISC-03 (notification-failure queryability) | acknowledged in 15-SECURITY-REVIEW.md — **OBSOLETED by v1.4**: tile being replaced by `lastPriceRefreshAt` |
 | RESOLVED v1.3 | D-DOS-01 (import preview rate-limit) | RESOLVED in Phase 22 — ADMIN_BULK rate-limit applied AFTER requireAdmin() |
-
-## Current Position
-
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-20 — Milestone v1.4 started
-
-## v1.3 Phase Sequence
-
-Execution order (research-recommended; deviates from numeric where lower-risk read-side ships before write-side):
-
-1. **Phase 16 — Schema & Migration** — foundation; binder column, finish enum, CHECK constraint, idempotent migration
-2. **Phase 17 — Parser & Etched** — populates the new column; fixes latent v1.2 etched-as-normal bug
-3. **Phase 20 — Storefront Aggregation & Cart Migration** — read-side first (more reversible); aggregates qty across binders, splits PublicCard/AdminCard, reconciles v1.2 carts
-4. **Phase 19 — Import Preview & Picker** — write-side scoped replace; two-stage NDJSON; remembered selection
-5. **Phase 18 — Allocator** — highest-risk; pure SQL CTE allocator with multi-binder concurrent-proof
-6. **Phase 21 — Admin Visibility & Audit** — admin inventory binder column + filter; `[binder]` annotation on order detail; audit metadata rendering
-7. **Phase 22 — Hardening & UAT** — STRIDE delta (I-DISC-05 + D-DOS-01 resolution); perf pin; live-deployment UAT
 
 ## Recently Completed
 
-- v1.2 Store Operations & Hardening shipped 2026-05-11 (Phases 13-15; live at `wikos-spellbinder.vercel.app`; 3/3 UAT passed)
-- v1.3 milestone bootstrap: PROJECT.md updated, REQUIREMENTS.md (29 requirements), research synthesis complete (STACK/FEATURES/ARCHITECTURE/PITFALLS + SUMMARY)
-- v1.3 ROADMAP.md created with 7 phases, 100% requirement coverage, success criteria derived from research findings
-
-## Cross-Cutting Constraints (from research)
-
-These constraints apply across multiple v1.3 phases and MUST be honored during planning and implementation:
-
-- **Phase 16 migration must dry-run on a Neon branch BEFORE merge.** Three pre-flight assertions: (a) no row already has `-unsorted` suffix, (b) no `binder` column yet exists, (c) capture `order_items.cardId` distribution before/after to verify zero new mismatches. `pg_dump` to `.planning/migrations/v1.3/backups/` before merge.
-- **Phase 17 etched literal verification step happens FIRST.** 5-minute manual test: operator exports one binder containing a known etched-foil card, greps the CSV, confirms `Foil` column literally equals `etched` BEFORE writing parser test fixtures.
-- **Phase 18 allocator MUST be one SQL CTE in one `db.execute()`.** No JS-side pre-allocation. Lock by `(set_code, collector_number, finish, condition)` aggregated key, NOT by chosen rows. `neon-http` has no interactive transactions; pre-computing then `id IN (...)` locking is the load-bearing correctness bug.
-- **Phase 18 concurrent-proof harness extended.** Multi-binder scenario: seed `(X,A02,2)`, `(X,A05,2)`, fire two `placeCheckoutOrder({ X: 3 })`, assert one success + one conflict + total stock conserved.
-- **Phase 19 two-stage NDJSON contract.** `{ type: 'binders', binders: [...] }` fires after parse (<2s), enrichment runs ONLY on selected subset. Confirmation modal between picker and commit catches operator-on-autopilot.
-- **Phase 20 `PublicCard`/`AdminCard` type split.** TypeScript guarantees binder names never reach storefront at compile time. Per-route invariant tests for `GET /`, `GET /cart`, `POST /api/checkout`. Cart reconciliation EXTENDS Phase 10-03 D-13 pattern (NOT a Zustand `migrate` hook — `migrate` can't see `cardMap`).
-- **Phase 21 `[binder]` annotation reads from `order_items.binder` snapshot.** NOT joined to live `cards`. Annotation must survive even if source `cards` row was later deleted by a re-import. Historical (pre-v1.3) `order_items` rows render as `[unsorted]` from the migration default.
-- **Phase 22 STRIDE delta document.** Records I-DISC-05 (binder name privacy) + resolves deferred D-DOS-01 (rate-limit on `/api/admin/import/preview` since v1.3 amplifies per-call cost). Perf pin: `parseManaboxCsvContents(12_749) < 2000ms`. Multi-binder concurrent-proof.
+- 2026-05-20 — v1.4 ROADMAP.md appended with Phase 23 (Import UX & Price Refresh); 2 plans, 16 requirements, 100% coverage
+- 2026-05-20 — v1.4 milestone bootstrap: PROJECT.md updated, REQUIREMENTS.md authored (16 requirements), research synthesis complete (STACK/FEATURES/ARCHITECTURE/PITFALLS + SUMMARY)
+- 2026-05-14 — Quick task wave (260514-7z2..gxr): buyer_phone end-to-end, storefront set-filter search, GitHub issues #8-#16 (search/modal/finish-text/double-faced flip/Type+Set filter defaults/Price filter reorder/sold-out hide/verified sender)
+- 2026-05-11 — v1.3 Binder-Aware Inventory & Pick Workflow shipped (Phases 16-22; 464/2 skipped tests; live at `wikos-spellbinder.vercel.app`)
+- 2026-05-11 — v1.2 Store Operations & Hardening shipped (Phases 13-15; live UAT 3/3 against `wikos-spellbinder.vercel.app`)
 
 ## Blockers/Concerns
 
 - No active blocker.
-- 30-minute spike during Phase 16 planning: verify `db.batch([sql\`...\`])` type compatibility with drizzle-orm@0.45.2; fall back to `db.execute(sql\`BEGIN; ALTER…; COMMIT;\`)` multi-statement raw SQL if batch typings reject.
-- Manabox `"etched"` literal verification (Phase 17) is MEDIUM-confidence in research; resolve via 5-minute manual export inspection BEFORE writing parser test fixtures.
-
-## Session Continuity
-
-Last session: 2026-05-11 — Resumed v1.3.1-patch paused at task 5/6. Unwound WIP bookkeeping commit `534677f`, pushed 4 patch commits (`2331068..555ddbc`) + annotated tag `v1.3.1` to `origin/main`. Vercel auto-deploy triggered.
-
-v1.3.1 (Faster CSV-Import Pricing Enrichment) shipped: batched Scryfall `/cards/collection` fetcher resolves the Axx-binder import timeout reported in v1.3.0. Tests 464/2 skipped/0 failed; tsc + build clean.
-
-Next action: Operator verifies Vercel deployment ` Ready` and re-attempts Axx-binder import. Then start the next milestone with `/gsd:new-milestone`.
-
-## Deferred Items
-
-Items acknowledged and deferred at v1.2 milestone close on 2026-05-11 (carried forward into v1.3 context):
-
-| Category | Item | Status |
-|----------|------|--------|
-| verification_gap | 02-VERIFICATION.md | human_needed (v1.0 historical) |
-| verification_gap | 04-VERIFICATION.md | human_needed (v1.0 historical) |
-| verification_gap | 05-VERIFICATION.md | human_needed (v1.0 historical) |
-| verification_gap | 08-VERIFICATION.md | human_needed (v1.1 historical) |
-| process_artifact | 13-VERIFICATION.md | missing — phase verified via SUMMARY browser+DB proof |
-| process_artifact | 14-VERIFICATION.md | missing — same as 13 |
-| process_artifact | VALIDATION.md (Phases 13/14/15) | missing — Nyquist coverage absent project-wide |
-| code_quality | src/app/admin/audit/page.tsx:112 raw console.error | bypasses src/lib/logger.ts |
-| security_followup | S-01 (case-sensitive admin email) | acknowledged in 15-SECURITY-REVIEW.md |
-| security_followup | D-DOS-01 (import preview rate-limit) | **owner = Phase 22 (v1.3 amplifies per-call cost)** |
-| security_followup | D-DOS-02 (rate-limit table maintenance) | acknowledged in 15-SECURITY-REVIEW.md |
-| security_followup | D-DOS-03 (header-trust IP source) | acknowledged in 15-SECURITY-REVIEW.md |
-| security_followup | I-DISC-03 (notification-failure queryability) | acknowledged in 15-SECURITY-REVIEW.md |
+- **CRITICAL pre-Plan-23-01 check:** `vercel.json` does NOT currently exist at repo root (verified during research). Plan 23-01 introduces it; operator must provision `CRON_SECRET` in Vercel env BEFORE first deploy (else cron fires and 401s silently — see Pitfall 6).
+- The Plan 23-01 unit test MUST NOT gate on `TEST_DATABASE_URL` or `CRON_SECRET`. Use `vi.stubEnv` instead. This is the load-bearing lesson from the v1.3.5 hotfix.
 
 ## Operator Next Steps
 
-1. **(NEXT) Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness.** Runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`. The v1.3.5 hotfix exposed that this harness — the *single most important test in the milestone per its own CONTEXT D-07* — has never run in CI because it's env-gated. The exact bug class it covers (allocator SQL correctness against real Postgres) already cost two production incidents.
-2. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
-3. When ready: start the next milestone with `/gsd:new-milestone`.
+1. **(NEXT) Plan Phase 23-01** with `/gsd:plan-phase 23` (or `/gsd:plan-phase 23 01` if multi-plan invocation is supported). Resolve open decisions: Tier 2 integration-test opt-in/skip, `CRON_SECRET` rotation runbook doc.
+2. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; same harness pattern Plan 23-01 will mirror IF Tier 2 is opted in.
+3. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
 
-## Recently Completed
+## Session Continuity
 
-- 2026-05-14 — Quick task 260514-7z2 (buyer_phone end-to-end): code shipped via b17ec52..d101581; prod migration applied (`orders.buyer_phone` column live, 1 existing row preserved with NULL phone, idempotent re-run verified).
-- 2026-05-14 — Quick task 260514-95g: storefront Set filter search moved into the set list and clears after selecting a set; code commit `8038d84`.
-- 2026-05-14 — Quick task 260514-afo: GitHub issues #8-#12 implemented; Scryfall-style search, card type filters, larger search input, Scryfall modal links, and modal close/go-to-cart actions shipped in code commits `6227501`, `8d4b2e7`, `1288b58`; `cards.type_line` / `cards.mana_value` migration applied and backfilled (1,384 rows preserved, missing metadata 0).
-- 2026-05-14 — Quick task 260514-bjt: storefront card tile names now append finish text for non-normal cards (`Card Name - Foil`, `Card Name - Etched`); code commit `1f7f711`.
-- 2026-05-14 — Quick task 260514-ewz: storefront card modal now flips double-faced cards front/back; `cards.back_image_url` migration applied and backfilled (1,384 rows preserved, 18 rows updated with second-face images); code commit `a207739`.
-- 2026-05-14 — Quick task 260514-fb1: replaced the modal overlay flip button with a Scryfall-like `Transform` action and added tile-level transform controls for double-faced cards; code commit `dfddefe`.
-- 2026-05-14 — Quick task 260514-fib: header logo now refreshes the storefront when clicked on the home page while preserving normal navigation from other routes; code commit `25f63a2`.
-- 2026-05-14 — Quick task 260514-fvh: storefront `Card Type` and `Set` filter sections now open by default; code commit `c771512`.
-- 2026-05-14 — Quick task 260514-fz0: storefront `Price` filter section moved to the bottom of the filter rail; code commit `e4e75f6`.
-- 2026-05-14 — Quick task 260514-g5e: sold-out purchased cards are excluded from storefront aggregation and checkout revalidates the shop; code commit `d41bc6f`.
-- 2026-05-14 — Quick task 260514-gxr: order emails now use the verified `orders@wikospellbinder.com` sender and confirmation copy reflects actual buyer email delivery; code commit `dc3d624`.
+Last session: 2026-05-20 — v1.4 milestone bootstrap completed. PROJECT.md, REQUIREMENTS.md (16 requirements), research synthesis (STACK/FEATURES/ARCHITECTURE/PITFALLS/SUMMARY) authored. ROADMAP.md appended with Phase 23.
+
+Next action: `/gsd:plan-phase 23` to decompose Plan 23-01 (Daily Price Refresh) and Plan 23-02 (Import Picker UX) into executable PLAN.md files.
 
 ## Quick Tasks Completed
 

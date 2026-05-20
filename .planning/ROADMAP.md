@@ -6,6 +6,7 @@
 - ✅ **v1.1 Admin Panel & Inventory Management** — Phases 6-12 (shipped 2026-04-27)
 - ✅ **v1.2 Store Operations & Hardening** — Phases 13-15 (shipped 2026-05-11)
 - ✅ **v1.3 Binder-Aware Inventory & Pick Workflow** — Phases 16-22 (shipped 2026-05-11)
+- 🚧 **v1.4 Import UX & Price Refresh** — Phase 23 (in progress, started 2026-05-20)
 
 _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 
@@ -58,6 +59,28 @@ _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 
 </details>
 
+### v1.4 Import UX & Price Refresh (Phase 23) — IN PROGRESS
+
+- [ ] **Phase 23: Import UX & Price Refresh** — Daily Scryfall price refresh + explicit opt-in binder picker
+
+## Phase Details
+
+### Phase 23: Import UX & Price Refresh
+**Goal**: Operator-trusted import workflow (explicit opt-in binder selection) and autonomous, observable price freshness (daily Scryfall refetch + manual escape hatch + `/admin/health` surface).
+**Depends on**: Phase 22 (v1.3 shipped — binder picker exists, audit log shape locked, `/admin/health` framework live)
+**Requirements**: IMPORT-UX-01, IMPORT-UX-02, IMPORT-UX-03, IMPORT-UX-04, IMPORT-UX-05, PRICE-REFRESH-01, PRICE-REFRESH-02, PRICE-REFRESH-03, PRICE-REFRESH-04, PRICE-REFRESH-05, PRICE-REFRESH-06, PRICE-REFRESH-07, PRICE-REFRESH-08, PRICE-REFRESH-09, PRICE-REFRESH-10, PRICE-REFRESH-11
+**Success Criteria** (what must be TRUE):
+  1. A daily Vercel Cron at `0 9 * * *` UTC refreshes all card prices and writes one `admin_audit_log` row per run with `{trigger, updated, unchanged, failed, skipped, durationMs}` metadata.
+  2. The admin can click "Refresh now" on `/admin/health` and see the "Last Price Refresh" tile (which replaces the dead "Notification failures" tile) update to the current timestamp.
+  3. Scryfall `not_found` cards never overwrite a previously-good price with NULL; rows missing `scryfallId` are skipped entirely; the etched-per-finish `getPrice` ladder is applied per row and UPDATEs go by 5-segment `cards.id` (never by `scryfall_id`).
+  4. Concurrent cron + manual invocations are single-flighted by a Postgres advisory lock; the second caller returns HTTP 409, the first run completes, and audit-log counts stay honest.
+  5. `/admin/health` JSON reports `cronSecret` as the literal `"configured"` or `"missing"` (never the value), and flips top-level `ok` to `false` when missing; the cron route fails closed (401) when the env var is absent.
+  6. A fresh-session import opens the binder picker with every binder unchecked regardless of any prior-session selection memory; Select All / Deselect All buttons toggle every binder in one click; a live "X of Y selected" counter updates as the operator clicks; the Continue button is disabled with helper text when nothing is selected and no will-delete entry is checked.
+**Plans**:
+  - **Plan 23-01: Daily Price Refresh** — PRICE-REFRESH-01..11 (write-side; MEDIUM risk; ships first because operator UAT happens against the deployed cron)
+  - **Plan 23-02: Import Picker UX** — IMPORT-UX-01..05 (UI-only; LOW risk; interleaves or follows Plan 23-01)
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status   | Completed  |
@@ -85,3 +108,4 @@ _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 | 20. Storefront Aggregation & Cart Migration | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 21. Admin Visibility & Audit                | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 22. Hardening & UAT                         | v1.3 | 2/2 | Complete | 2026-05-11 |
+| 23. Import UX & Price Refresh               | v1.4 | 0/2 | Not started | —          |

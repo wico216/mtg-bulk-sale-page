@@ -65,29 +65,29 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| IMPORT-UX-01 | TBD | Pending |
-| IMPORT-UX-02 | TBD | Pending |
-| IMPORT-UX-03 | TBD | Pending |
-| IMPORT-UX-04 | TBD | Pending |
-| IMPORT-UX-05 | TBD | Pending |
-| PRICE-REFRESH-01 | TBD | Pending |
-| PRICE-REFRESH-02 | TBD | Pending |
-| PRICE-REFRESH-03 | TBD | Pending |
-| PRICE-REFRESH-04 | TBD | Pending |
-| PRICE-REFRESH-05 | TBD | Pending |
-| PRICE-REFRESH-06 | TBD | Pending |
-| PRICE-REFRESH-07 | TBD | Pending |
-| PRICE-REFRESH-08 | TBD | Pending |
-| PRICE-REFRESH-09 | TBD | Pending |
-| PRICE-REFRESH-10 | TBD | Pending |
-| PRICE-REFRESH-11 | TBD | Pending |
+| Requirement | Phase | Plan | Status |
+|-------------|-------|------|--------|
+| IMPORT-UX-01 | Phase 23 | 23-02 | Pending |
+| IMPORT-UX-02 | Phase 23 | 23-02 | Pending |
+| IMPORT-UX-03 | Phase 23 | 23-02 | Pending |
+| IMPORT-UX-04 | Phase 23 | 23-02 | Pending |
+| IMPORT-UX-05 | Phase 23 | 23-02 | Pending |
+| PRICE-REFRESH-01 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-02 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-03 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-04 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-05 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-06 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-07 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-08 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-09 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-10 | Phase 23 | 23-01 | Pending |
+| PRICE-REFRESH-11 | Phase 23 | 23-01 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 16 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 16 ⚠️ (will be 0 after roadmap)
+- Mapped to phases: 16 (100%)
+- Unmapped: 0
 
 ## Decisions Locked at Requirements Time
 
@@ -107,4 +107,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-20*
-*Last updated: 2026-05-20 after v1.4 milestone bootstrap*
+*Last updated: 2026-05-20 — roadmap creation mapped 16/16 requirements to Phase 23 (Plan 23-01 / Plan 23-02)*
