@@ -32,7 +32,23 @@ findings:
   warning: 5
   info: 4
   total: 10
-status: issues_found
+status: fixed
+fixed_at: 2026-05-20T17:08:00Z
+fixed_findings:
+  - CR-01
+  - WR-01
+  - WR-02
+  - WR-03
+  - WR-04
+  - WR-05
+deferred_findings:
+  - IN-01
+  - IN-02
+  - IN-03
+  - IN-04
+test_baseline:
+  before: "540 passed, 2 skipped, 0 failed"
+  after: "543 passed, 2 skipped, 0 failed (+3 new tests for CR-01/WR-02/WR-03)"
 ---
 
 # Phase 23: Code Review Report
@@ -386,6 +402,143 @@ points at the rationale's location. Lowest-priority polish.
 
 ---
 
+## Fix Log
+
+**Fixed at:** 2026-05-20T17:08:00Z
+**Fixer:** Claude (gsd-code-fixer)
+**Scope:** 1 critical + 5 warnings (IN-01..IN-04 deferred — out of scope this run)
+**Test baseline:** 540 → 543 passed (+3 new tests), 2 skipped (unchanged), 0 failed
+
+### CR-01 — Replace broken advisory lock with row-based lease
+
+**Commit:** `779fc3a fix(23): CR-01 replace broken advisory lock with row-based lease in price_refresh_lock`
+
+**Approach chosen:** Option B (row-based lease in a new `price_refresh_lock`
+table). Option A (drop neon-http for this path) crosses the STACK.md
+neon-http invariant and would require a connection-pooler driver alongside
+the existing HTTP driver — a larger surface area for a single-flight fix.
+The `pg_try_advisory_xact_lock` variant was considered but ruled out
+against the driver: the rate-limit module's CR-01 comment in
+`src/lib/rate-limit.ts:386-394` explicitly documents that the neon-http
+driver does NOT support multi-statement transactions or session-level
+advisory locks ("each db.execute is an independent HTTP call with
+auto-commit"), so wrapping the refresh in a transaction is not an
+available option without changing the driver.
+
+**Implementation:**
+- New `price_refresh_lock` table: single row with `id INTEGER PRIMARY KEY
+  CHECK (id = 1)` + `acquired_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`.
+- Lazy-created on first call via `CREATE TABLE IF NOT EXISTS` mirroring
+  `createPostgresRateLimitStore.ensureTable()` (no drizzle migration).
+- Acquire via atomic upsert:
+  `INSERT INTO price_refresh_lock (id, acquired_at) VALUES (1, NOW())
+   ON CONFLICT (id) DO UPDATE SET acquired_at = NOW()
+   WHERE price_refresh_lock.acquired_at < (NOW() - INTERVAL '10 minutes')
+   RETURNING id`
+  Zero rows returned ⇒ throw `PriceRefreshLockedError`.
+- Release via `DELETE FROM price_refresh_lock WHERE id = 1` in `finally`
+  (covers WR-02's release-on-error requirement at the same time).
+- 10-minute stale-lease recovery threshold safely above the 300s
+  `maxDuration` ceiling and well above the observed ~26s cold-cache
+  refresh.
+
+**Test updates:** hoisted mock state renamed `advisoryAcquired` →
+`lockAcquired`; mock recognises the new acquire SQL by string match.
+Case 8 updated description to reflect the new mechanism.
+
+### WR-01 — Constant-time Bearer comparison on cron route
+
+**Commit:** `2c76c42 fix(23): WR-01 use timingSafeEqual for cron Bearer comparison`
+
+Added `bearerMatches(authHeader, secret)` helper using
+`node:crypto.timingSafeEqual` after length-equalization. Length mismatch
+returns false immediately (revealing only the well-known header
+shape "Bearer <hex>", not secret material). Equal-length case uses
+`Buffer.from + timingSafeEqual` for the byte-level compare.
+
+The existing 7 cron route tests pass unchanged:
+- Case 1 (missing header) → early return
+- Case 2 (wrong value with different length) → length-mismatch fast-path
+- Case 4 (valid Bearer) → equal-length true path
+
+### WR-02 — Audit-on-failure + try/finally release
+
+**Commit (release):** `779fc3a` (folded into CR-01 — the lock cannot be
+correct without `finally` release).
+**Commit (audit-on-failure):** `cbf1a55 fix(23): WR-02 write partial audit row on refresh failure; lease release in finally`
+
+Counters (`updated/unchanged/failed/skipped`) hoisted OUT of the try
+block so the catch block can read them. Catch writes a partial-summary
+audit row with the same locked-scalar D-04 metadata shape
+`{trigger, updated, unchanged, failed, skipped, durationMs}` — no
+new keys, no error-message leak, 4KB cap preserved. The catch swallows
+its own write errors so an audit-write blip never masks the original
+refresh error.
+
+New tests:
+- Case 9: Scryfall rejection mid-refresh ⇒ partial audit row written
+  with the partial `skipped` count, then original error re-thrown.
+- Case 10: lease release (`DELETE FROM price_refresh_lock`) appears in
+  captured SQL on BOTH success AND failure paths, proving the finally
+  block runs unconditionally.
+
+### WR-03 — `updated` count reflects driver rowCount, not classification intent
+
+**Commit:** `0611e69 fix(23): WR-03 use driver rowCount as the canonical updated count`
+
+Removed the `updated++` increment at classification time. The chunked
+UPDATE loop now reads `result.rowCount` from each chunk and sums into
+`updated`, falling back to `chunk.length` only when the driver doesn't
+populate rowCount (unit-test mocks). Production neon-http always
+populates `rowCount` via FullQueryResults
+(`@neondatabase/serverless` index.d.ts:277).
+
+Hoisted mock state extended with `updateRowCount: number | null`; new
+Case 11 sets `updateRowCount = 1` while classifying 2 rows for update,
+asserts `summary.updated === 1` (driver value, not classification
+intent), and verifies the audit metadata.updated + audit.targetCount
+both carry the driver value.
+
+### WR-04 — Dropped redundant `setLastSelection` mirror
+
+**Commit:** `f62f05f fix(23): WR-04 drop redundant setLastSelection mirror after recordCommit`
+
+`recordCommit(newSelection)` already handles both `lastSelection` and
+`lastUsedAt` in one `set()` call. Removed the follow-up
+`setLastSelection(newSelection)` call AND its now-unused selector
+subscription at the top of the component. Replaced the defensive
+comment with a single-source-of-truth explanation. All 14 import-client
+tests pass unchanged.
+
+### WR-05 — Hoisted `filesByStageRef` to top of component body
+
+**Commit:** `ec70578 fix(23): WR-05 hoist filesByStageRef useRef to top of component body`
+
+Moved `const filesByStageRef = useRef<File[] | null>(null)` up next to
+`abortControllerRef` so both hook calls live at the top of the component
+body. The original mid-component declaration worked at runtime (useRef
+runs in declaration order during setup; handlers don't read the ref
+until events fire) but read as a TDZ violation at first glance and was
+fragile against refactors that reordered handlers. Comment moved with
+the declaration and rewritten to document the WR-05 hoist rationale
+instead of apologizing for the old misplacement.
+
+### Deferred (out of scope for this run)
+
+- **IN-01** — `getPrice` doc-vs-behavior drift. Comment rewording only;
+  no functional impact.
+- **IN-02** — Per-row `price_refresh.not_found` log volume. Tractable
+  separately when log volume becomes a concern; current ~12k row
+  inventory size makes this premature.
+- **IN-03** — Moot: the strict `if (acquired !== true)` check it
+  flagged is gone with the CR-01 lock replacement.
+- **IN-04** — `vercel.json` rationale lives in CONTEXT.md, not in
+  `vercel.json`. Lowest-priority polish; defer to a docs sweep.
+
+---
+
 _Reviewed: 2026-05-20T00:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Fixed: 2026-05-20T17:08:00Z_
+_Fixer: Claude (gsd-code-fixer)_
