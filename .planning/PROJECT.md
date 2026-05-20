@@ -10,17 +10,9 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ## Current State
 
-**Last shipped:** v1.3 Binder-Aware Inventory & Pick Workflow (2026-05-11). Live at `wikos-spellbinder.vercel.app`. Cards know which physical binder they live in; admin order detail shows `[binder]` pull paths; storefront aggregates across binders; etched cards now correctly priced.
+**Last shipped:** v1.4 Import UX & Price Refresh (2026-05-20). Live at `wikos-spellbinder.vercel.app`. Daily Vercel cron at `0 9 * * *` UTC refreshes Scryfall prices via the shared `runPriceRefresh` service; admin can trigger manual refresh on `/admin/health`; binder import picker opens with explicit opt-in (no remembered selection); `lastPriceRefreshAt` and `cronSecret` env presence on the health surface. Post-deploy `cardToRow` bug discovered + fixed + 2353 prod rows backfilled with `scryfall_id` in the same session.
 
-**Current milestone:** v1.4 Import UX & Price Refresh — see below.
-
-## Current Milestone: v1.4 Import UX & Price Refresh
-
-**Goal:** Tighten the import workflow with explicit opt-in binder selection, and keep card prices fresh autonomously via a daily Scryfall refetch.
-
-**Target features:**
-- Import binder picker — explicit opt-in (Select All / Deselect All buttons; all binders deselected by default on open)
-- Daily price refresh — Vercel Cron daily at off-peak refetches all cards via the existing batched Scryfall `/cards/collection` fetcher; one `admin_audit_log` row per run with counts; `lastPriceRefreshAt` surfaced on `/admin/health`; manual "Refresh now" admin button as escape hatch
+**Next milestone:** TBD — planning required.
 
 ## Requirements
 
@@ -53,17 +45,18 @@ Friends can easily find and order cards from your bulk collection without fricti
 - [x] Storefront aggregates SUM across binders; PublicCard/AdminCard type split prevents binder leak at compile time; cart reconciliation transitions v1.2 carts forward — Validated in Phase 20 (AGG-01..03)
 - [x] Admin inventory binder column + filter; admin order detail [binder] pill from snapshot; admin audit page renders ScopedImportAuditMetadata — Validated in Phase 21 (ADM-01..03)
 - [x] Hardening: import preview rate-limit (resolves v1.2 D-DOS-01); STRIDE delta with I-DISC-05; perf pin (12,749 rows in 38ms); 5-scenario UAT runbook — Validated in Phase 22 (HARD-01..04); live UAT pending operator execution
+- [x] Operator can Select All / Deselect All binders in the import binder picker — Validated in Phase 23 Plan 02 (IMPORT-UX-01..02); native buttons with `onBulkSet(names, checked)` single-render callback
+- [x] Import binder picker opens with all binders deselected by default — Validated in Phase 23 Plan 02 (IMPORT-UX-03); `defaultCheckedFor` memory dropped (Option A per D-05); UAT 3 confirmed live
+- [x] Card prices refresh automatically once per day via Vercel Cron — Validated in Phase 23 Plan 01 (PRICE-REFRESH-01..03); `vercel.json` declares `0 9 * * *` UTC; Bearer-token auth via `CRON_SECRET`; first live cron firing confirmation pending next 09:00 UTC window
+- [x] Each price refresh records an audit log entry with updated/unchanged/failed counts — Validated in Phase 23 Plan 01 (PRICE-REFRESH-05..07); proven live on prod with `updated:1102 unchanged:1251 skipped:0 durationMs:9690` audit row
+- [x] Admin can see `lastPriceRefreshAt` on `/admin/health` — Validated in Phase 23 Plan 01 (PRICE-REFRESH-08..09); UAT 1 confirmed `router.refresh()` re-renders the tile after click without full page reload
+- [x] Admin can trigger a manual price refresh from the admin UI — Validated in Phase 23 Plan 01 (PRICE-REFRESH-10..11); admin route uses `requireAdmin()` + `ADMIN_BULK` rate-limit; calls same `runPriceRefresh` service as cron (D-12 auth-agnostic service)
 
 ### Active
 
-<!-- v1.4 Import UX & Price Refresh — see REQUIREMENTS.md for REQ-IDs -->
+<!-- Next milestone (TBD) — populate via /gsd:new-milestone -->
 
-- [ ] Operator can Select All / Deselect All binders in the import binder picker
-- [ ] Import binder picker opens with all binders deselected by default
-- [ ] Card prices refresh automatically once per day via Vercel Cron
-- [ ] Each price refresh records an audit log entry with updated/unchanged/failed counts
-- [ ] Admin can see `lastPriceRefreshAt` on `/admin/health`
-- [ ] Admin can trigger a manual price refresh from the admin UI
+_None — awaiting next milestone planning._
 
 ### Out of Scope
 
@@ -84,7 +77,8 @@ Friends can easily find and order cards from your bulk collection without fricti
 - v1.1 shipped 2026-04-27: live database-backed storefront/admin inventory, multi-CSV import, bulk operations, dashboard, transactional checkout, and admin order history
 - v1.2 shipped 2026-05-11: admin order workflow, inventory audit trail, production hardening (rate limits + structured logs + `/admin/health` + smoke script + STRIDE review)
 - v1.3 shipped 2026-05-11: binder-aware inventory + multi-binder allocator + binder picker + storefront aggregation with PublicCard/AdminCard type-split privacy + admin binder visibility + hardening delta. Etched-foil bug fix for 11 known cards in operator's collection.
-- Codebase: ~26,292 LOC TypeScript (+6,631 from v1.2). 36+ test files, 464 tests passing + 2 env-gated skipped.
+- v1.4 shipped 2026-05-20: daily Scryfall price refresh (Vercel cron + admin manual) + explicit-opt-in binder picker. Discovered + fixed post-deploy that `cardToRow` had silently dropped `scryfall_id` on every Manabox import since v1.0; backfilled all 2353 prod rows. First real refresh: `updated:1102 unchanged:1251 skipped:0`.
+- Codebase: ~26,292 LOC TypeScript (+6,631 from v1.2; +~5,929 net from v1.4 work). 545 tests passing + 2 skipped.
 
 ## Constraints
 

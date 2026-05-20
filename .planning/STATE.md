@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
-status: milestone_complete
-last_updated: "2026-05-20T23:00:00.000Z"
-last_activity: 2026-05-20 -- v1.4 shipped to prod + post-deploy bug discovered/fixed/backfilled. Push of 28 unshipped commits landed `mtg-bulk-sale-page-o6mn3t1hs` then redeployed `p1391v06s` with CRON_SECRET. cardToRow bug found (every Manabox import silently dropped scryfallId since v1.0); 1-line fix `f1312ad` + companion backfill script `c78893a` populated 2353 prod rows. First real price refresh on prod: `updated:1102 unchanged:1251 skipped:0` (vs the dead-on-arrival `skipped:2353` pre-fix).
+status: Awaiting next milestone
+last_updated: "2026-05-20T23:25:23.603Z"
+last_activity: 2026-05-20 — Milestone v1.4 completed and archived
 progress:
   total_phases: 1
   completed_phases: 1
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **23 — Import UX & Price Refresh** (complete — 2/2 plans shipped + 4/4 human UAT passed)
-Plan: **23-02 Import Picker UX** (shipped — feat `6e9ce34`, `2e45ab2`, `4c156c7` + docs SUMMARY commit)
-Status: v1.4 milestone-complete on `main` (status=milestone_complete); awaiting operator setup (`CRON_SECRET` in Vercel) for first deployed cron run, then `/gsd:complete-milestone`.
-Last activity: 2026-05-20 -- Human UAT walkthrough complete: UAT 1 (Refresh-now updates tile) PASS, UAT 2 (missing CRON_SECRET surfaces on /admin/health) PASS, UAT 3 (multi-binder picker opens unchecked) PASS, UAT 4 (keyboard-only walkthrough + aria-describedby) PASS. 23-HUMAN-UAT.md status=passed, 23-VERIFICATION.md status flipped human_needed→verified.
+Phase: Milestone v1.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-20 — Milestone v1.4 completed and archived
 
 ## v1.4 Phase Sequence
 
@@ -105,12 +105,7 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-1. ~~Provision `CRON_SECRET` in Vercel env~~ **DONE 2026-05-20** (redeploy `p1391v06s` carries it).
-2. ~~UAT Plan 23-02 Import Picker UX~~ **DONE 2026-05-20** (4/4 PASS, see 23-HUMAN-UAT.md).
-3. **Observe first prod cron firing**: at the next 09:00–09:59 UTC window after the redeploy, confirm one new `admin_audit_log` row with `action='price_refresh'` and `metadata.trigger='cron'` (the manual `trigger='manual'` row from 2026-05-20T22:58Z proved the shared `runPriceRefresh` service works against live data; only the Bearer-auth wrapper + Vercel scheduler are still untested in prod). PITFALLS Pitfall 9 (Vercel Hobby cron drift ±59min within the hour) is normal — do NOT report as a bug.
-4. **Complete v1.4 milestone** with `/gsd:complete-milestone` after step 3 confirms (or earlier, since the cron firing is observational not blocking).
-5. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; carry forward into v1.5 unless promoted.
-6. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`) — also v1.3 carry-forward.
+- Start the next milestone with /gsd-new-milestone
 
 ## Session Continuity
 
@@ -121,6 +116,7 @@ Next action: Wait for the first prod cron firing window (~next 09:00–09:59 UTC
 Resume hint: v1.4 is fully shipped and live on `wikos-spellbinder.vercel.app`. Latest prod deploy `77jk94cka` (post-backfill-script commit). Prod `cards.scryfall_id` is 2353/2353 populated. First real price refresh succeeded (audit row 2026-05-20T22:58Z, `updated:1102`). Before/after snapshots at `/tmp/prices-before-1779316713.tsv` and `/tmp/prices-after-1779317933.tsv` (will disappear on reboot — not persisted to repo).
 
 Local-env state on this workstation:
+
 - `.env.local` has `ADMIN_USERNAME=admin` + a generated `ADMIN_PASSWORD` from the UAT session — safe to delete if you don't need local password login. `CRON_SECRET` is NOT set locally (still intentionally absent — was used to validate the missing-state surfaces correctly on `/admin/health`).
 - No local processes running. Dev server stopped earlier (task `brlnx22dg`).
 

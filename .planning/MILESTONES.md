@@ -1,5 +1,28 @@
 # Milestones
 
+## v1.4 Import UX & Price Refresh (Shipped: 2026-05-20)
+
+**Phases completed:** 1 phase (Phase 23), 2 plans (23-01, 23-02), 7 in-phase tasks + post-deploy bug fix + backfill chain
+**Code change:** 46 files changed, +8,260 / −2,331 (committed across 32 commits aa72121..f8b06da)
+**Timeline:** 2026-05-20 13:34 → 19:13 ET (~5.5 hours wall-clock from bootstrap to shipped + verified)
+**Test count:** 540 → 545 passed / 2 skipped (net +5 tests across phase + cardToRow bug-fix work)
+**Known deferred items at close:** 13 (see STATE.md `## Deferred Items` — all v1.3 carry-forwards or audit scanner false positives; zero NEW v1.4 gaps)
+
+**Key accomplishments:**
+
+- **Plan 23-01 — Daily Price Refresh:** Vercel cron at `0 9 * * *` UTC + admin-only "Refresh now" button on `/admin/health` both call shared `runPriceRefresh({trigger, actorEmail?})` service. Row-based lease in `price_refresh_lock` table for single-flight (replaces broken `pg_try_advisory_lock` design — see REVIEW.md CR-01 fix). `timingSafeEqual` Bearer-token check (WR-01). Audit metadata distinguishes `updated/unchanged/failed/skipped`. `lastPriceRefreshAt` tile + `cronSecret` env-presence check on `/admin/health`. Tier-1 default-run unit tests with literal `"NOT env-gated"` headers (v1.3.5 lesson encoded).
+- **Plan 23-02 — Import Picker UX:** Explicit opt-in binder selection. Dropped `defaultCheckedFor` memory from zustand store (Option A per D-05). Select all / Deselect all native buttons in picker header with `onBulkSet(names, checked)` callback (single render per click, D-15). Picker opens UNCHECKED every session. Disabled-Continue helper text via `aria-describedby`. Will-delete amber panel's v1.3 default-CHECKED behavior intentionally preserved (separate component, separate concern).
+- **Post-deploy `cardToRow` bug discovery + fix + backfill chain (f1312ad, c78893a, f8b06da):** Verification after the prod push revealed every Manabox import since v1.0 silently dropped `scryfall_id` because `src/db/seed.ts:cardToRow` hardcoded it to null. 1-line fix forwards `card.scryfallId ?? null`. Companion one-shot script populated all 2353 prod rows in 160.6s via Scryfall `/cards/collection` lookups by `(set, collector_number)` — 1861 unique printings, 100% match rate. Type-fix follow-up (`f8b06da`) satisfied `db.execute<T>` `Record<string, unknown>` constraint that local tsx didn't enforce.
+- **First real prod price refresh (2026-05-20T22:58Z):** `updated:1102 unchanged:1251 failed:0 skipped:0 durationMs:9690` — proves the shared service end-to-end against live data with per-row finish-aware `getPrice(prices, finish)` ladder working (foil rows received different prices than normal rows of the same printing).
+- **`/admin/health` cronSecret surface:** With `CRON_SECRET` unset, top-level `ok=false`, banner reads "Attention required", row shows "Missing" + `openssl rand -hex 32` hint. With the secret added in Vercel env + redeploy (`p1391v06s`), top-level flips to "All checks passing" — verified live during UAT 2.
+- **Phase 23 human UAT 4/4 PASS** (2026-05-20T22:10Z): Refresh-now tile update, missing-CRON_SECRET surface, multi-binder picker opens unchecked + Select-all flow, keyboard-only walkthrough with `aria-describedby` announcement. 23-HUMAN-UAT.md status=passed, 23-VERIFICATION.md status human_needed → verified.
+
+**Open observational item (non-blocking for milestone close):**
+
+- First Vercel cron firing at the next 09:00–09:59 UTC window will produce one `admin_audit_log` row with `metadata.trigger='cron'` (vs the `trigger='manual'` rows already proven). This is the only piece untested in prod — Bearer-auth wrapper + Vercel scheduler. Observe and confirm; nothing to act on unless it fails.
+
+---
+
 ## v1.3 Binder-Aware Inventory & Pick Workflow (Shipped: 2026-05-11)
 
 **Phases completed:** 7 phases (16-22), 11 plans, 73 commits
