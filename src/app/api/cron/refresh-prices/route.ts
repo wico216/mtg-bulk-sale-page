@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   PriceRefreshLockedError,
   runPriceRefresh,
@@ -34,6 +35,32 @@ const ROUTE = "/api/cron/refresh-prices";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/**
+ * Constant-time Bearer-header comparison (REVIEW WR-01). The raw `!==`
+ * we previously used short-circuits at the first differing byte, leaking
+ * timing about the secret's prefix. Remote-timing attacks against a
+ * V8 string compare across a network are practically infeasible for a
+ * 256-bit hex secret, but defense-in-depth says use the constant-time
+ * primitive that already ships with Node.
+ *
+ * Length-equalize first: `timingSafeEqual` requires equal-length buffers
+ * and throws otherwise (its constant-time guarantee is conditional on
+ * that precondition). A mismatched length is always a fail-fast 401 — we
+ * deliberately reveal a length-bucket signal here rather than padding
+ * because the Authorization header's shape ("Bearer <hex>") is
+ * well-known and the secret's length (`hex 32` -> 64 chars -> "Bearer "
+ * + 64 = 71 byte string) is not the secret material itself.
+ */
+function bearerMatches(
+  authHeader: string | null,
+  secret: string,
+): boolean {
+  if (!authHeader) return false;
+  const expected = `Bearer ${secret}`;
+  if (authHeader.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
@@ -41,7 +68,7 @@ export async function GET(request: Request) {
   // D-12: fail closed when env unset. The `!cronSecret` clause means a
   // production deploy without CRON_SECRET set returns 401 to every cron
   // event — better an audible 401 than a silent unauthenticated refresh.
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || !bearerMatches(authHeader, cronSecret)) {
     logEvent({
       level: "warn",
       event: "cron.refresh_prices.unauthorized",
