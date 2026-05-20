@@ -1,9 +1,11 @@
 ---
 phase: 23-import-ux-price-refresh
-verified: 2026-05-20T17:20:00Z
-status: human_needed
+verified: 2026-05-20T22:10:00Z
+status: verified
 score: 6/6
 overrides_applied: 0
+human_uat_completed: 2026-05-20T22:10:00Z
+human_uat_result: "passed (4/4) — see 23-HUMAN-UAT.md"
 human_verification:
   - test: "Trigger Refresh now button on /admin/health and confirm the Last Price Refresh tile timestamp updates"
     expected: "Tile shows current timestamp after successful POST to /api/admin/prices/refresh; router.refresh() causes re-render without full page reload"

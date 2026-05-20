@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
-status: executing
-last_updated: "2026-05-20T20:40:11.068Z"
-last_activity: 2026-05-20 -- Plan 23-02 Import Picker UX complete (Tasks 1-3 + SUMMARY committed on `main`; v1.4 milestone now feature-complete pending operator setup + UAT)
+status: milestone_complete
+last_updated: "2026-05-20T22:10:00.000Z"
+last_activity: 2026-05-20 -- Phase 23 human UAT complete (4/4 pass on live dev server); milestone v1.4 feature-complete and human-verified. Operator action (CRON_SECRET in Vercel) still pending for first deployed cron run, but does not block milestone close.
 progress:
   total_phases: 1
   completed_phases: 1
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** v1.4 Import UX & Price Refresh — Phase 23 (Plan 23-01 Daily Price Refresh → Plan 23-02 Import Picker UX)
+**Current focus:** v1.4 milestone complete (human UAT passed 2026-05-20); ready for `/gsd:complete-milestone` after operator provisions `CRON_SECRET` and confirms first live cron firing.
 
 ## Current Position
 
-Phase: **23 — Import UX & Price Refresh** (complete — 2/2 plans shipped)
-Plan: **23-02 Import Picker UX** (just shipped — feat `6e9ce34`, `2e45ab2`, `4c156c7` + docs SUMMARY commit)
-Status: v1.4 feature-complete on `main`; awaiting operator setup (Plan 23-01 CRON_SECRET) + UAT for both plans
-Last activity: 2026-05-20 -- Plan 23-02 Import Picker UX complete (Tasks 1-3 + SUMMARY committed on `main`; 540/2 skipped tests; IMPORT-UX-01..05 marked complete in REQUIREMENTS.md)
+Phase: **23 — Import UX & Price Refresh** (complete — 2/2 plans shipped + 4/4 human UAT passed)
+Plan: **23-02 Import Picker UX** (shipped — feat `6e9ce34`, `2e45ab2`, `4c156c7` + docs SUMMARY commit)
+Status: v1.4 milestone-complete on `main` (status=milestone_complete); awaiting operator setup (`CRON_SECRET` in Vercel) for first deployed cron run, then `/gsd:complete-milestone`.
+Last activity: 2026-05-20 -- Human UAT walkthrough complete: UAT 1 (Refresh-now updates tile) PASS, UAT 2 (missing CRON_SECRET surfaces on /admin/health) PASS, UAT 3 (multi-binder picker opens unchecked) PASS, UAT 4 (keyboard-only walkthrough + aria-describedby) PASS. 23-HUMAN-UAT.md status=passed, 23-VERIFICATION.md status flipped human_needed→verified.
 
 ## v1.4 Phase Sequence
 
@@ -106,9 +106,11 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Session Continuity
 
-Last session: 2026-05-20T20:37:00.000Z
+Last session: 2026-05-20T22:10:00.000Z
 
-Next action: complete the v1.4 milestone with `/gsd:complete-milestone` once operator setup (CRON_SECRET) + UAT for both Plan 23-01 and Plan 23-02 are confirmed. No further plan execution remains in Phase 23.
+Next action: Run `/gsd:complete-milestone` to archive v1.4 — all UAT and verification gates are cleared. The remaining `CRON_SECRET` Vercel-env provisioning is a deploy-time operator action and intentionally NOT a milestone-close blocker (D-13 + Operator Next Step #1 in the carried-forward runbook). Live cron firing windowing (09:00–09:59 UTC) verification can happen post-deploy without re-opening v1.4.
+
+Resume hint: human UAT was just completed on 2026-05-20 against the live Neon DB on localhost:3000 dev server. UAT 1 wrote 2 harmless `admin_audit_log` rows (`action='price_refresh'`, both `skipped:2353` since local cards lack `scryfallId`). UAT 2-4 wrote nothing. Dev server stopped (task `brlnx22dg`). Local password login was added to `.env.local` (`ADMIN_USERNAME=admin` + generated `ADMIN_PASSWORD`) for the UAT walkthrough — safe to keep or remove for next session.
 
 ## Quick Tasks Completed
 
