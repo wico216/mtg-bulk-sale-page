@@ -12,7 +12,15 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 **Last shipped:** v1.3 Binder-Aware Inventory & Pick Workflow (2026-05-11). Live at `wikos-spellbinder.vercel.app`. Cards know which physical binder they live in; admin order detail shows `[binder]` pull paths; storefront aggregates across binders; etched cards now correctly priced.
 
-**Next milestone:** TBD — start with `/gsd:new-milestone`.
+**Current milestone:** v1.4 Import UX & Price Refresh — see below.
+
+## Current Milestone: v1.4 Import UX & Price Refresh
+
+**Goal:** Tighten the import workflow with explicit opt-in binder selection, and keep card prices fresh autonomously via a daily Scryfall refetch.
+
+**Target features:**
+- Import binder picker — explicit opt-in (Select All / Deselect All buttons; all binders deselected by default on open)
+- Daily price refresh — Vercel Cron daily at off-peak refetches all cards via the existing batched Scryfall `/cards/collection` fetcher; one `admin_audit_log` row per run with counts; `lastPriceRefreshAt` surfaced on `/admin/health`; manual "Refresh now" admin button as escape hatch
 
 ## Requirements
 
@@ -48,7 +56,14 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Active
 
-(None — define next milestone with `/gsd:new-milestone`)
+<!-- v1.4 Import UX & Price Refresh — see REQUIREMENTS.md for REQ-IDs -->
+
+- [ ] Operator can Select All / Deselect All binders in the import binder picker
+- [ ] Import binder picker opens with all binders deselected by default
+- [ ] Card prices refresh automatically once per day via Vercel Cron
+- [ ] Each price refresh records an audit log entry with updated/unchanged/failed counts
+- [ ] Admin can see `lastPriceRefreshAt` on `/admin/health`
+- [ ] Admin can trigger a manual price refresh from the admin UI
 
 ### Out of Scope
 
@@ -142,4 +157,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-11 — after v1.3 milestone completion*
+*Last updated: 2026-05-20 — after v1.4 milestone bootstrap*

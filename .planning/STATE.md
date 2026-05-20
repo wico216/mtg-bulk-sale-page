@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Binder-Aware Inventory & Pick Workflow
-status: Awaiting next milestone
-last_updated: "2026-05-14T16:18:46.000Z"
-last_activity: 2026-05-14 — Quick task 260514-gxr completed: verified-domain order emails and accurate confirmation copy
+milestone: v1.4
+milestone_name: Import UX & Price Refresh
+status: planning
+last_updated: "2026-05-20T17:34:47.354Z"
+last_activity: 2026-05-20
 progress:
-  total_phases: 22
-  completed_phases: 21
-  total_plans: 44
-  completed_plans: 45
-  percent: 95
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -45,10 +45,10 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11:
 
 ## Current Position
 
-Phase: Milestone v1.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-14 — Quick task 260514-gxr completed: verified-domain order emails and accurate confirmation copy
+Status: Defining requirements
+Last activity: 2026-05-20 — Milestone v1.4 started
 
 ## v1.3 Phase Sequence
 
