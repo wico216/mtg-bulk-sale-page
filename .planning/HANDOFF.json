@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-20T21:25:52Z",
+  "phase": "23",
+  "phase_name": "import-ux-price-refresh",
+  "phase_dir": ".planning/phases/23-import-ux-price-refresh",
+  "plan": null,
+  "task": null,
+  "total_tasks": 7,
+  "status": "awaiting_human_uat",
+  "completed_tasks": [
+    {"id": "23-01.1", "name": "Extend health surface with cronSecret + lastPriceRefreshAt", "status": "done", "commit": "f4835d2"},
+    {"id": "23-01.2", "name": "runPriceRefresh shared service (originally w/ advisory lock; replaced via CR-01 fix)", "status": "done", "commit": "27ef9a9"},
+    {"id": "23-01.3", "name": "Cron + admin price-refresh routes + vercel.json", "status": "done", "commit": "4a4f030"},
+    {"id": "23-01.4", "name": "Mount RefreshPricesButton on /admin/health", "status": "done", "commit": "bdf8cbe"},
+    {"id": "23-02.1", "name": "Drop defaultCheckedFor from binder import store (D-05)", "status": "done", "commit": "6e9ce34"},
+    {"id": "23-02.2", "name": "Add Select all / Deselect all to BinderPicker (D-05, D-15)", "status": "done", "commit": "2e45ab2"},
+    {"id": "23-02.3", "name": "Cover Select all / Deselect all / counter / disabled-Continue / zero-memory tests", "status": "done", "commit": "4c156c7"},
+    {"id": "23-01.SUMMARY", "name": "Plan 23-01 SUMMARY.md", "status": "done", "commit": "f133d78"},
+    {"id": "23-02.SUMMARY", "name": "Plan 23-02 SUMMARY.md", "status": "done", "commit": "5b05da9"},
+    {"id": "review", "name": "Code review (23-REVIEW.md): 1 critical + 5 warnings + 4 info", "status": "done", "commit": "3dd46d7"},
+    {"id": "fix.CR-01", "name": "Replace advisory lock with row-based lease in price_refresh_lock", "status": "done", "commit": "779fc3a"},
+    {"id": "fix.WR-01", "name": "timingSafeEqual for cron Bearer comparison", "status": "done", "commit": "2c76c42"},
+    {"id": "fix.WR-02", "name": "try/finally lease release + partial-failure audit row", "status": "done", "commit": "cbf1a55"},
+    {"id": "fix.WR-03", "name": "Driver rowCount as canonical updated count", "status": "done", "commit": "0611e69"},
+    {"id": "fix.WR-04", "name": "Drop redundant setLastSelection mirror", "status": "done", "commit": "f62f05f"},
+    {"id": "fix.WR-05", "name": "Hoist filesByStageRef useRef to top of component body", "status": "done", "commit": "ec70578"},
+    {"id": "fix.docs", "name": "REVIEW.md status=fixed + Fix Log", "status": "done", "commit": "49d346f"},
+    {"id": "verify", "name": "Phase verification (23-VERIFICATION.md status=human_needed; 6/6 must-haves)", "status": "done", "commit": "06ce7a3"},
+    {"id": "uat.persist", "name": "Persist 4 human UAT items to 23-HUMAN-UAT.md", "status": "done", "commit": "06ce7a3"}
+  ],
+  "remaining_tasks": [
+    {"id": "uat.1", "name": "Local UAT: Refresh now button updates Last Price Refresh tile", "status": "not_started"},
+    {"id": "uat.2", "name": "Local UAT: /admin/health surfaces missing CRON_SECRET (already unset locally)", "status": "not_started"},
+    {"id": "uat.3", "name": "Local UAT: Multi-binder CSV import opens picker unchecked + Select-all/Deselect-all flow", "status": "not_started"},
+    {"id": "uat.4", "name": "Local UAT: Keyboard-only walkthrough of import picker (tab order + AT announcement)", "status": "not_started"},
+    {"id": "update_roadmap", "name": "Run update_roadmap step of execute-phase workflow after UAT approval", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Walk through 4 UAT items in 23-HUMAN-UAT.md", "context": "Verifier returned human_needed; all 6 must-haves verified against code but live browser + missing-env testing cannot be automated", "blocking": true},
+    {"action": "Operator: provision CRON_SECRET in Vercel env before next deploy", "context": "Cron route fails closed (401) without it; /admin/health surfaces 'Missing' until set", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Recovery from worktree path drift: Option A (cherry-pick 0a21f35 onto worktree branch as f4835d2, reset main back to 5165ac5, then merge worktree to main as a8769a3)", "rationale": "User-confirmed via AskUserQuestion. Single stray commit, no concurrent activity, well-scoped recovery preserves the parallel-execution merge contract", "phase": "23"},
+    {"decision": "Continue Wave 1 (plan 23-01 tasks 2-4) and Wave 2 (plan 23-02) in SEQUENTIAL mode without worktree isolation", "rationale": "Wave 1 had only one plan and Wave 2 only one plan, so serial-on-main is safe. Eliminates re-triggering the worktree absolute-path drift bug.", "phase": "23"},
+    {"decision": "CR-01 fix: row-based lease in lazily-created price_refresh_lock table, not pg_try_advisory_xact_lock", "rationale": "Project's src/lib/rate-limit.ts already documents that the neon-http driver cannot support multi-statement transactions or session-level advisory locks. Lease table piggybacks on the existing CREATE TABLE IF NOT EXISTS pattern from rate_limit_hits; no drizzle migration needed.", "phase": "23"}
+  ],
+  "uncommitted_files": [".claude/ (untracked, pre-existing — Claude Code plugin config, not part of project)"],
+  "next_action": "User runs `npm run dev` locally and walks through the 4 UAT items in 23-HUMAN-UAT.md. Mark each result in that file. When all 4 pass: orchestrator runs the update_roadmap step of execute-phase (gsd-sdk query phase.complete 23) to mark phase done and commit. If any fail: route to /gsd:plan-phase 23 --gaps for gap closure.",
+  "context_notes": "Phase 23 code is verified-complete. The execute-phase workflow paused at the post-verify_phase_goal decision point (verifier returned status=human_needed). Only the human UAT walkthrough and final update_roadmap remain. Test suite: 543/2/0. TypeScript clean. CRON_SECRET currently unset locally — this is OK for UAT 2 (tests missing state), and not required for UAT 1 (admin-auth route, not cron-secret-auth). Generate one via `openssl rand -hex 32` and add to .env.local to test the configured state."
+}
