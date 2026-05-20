@@ -25,7 +25,15 @@ import type { ScryfallCard } from "@/lib/types";
 // `vi.hoisted` returns refs we can both attach to vi.mock factories AND read
 // from inside individual it() blocks for per-test setup. The `state` object
 // is shared by reference across all mock factories so per-test mutations
-// (e.g. flipping `advisoryAcquired` to false) take effect immediately.
+// (e.g. flipping `lockAcquired` to false) take effect immediately.
+//
+// Phase 23 REVIEW CR-01: the single-flight primitive was migrated from a
+// session-scoped `pg_try_advisory_lock` to a row-based lease in the
+// `price_refresh_lock` table. The mock recognises the new acquire/release
+// SQL by string-match below; `state.lockAcquired = false` simulates the
+// "another runner is in flight" branch (INSERT ... ON CONFLICT ... RETURNING
+// id produced zero rows because the WHERE filter on stale-lease age
+// rejected the upsert).
 const {
   state,
   mockSelectRows,
@@ -35,7 +43,7 @@ const {
   mockCreateAudit,
   mockLogEvent,
 } = vi.hoisted(() => {
-  const state = { advisoryAcquired: true };
+  const state = { lockAcquired: true };
   const executeCalls: Array<{ sqlText: string }> = [];
   return {
     state,
@@ -80,8 +88,17 @@ vi.mock("@/db/client", () => {
     const text = sqlToString(query);
     mockExecuteCalls.push({ sqlText: text });
     mockExecute(text);
-    if (text.includes("pg_try_advisory_lock")) {
-      return { rows: [{ acquired: state.advisoryAcquired }] };
+    // Phase 23 REVIEW CR-01: row-based lease acquire/release.
+    //   - INSERT INTO price_refresh_lock ... RETURNING id is the acquire;
+    //     `state.lockAcquired` controls whether the upsert "took" (one row)
+    //     or was blocked by the fresh-lease WHERE filter (zero rows).
+    //   - CREATE TABLE IF NOT EXISTS / DELETE FROM are idempotent no-op
+    //     paths that return zero rows.
+    if (
+      text.includes("INSERT INTO price_refresh_lock") &&
+      text.includes("RETURNING id")
+    ) {
+      return state.lockAcquired ? { rows: [{ id: 1 }] } : { rows: [] };
     }
     return { rows: [] };
   });
@@ -164,7 +181,7 @@ beforeEach(() => {
   mockCreateAudit.mockReset();
   mockCreateAudit.mockResolvedValue({});
   mockLogEvent.mockReset();
-  state.advisoryAcquired = true;
+  state.lockAcquired = true;
 });
 
 describe("runPriceRefresh", () => {
@@ -360,8 +377,14 @@ describe("runPriceRefresh", () => {
     expect(auditInput.metadata).not.toHaveProperty("notFoundIds");
   });
 
-  it("Case 8: advisory lock returns acquired=false -> throws PriceRefreshLockedError; Scryfall is never called", async () => {
-    state.advisoryAcquired = false;
+  it("Case 8: lease acquire returns zero rows -> throws PriceRefreshLockedError; Scryfall is never called", async () => {
+    // REVIEW CR-01: single-flight is now a row-based lease in
+    // price_refresh_lock. When INSERT ... ON CONFLICT DO UPDATE WHERE
+    // acquired_at < (NOW() - INTERVAL '10 minutes') RETURNING id produces
+    // zero rows (the existing lease is still fresh), the helper throws
+    // PriceRefreshLockedError BEFORE any of the refresh work (Scryfall
+    // call, classification loop, UPDATEs, audit row) runs.
+    state.lockAcquired = false;
     mockSelectRows.mockReturnValue([
       makeRow({ id: "row-1", scryfallId: "sf-A" }),
     ]);
