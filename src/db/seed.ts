@@ -35,7 +35,7 @@ export function cardToRow(card: InventoryRow) {
     rarity: card.rarity,
     finish: card.finish,
     binder: card.binder,
-    scryfallId: null, // Not in cards.json; populated by Phase 10 CSV import (D-07)
+    scryfallId: card.scryfallId ?? null,
   };
 }
 

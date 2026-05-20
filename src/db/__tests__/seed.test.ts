@@ -92,4 +92,14 @@ describe("cardToRow", () => {
     const row = cardToRow(makeCard({ price: 19.95 }));
     expect(row.price).toBe(1995);
   });
+
+  it("forwards scryfallId from Manabox CSV through to the DB row", () => {
+    const row = cardToRow(makeCard({ scryfallId: "1d52fb47-09b8-414c-9cdc-a91ce64ee0eb" }));
+    expect(row.scryfallId).toBe("1d52fb47-09b8-414c-9cdc-a91ce64ee0eb");
+  });
+
+  it("falls back to null when scryfallId is undefined (legacy cards.json seed path)", () => {
+    const row = cardToRow(makeCard({ scryfallId: undefined }));
+    expect(row.scryfallId).toBeNull();
+  });
 });
