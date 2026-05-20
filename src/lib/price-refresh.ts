@@ -197,6 +197,18 @@ export async function runPriceRefresh(opts: {
   // `acquireRefreshLock` above). The lease is released in the `finally`
   // block at the bottom of this function.
   await acquireRefreshLock();
+
+  // ---- D-04 / REVIEW WR-02: counters live OUTSIDE the try block ------------
+  // The success path writes an audit row with these values; the catch path
+  // ALSO writes an audit row with whatever values were accumulated before
+  // the throw, so a failed refresh still leaves a queryable record on the
+  // /admin/audit page (otherwise the only signal would be the structured
+  // logger, which is not surfaced in admin UI).
+  let updated = 0;
+  let unchanged = 0;
+  let failed = 0;
+  let skipped = 0;
+
   try {
     // ---- Read every card row in scope --------------------------------------
     // Select only the columns we need (id for the UPDATE key; scryfallId to
@@ -235,10 +247,6 @@ export async function runPriceRefresh(opts: {
         : new Map<string, ScryfallCard>();
 
     // ---- D-09 + D-10: per-row classification -----------------------------
-    let updated = 0;
-    let unchanged = 0;
-    let failed = 0;
-    let skipped = 0;
     const updates: Array<{ id: string; priceCents: number | null }> = [];
 
     for (const row of rows) {
@@ -337,6 +345,43 @@ export async function runPriceRefresh(opts: {
       skipped,
       durationMs,
     };
+  } catch (err) {
+    // REVIEW WR-02: write a partial-summary audit row on failure so a
+    // failed refresh is queryable from the /admin/audit page, not just
+    // visible in structured logs. The metadata keys remain locked to the
+    // D-04 set { trigger, updated, unchanged, failed, skipped, durationMs };
+    // the failure signal is the truncated durationMs and the fact that
+    // updated+unchanged+failed+skipped will typically be less than the
+    // total row count. Per-error detail flows through the route handler's
+    // logError() call after re-throw (admin.price_refresh.failed event /
+    // cron.refresh_prices.failed event), not through this audit row.
+    //
+    // A failure during the audit-write itself MUST NOT mask the original
+    // error — we swallow audit-write errors so the route handler still
+    // sees the underlying refresh failure (Scryfall outage, UPDATE
+    // constraint violation, etc.).
+    const durationMs = Date.now() - started;
+    try {
+      await createAdminAuditEntry({
+        action: "price_refresh",
+        actorEmail: opts.actorEmail ?? null,
+        targetType: "inventory",
+        targetId: null,
+        targetCount: updated,
+        metadata: {
+          trigger: opts.trigger,
+          updated,
+          unchanged,
+          failed,
+          skipped,
+          durationMs,
+        },
+      });
+    } catch {
+      // Best-effort. The structured logger from the route handler is the
+      // floor signal; admin-audit visibility on failure is the nice-to-have.
+    }
+    throw err;
   } finally {
     // REVIEW.md CR-01: ALWAYS release the lease, even when the refresh body
     // threw. The release itself swallows DB errors (the stale-lease

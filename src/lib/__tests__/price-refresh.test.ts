@@ -395,4 +395,74 @@ describe("runPriceRefresh", () => {
     expect(mockFetchCards).not.toHaveBeenCalled();
     expect(mockCreateAudit).not.toHaveBeenCalled();
   });
+
+  it("Case 9 (REVIEW WR-02): Scryfall failure mid-refresh STILL writes a partial-summary audit row, then re-throws", async () => {
+    // Two rows go through the not_found preserve-price branch BEFORE the
+    // Scryfall call resolves. Wait — actually fetchCards is called once
+    // with all unique ids; we'd need it to throw to interrupt the refresh.
+    // Set up: rows with scryfallIds + Scryfall fetch rejects. The catch
+    // block must still call createAdminAuditEntry with the locked-scalar
+    // metadata before re-throwing the original error.
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-skip", scryfallId: null }),
+      makeRow({ id: "row-1", scryfallId: "sf-A" }),
+    ]);
+    const scryfallErr = new Error("Scryfall 503");
+    mockFetchCards.mockRejectedValue(scryfallErr);
+
+    await expect(
+      runPriceRefresh({ trigger: "cron" }),
+    ).rejects.toBe(scryfallErr);
+
+    // Audit was still written -- this is the WR-02 invariant.
+    expect(mockCreateAudit).toHaveBeenCalledTimes(1);
+    const auditInput = mockCreateAudit.mock.calls[0][0];
+    expect(auditInput.action).toBe("price_refresh");
+    // Metadata still locked to the D-04 six-key shape; counts reflect
+    // whatever was accumulated before the throw (skipped was incremented
+    // for the null-scryfallId row, the rest are still zero).
+    const metadataKeys = Object.keys(auditInput.metadata).sort();
+    expect(metadataKeys).toEqual([
+      "durationMs",
+      "failed",
+      "skipped",
+      "trigger",
+      "unchanged",
+      "updated",
+    ]);
+    // No keys were added to leak the error message into audit metadata.
+    expect(auditInput.metadata).not.toHaveProperty("error");
+    expect(auditInput.metadata).not.toHaveProperty("errorMessage");
+  });
+
+  it("Case 10 (REVIEW WR-02): lease release runs in finally on BOTH success and failure paths", async () => {
+    // Success path first: DELETE FROM price_refresh_lock must appear in
+    // the captured SQL after a successful refresh.
+    mockSelectRows.mockReturnValue([]);
+    mockFetchCards.mockResolvedValue(new Map());
+    await runPriceRefresh({ trigger: "cron" });
+    const successReleaseCalls = mockExecuteCalls.filter((c) =>
+      c.sqlText.toUpperCase().includes("DELETE FROM PRICE_REFRESH_LOCK"),
+    );
+    expect(successReleaseCalls.length).toBeGreaterThanOrEqual(1);
+
+    // Reset and exercise the failure path. The release MUST still run
+    // even though the refresh body threw.
+    mockExecuteCalls.length = 0;
+    mockCreateAudit.mockReset();
+    mockCreateAudit.mockResolvedValue({});
+    mockFetchCards.mockReset();
+    mockFetchCards.mockRejectedValue(new Error("scryfall down"));
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A" }),
+    ]);
+
+    await expect(runPriceRefresh({ trigger: "cron" })).rejects.toThrow(
+      /scryfall down/,
+    );
+    const failureReleaseCalls = mockExecuteCalls.filter((c) =>
+      c.sqlText.toUpperCase().includes("DELETE FROM PRICE_REFRESH_LOCK"),
+    );
+    expect(failureReleaseCalls.length).toBeGreaterThanOrEqual(1);
+  });
 });
