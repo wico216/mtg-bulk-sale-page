@@ -52,9 +52,17 @@ const BATCH_SIZE = 75;
 const RATE_LIMIT_MS = 250;
 const SCRYFALL_URL = "https://api.scryfall.com/cards/collection";
 
-interface Printing {
+// db.execute<T>() requires T extends Record<string, unknown>, so the row
+// shape types below extend it explicitly. Without that the strict TS pass
+// run during the Vercel build fails (the local `npx tsx` runner does not
+// enforce the constraint).
+interface Printing extends Record<string, unknown> {
   set_code: string;
   collector_number: string;
+}
+
+interface CountRow extends Record<string, unknown> {
+  count: string;
 }
 
 interface ScryfallCard {
@@ -111,11 +119,11 @@ async function main() {
   const printings: Printing[] = printingsResult.rows ?? (printingsResult as unknown as Printing[]);
   const totalPrintings = printings.length;
 
-  const rowCountResult = await db.execute<{ count: string }>(sql`
+  const rowCountResult = await db.execute<CountRow>(sql`
     SELECT count(*)::text AS count FROM cards WHERE scryfall_id IS NULL
   `);
   const rowsBefore = parseInt(
-    (rowCountResult.rows ?? (rowCountResult as unknown as Array<{ count: string }>))[0]?.count ?? "0",
+    (rowCountResult.rows ?? (rowCountResult as unknown as CountRow[]))[0]?.count ?? "0",
     10,
   );
 
@@ -198,11 +206,11 @@ async function main() {
   }
 
   // ---- Final stats --------------------------------------------------------
-  const afterRowsResult = await db.execute<{ count: string }>(sql`
+  const afterRowsResult = await db.execute<CountRow>(sql`
     SELECT count(*)::text AS count FROM cards WHERE scryfall_id IS NULL
   `);
   const rowsAfter = parseInt(
-    (afterRowsResult.rows ?? (afterRowsResult as unknown as Array<{ count: string }>))[0]?.count ?? "0",
+    (afterRowsResult.rows ?? (afterRowsResult as unknown as CountRow[]))[0]?.count ?? "0",
     10,
   );
 
