@@ -55,10 +55,11 @@ describe("useBinderImportStore", () => {
     expect(state.lastUsedAt).toBeNull();
   });
 
-  // Phase 23 / v1.4 D-05: the Phase 19 D-08/D-09/D-10 `defaultCheckedFor`
-  // memory getter is REMOVED. The picker now opens UNCHECKED every session.
-  // The three test cases that exercised the removed getter (D-08 unsorted
-  // override, isNew fallback, lastSelection-over-isNew) have been deleted.
+  // Phase 23 / v1.4 D-05: the Phase 19 D-08/D-09/D-10 memory getter
+  // is REMOVED. // removed (see binder-import-store.ts header docblock).
+  // The picker now opens UNCHECKED every session. The three test cases
+  // that exercised the removed getter (D-08 unsorted override, isNew
+  // fallback, lastSelection-over-isNew) have been deleted.
   // Reintroduction is guarded at the parent level by a `@ts-expect-error`
   // type-level assertion in import-client.test.tsx (Plan 23-02 Task 3).
 

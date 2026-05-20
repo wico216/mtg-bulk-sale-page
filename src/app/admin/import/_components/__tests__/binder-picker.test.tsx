@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { useState } from "react";
+import { render, screen, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   BinderPicker,
@@ -21,15 +22,57 @@ function makeBinder(overrides: Partial<BinderSummary> = {}): BinderSummary {
 
 function renderPicker(overrides: Partial<BinderPickerProps> = {}) {
   const onToggle = vi.fn();
+  const onBulkSet = vi.fn();
   const props: BinderPickerProps = {
     binders: [makeBinder()],
     knownBinderNames: [],
     selection: {},
     onToggle,
+    onBulkSet,
     ...overrides,
   };
   render(<BinderPicker {...props} />);
-  return { onToggle };
+  return { onToggle, onBulkSet };
+}
+
+/**
+ * Plan 23-02 Task 3 helper — wrap the picker in a tiny stateful parent so
+ * click handlers can drive the controlled `selection` prop. Used by the
+ * Select all / Deselect all / live-counter tests where we must observe
+ * the picker re-render with the new state in the same render cycle.
+ *
+ * Returns a `getSetStateCallCount` accessor so the D-15 single-render
+ * test can assert the parent's setState fired exactly once per bulk click.
+ */
+function renderControlledPicker(
+  binders: BinderSummary[],
+  initialSelection: Record<string, boolean> = {},
+) {
+  let setStateCallCount = 0;
+  function Wrapper() {
+    const [selection, setSelection] = useState(initialSelection);
+    return (
+      <BinderPicker
+        binders={binders}
+        knownBinderNames={[]}
+        selection={selection}
+        onToggle={(name, checked) => {
+          setStateCallCount += 1;
+          setSelection((prev) => ({ ...prev, [name]: checked }));
+        }}
+        onBulkSet={(names, checked) => {
+          setStateCallCount += 1;
+          setSelection((prev) => {
+            const next = { ...prev };
+            for (const n of names) next[n] = checked;
+            return next;
+          });
+        }}
+      />
+    );
+  }
+  render(<Wrapper />);
+  return { getSetStateCallCount: () => setStateCallCount };
 }
 
 describe("BinderPicker", () => {
@@ -145,6 +188,160 @@ describe("BinderPicker", () => {
     const cb = screen.getByRole("checkbox");
     const wrapper = cb.closest("div");
     expect(wrapper?.querySelectorAll("p").length).toBe(0);
+  });
+});
+
+describe("BinderPicker — Plan 23-02 Select all / Deselect all (D-05, D-15)", () => {
+  const twoBinders: BinderSummary[] = [
+    { name: "a", rowCount: 10, sampleNames: [], isNew: false },
+    { name: "b", rowCount: 5, sampleNames: [], isNew: true },
+  ];
+
+  it("IMPORT-UX-05: initial render header shows '0 of N' when nothing is selected", () => {
+    renderPicker({
+      binders: twoBinders,
+      selection: { a: false, b: false },
+    });
+    const header = screen.getByRole("heading", {
+      name: /Select binders to import/,
+    });
+    expect(within(header).getByText(/0 of 2/)).toBeInTheDocument();
+  });
+
+  it("IMPORT-UX-05: live counter updates from '0 of N' to '1 of N' within one click cycle", async () => {
+    const user = userEvent.setup();
+    renderControlledPicker(twoBinders, { a: false, b: false });
+    // Before: 0 of 2
+    expect(
+      within(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).getByText(/0 of 2/),
+    ).toBeInTheDocument();
+    // Click the first checkbox (a).
+    const cbA = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
+    await user.click(cbA);
+    // After: counter shows 1 of 2 within the same render flush
+    expect(
+      within(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).getByText(/1 of 2/),
+    ).toBeInTheDocument();
+  });
+
+  it("IMPORT-UX-01: Select all calls onBulkSet exactly once with (allNames, true) and updates the counter to 'N of N'", async () => {
+    const user = userEvent.setup();
+    const { onBulkSet } = renderPicker({
+      binders: twoBinders,
+      selection: { a: false, b: false },
+    });
+    await user.click(screen.getByRole("button", { name: /^Select all$/ }));
+    expect(onBulkSet).toHaveBeenCalledTimes(1);
+    // The bulk array reflects the INPUT `binders` prop order — the picker
+    // maps over `binders` (NOT the locally-sorted display list), so the
+    // names arrive in the order they were passed.
+    expect(onBulkSet).toHaveBeenCalledWith(["a", "b"], true);
+
+    // Now simulate the parent applying the bulk update.
+    renderControlledPicker(twoBinders, { a: false, b: false });
+    // Use the second render-tree's Select all button. There are now two
+    // pickers in the DOM (the bare one above and the controlled one); the
+    // second is the controlled wrapper.
+    const allSelectAll = screen.getAllByRole("button", { name: /^Select all$/ });
+    await user.click(allSelectAll[allSelectAll.length - 1]);
+    // The controlled wrapper's picker shows '2 of 2' in its heading.
+    const headings = screen.getAllByRole("heading", {
+      name: /Select binders to import/,
+    });
+    expect(
+      within(headings[headings.length - 1]).getByText(/2 of 2/),
+    ).toBeInTheDocument();
+  });
+
+  it("IMPORT-UX-02: Deselect all calls onBulkSet exactly once with (allNames, false) and counter returns to '0 of N'", async () => {
+    const user = userEvent.setup();
+    const { onBulkSet } = renderPicker({
+      binders: twoBinders,
+      selection: { a: true, b: true },
+    });
+    await user.click(screen.getByRole("button", { name: /^Deselect all$/ }));
+    expect(onBulkSet).toHaveBeenCalledTimes(1);
+    expect(onBulkSet).toHaveBeenCalledWith(["a", "b"], false);
+
+    // Controlled wrapper round-trip.
+    renderControlledPicker(twoBinders, { a: true, b: true });
+    const allDeselectAll = screen.getAllByRole("button", {
+      name: /^Deselect all$/,
+    });
+    await user.click(allDeselectAll[allDeselectAll.length - 1]);
+    const headings = screen.getAllByRole("heading", {
+      name: /Select binders to import/,
+    });
+    expect(
+      within(headings[headings.length - 1]).getByText(/0 of 2/),
+    ).toBeInTheDocument();
+  });
+
+  it("IMPORT-UX-01 / D-15: Select all triggers exactly ONE parent setState call (single-render guarantee)", async () => {
+    const user = userEvent.setup();
+    const tenBinders: BinderSummary[] = Array.from({ length: 10 }, (_, i) => ({
+      name: `binder-${String(i).padStart(2, "0")}`,
+      rowCount: 1,
+      sampleNames: [],
+      isNew: false,
+    }));
+    const { getSetStateCallCount } = renderControlledPicker(tenBinders, {});
+    await user.click(screen.getByRole("button", { name: /^Select all$/ }));
+    // D-15: ONE setState call regardless of binder count (NOT 10).
+    expect(getSetStateCallCount()).toBe(1);
+  });
+
+  it("PITFALLS Pitfall 15: Select all and Deselect all are native <button type='button'> with correct tab order", async () => {
+    renderPicker({
+      binders: twoBinders,
+      selection: { a: false, b: false },
+    });
+    const selectAll = screen.getByRole("button", { name: /^Select all$/ });
+    const deselectAll = screen.getByRole("button", { name: /^Deselect all$/ });
+
+    // Native button element with the type="button" attribute (NOT a div /
+    // span / anchor pretending to be a button).
+    expect(selectAll.tagName).toBe("BUTTON");
+    expect(deselectAll.tagName).toBe("BUTTON");
+    expect(selectAll).toHaveAttribute("type", "button");
+    expect(deselectAll).toHaveAttribute("type", "button");
+
+    // Tab order: Select all → Deselect all → first checkbox.
+    act(() => (selectAll as HTMLButtonElement).focus());
+    expect(document.activeElement).toBe(selectAll);
+
+    const user = userEvent.setup();
+    await user.tab();
+    expect(document.activeElement).toBe(deselectAll);
+    await user.tab();
+    // Next focusable element is the first row's checkbox. Picker sorts
+    // NEW binders first (b) then existing alpha (a) — the first checkbox
+    // belongs to "b".
+    const firstCheckbox = screen.getAllByRole("checkbox")[0];
+    expect(document.activeElement).toBe(firstCheckbox);
+  });
+
+  it("IMPORT-UX-01: when binders includes 'unsorted', Select all checks it too (no special-case after D-05 dropped D-08 unsorted override)", async () => {
+    const user = userEvent.setup();
+    const bindersWithUnsorted: BinderSummary[] = [
+      { name: "a02", rowCount: 5, sampleNames: [], isNew: false },
+      { name: "unsorted", rowCount: 100, sampleNames: [], isNew: false },
+    ];
+    const { onBulkSet } = renderPicker({
+      binders: bindersWithUnsorted,
+      selection: { a02: false, unsorted: false },
+    });
+    await user.click(screen.getByRole("button", { name: /^Select all$/ }));
+    expect(onBulkSet).toHaveBeenCalledTimes(1);
+    // The bulk array MUST include "unsorted" — the operator can deselect
+    // it via the row checkbox if they don't actually want to import it.
+    const [names, checked] = onBulkSet.mock.calls[0];
+    expect(new Set(names)).toEqual(new Set(["a02", "unsorted"]));
+    expect(checked).toBe(true);
   });
 });
 

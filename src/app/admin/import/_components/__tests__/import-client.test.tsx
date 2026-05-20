@@ -121,9 +121,9 @@ describe("ImportClient — Phase 19 picker flow", () => {
       ).toBeInTheDocument(),
     );
 
-    // a02 is "isNew: false" and lastSelection is empty → defaultCheckedFor
-    // returns false. The picker checkbox should be unchecked. The operator
-    // must check it before Continue.
+    // D-05 / IMPORT-UX-03: picker opens UNCHECKED regardless of isNew or
+    // prior lastSelection. The operator must check it (or click Select
+    // all) before Continue activates.
     const a02Checkbox = screen.getByRole("checkbox", {
       // The picker's checkbox is inside a label that wraps the binder name.
     });
@@ -340,7 +340,7 @@ describe("ImportClient — Phase 19 picker flow", () => {
     );
   });
 
-  it("unsorted is not pre-checked even if lastSelection had it true (D-08)", async () => {
+  it("IMPORT-UX-03 (D-05): unsorted opens UNCHECKED even if lastSelection had it true (no per-binder memory)", async () => {
     const user = userEvent.setup();
     act(() => {
       useBinderImportStore.setState({
@@ -453,5 +453,234 @@ describe("ImportClient — Phase 19 picker flow", () => {
       expect(screen.getByText(/parse failure/)).toBeInTheDocument(),
     );
     expect(screen.getByText(/Import failed/)).toBeInTheDocument();
+  });
+});
+
+describe("ImportClient — Plan 23-02 picker UX (D-05, IMPORT-UX-01..05)", () => {
+  /**
+   * Two-binder stage-1 NDJSON response builder used by the Plan 23-02
+   * tests. Mirrors the shape returned by `/api/admin/import/preview`
+   * stage 1 (binders message only; client aborts the rest).
+   */
+  function twoBinderStream(): Response {
+    return ndjsonResponse([
+      {
+        type: "binders",
+        binders: [
+          {
+            name: "binder-a",
+            rowCount: 12,
+            sampleNames: [],
+            isNew: false,
+          },
+          {
+            name: "binder-b",
+            rowCount: 8,
+            sampleNames: [],
+            isNew: true,
+          },
+        ],
+      },
+    ]);
+  }
+
+  it("IMPORT-UX-03: fresh session with no localStorage opens the picker with every binder UNCHECKED and Continue disabled", async () => {
+    const user = userEvent.setup();
+    // Fresh JSDOM: clear localStorage AND the in-memory store (the global
+    // `beforeEach` already does this, but re-asserting fresh-session
+    // semantics in-test makes the invariant explicit).
+    localStorage.clear();
+    act(() => {
+      useBinderImportStore.setState({ lastSelection: {}, lastUsedAt: null });
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(twoBinderStream());
+
+    render(<ImportClient currentTotal={0} />);
+    await dropFile(user);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).toBeInTheDocument(),
+    );
+
+    // Every checkbox is UNCHECKED.
+    const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(2);
+    for (const cb of checkboxes) {
+      expect(cb.checked).toBe(false);
+    }
+    // Header counter: 0 of 2.
+    expect(screen.getByText(/0 of 2/)).toBeInTheDocument();
+    // Continue is disabled (no selection, no will-delete).
+    expect(screen.getByRole("button", { name: /Continue/ })).toBeDisabled();
+  });
+
+  it("IMPORT-UX-03 (D-05): returning session with prior lastSelection in localStorage STILL opens the picker UNCHECKED", async () => {
+    const user = userEvent.setup();
+    // Pre-populate localStorage with the EXACT key + version + state shape
+    // that the zustand persist middleware writes. This proves the picker
+    // ignores any per-binder memory (D-05 zero-memory invariant) — even
+    // when the persisted shape pre-checks both binders, the picker still
+    // opens unchecked.
+    localStorage.setItem(
+      "viki-binder-import-selection",
+      JSON.stringify({
+        state: {
+          lastSelection: { "binder-a": true, "binder-b": true },
+          lastUsedAt: "2026-05-19T00:00:00Z",
+        },
+        version: 1,
+      }),
+    );
+    // Force the store to re-hydrate from localStorage. The persist
+    // middleware reads localStorage on first access; we explicitly set
+    // the in-memory state to match what hydration would produce.
+    act(() => {
+      useBinderImportStore.setState({
+        lastSelection: { "binder-a": true, "binder-b": true },
+        lastUsedAt: "2026-05-19T00:00:00Z",
+      });
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(twoBinderStream());
+
+    render(<ImportClient currentTotal={0} />);
+    await dropFile(user);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).toBeInTheDocument(),
+    );
+
+    // D-05: BOTH checkboxes still UNCHECKED despite prior lastSelection
+    // having both = true.
+    const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(2);
+    for (const cb of checkboxes) {
+      expect(cb.checked).toBe(false);
+    }
+  });
+
+  it("IMPORT-UX-04 + PITFALLS Pitfall 8: Continue disabled, helper text rendered with id 'continue-disabled-helper', button has aria-describedby pointing at it", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(twoBinderStream());
+
+    render(<ImportClient currentTotal={0} />);
+    await dropFile(user);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).toBeInTheDocument(),
+    );
+
+    // Helper text present.
+    const helper = screen.getByText(
+      /Select at least one binder to continue\. Use Select all to start with everything checked\./,
+    );
+    expect(helper).toBeInTheDocument();
+    expect(helper).toHaveAttribute("id", "continue-disabled-helper");
+
+    // Continue button is disabled AND aria-describedby points at the helper.
+    const continueBtn = screen.getByRole("button", { name: /Continue/ });
+    expect(continueBtn).toBeDisabled();
+    expect(continueBtn).toHaveAttribute(
+      "aria-describedby",
+      "continue-disabled-helper",
+    );
+  });
+
+  it("IMPORT-UX-04 + IMPORT-UX-01: clicking Select all enables Continue and removes the helper text", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(twoBinderStream());
+
+    render(<ImportClient currentTotal={0} />);
+    await dropFile(user);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).toBeInTheDocument(),
+    );
+
+    // Initial: disabled + helper visible.
+    expect(screen.getByRole("button", { name: /Continue/ })).toBeDisabled();
+    expect(
+      screen.getByText(/Use Select all to start with everything checked/),
+    ).toBeInTheDocument();
+
+    // Click Select all (header button) — both binders flip checked in
+    // one render via onBulkSet (D-15).
+    await user.click(screen.getByRole("button", { name: /^Select all$/ }));
+
+    // Continue is now enabled; helper text is gone.
+    expect(screen.getByRole("button", { name: /Continue/ })).not.toBeDisabled();
+    expect(
+      screen.queryByText(/Use Select all to start with everything checked/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("IMPORT-UX-04: Continue stays ENABLED when picker selection is empty but a will-delete entry remains checked (D-05 will-delete UNCHANGED)", async () => {
+    const user = userEvent.setup();
+    // Pre-seed lastSelection with a binder that is NOT in the upload.
+    // The will-delete amber panel will surface "binder-b" as a missing
+    // prior-known binder, default-CHECKED per v1.3 D-11 (UNCHANGED in v1.4).
+    act(() => {
+      useBinderImportStore.setState({
+        lastSelection: { "binder-a": true, "binder-b": true },
+        lastUsedAt: null,
+      });
+    });
+    // Upload contains only "binder-a"; "binder-b" is missing.
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      ndjsonResponse([
+        {
+          type: "binders",
+          binders: [
+            {
+              name: "binder-a",
+              rowCount: 5,
+              sampleNames: [],
+              isNew: false,
+            },
+          ],
+        },
+      ]),
+    );
+
+    render(<ImportClient currentTotal={0} />);
+    await dropFile(user);
+    await waitFor(() =>
+      expect(screen.getByText("binder-b")).toBeInTheDocument(),
+    );
+
+    // Will-delete checkbox for binder-b is CHECKED by default (D-11 / D-05).
+    const willDeleteCb = screen.getByLabelText(
+      /Delete binder binder-b/,
+    ) as HTMLInputElement;
+    expect(willDeleteCb.checked).toBe(true);
+
+    // The picker checkbox for binder-a is UNCHECKED (D-05).
+    const allCheckboxes = screen.getAllByRole(
+      "checkbox",
+    ) as HTMLInputElement[];
+    const pickerCb = allCheckboxes.find((cb) => cb !== willDeleteCb);
+    expect(pickerCb?.checked).toBe(false);
+
+    // Continue is ENABLED because willDeleteCount > 0 even though
+    // selectedCount === 0.
+    expect(screen.getByRole("button", { name: /Continue/ })).not.toBeDisabled();
+    // Helper text is NOT rendered (canContinue is true).
+    expect(
+      screen.queryByText(/Use Select all to start with everything checked/),
+    ).not.toBeInTheDocument();
+  });
+
+  // D-05 type-level guard test — see PITFALLS Pitfall 3 (removed)
+  it("D-05 type-level guard: accessing the removed selector (defaultCheckedFor) // removed is a TypeScript error (prevents future re-introduction)", () => {
+    const state = useBinderImportStore.getState();
+    // @ts-expect-error — D-05 / Plan 23-02 Task 1: removed from BinderImportState. // removed
+    const removed = state.defaultCheckedFor; // removed
+    // Runtime secondary check: the property is undefined.
+    expect(removed).toBeUndefined();
   });
 });
