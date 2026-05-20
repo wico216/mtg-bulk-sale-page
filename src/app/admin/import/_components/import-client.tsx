@@ -137,7 +137,6 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   const setLastSelection = useBinderImportStore((s) => s.setLastSelection);
   const recordCommit = useBinderImportStore((s) => s.recordCommit);
   const knownBinderNamesFn = useBinderImportStore((s) => s.knownBinderNames);
-  const defaultCheckedFor = useBinderImportStore((s) => s.defaultCheckedFor);
 
   // ------------------------------------------------------------------------
   // Stage-1: drop files → fetch binders → halt stream → show picker
@@ -239,11 +238,14 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
       return;
     }
 
-    // We have the binders list. Initialize the picker state from the
-    // store's default-checked derivation.
+    // D-05 / v1.4: Picker opens with every binder UNCHECKED on every
+    // session. Select all is the recovery affordance (rendered in the
+    // BinderPicker header below). Any prior `lastSelection` content is
+    // intentionally ignored by the picker — `lastSelection` survives
+    // only to drive the will-delete amber panel below.
     const initialSelection: Record<string, boolean> = {};
     for (const b of binders as BinderSummary[]) {
-      initialSelection[b.name] = defaultCheckedFor(b);
+      initialSelection[b.name] = false;
     }
     setPickerSelection(initialSelection);
 
@@ -628,7 +630,28 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
           onToggle={(name, checked) =>
             setPickerSelection((prev) => ({ ...prev, [name]: checked }))
           }
+          onBulkSet={(names, checked) =>
+            // D-15: SINGLE setPickerSelection — one parent render flips
+            // every binder, regardless of count. Do NOT loop onToggle.
+            setPickerSelection((prev) => {
+              const next = { ...prev };
+              for (const name of names) next[name] = checked;
+              return next;
+            })
+          }
         />
+
+        {/* IMPORT-UX-04 / PITFALLS Pitfall 8: helper text + aria-describedby
+            so the disabled Continue button is announced with actionable copy. */}
+        {!canContinue && (
+          <p
+            id="continue-disabled-helper"
+            className="text-xs text-zinc-500 dark:text-zinc-400 text-right"
+          >
+            Select at least one binder to continue. Use Select all to start
+            with everything checked.
+          </p>
+        )}
 
         <div className="flex items-center justify-end gap-3">
           <button
@@ -642,6 +665,7 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
             type="button"
             onClick={handleConfirmPicker}
             disabled={!canContinue}
+            aria-describedby={!canContinue ? "continue-disabled-helper" : undefined}
             className="px-4 py-2 text-sm font-semibold rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Continue

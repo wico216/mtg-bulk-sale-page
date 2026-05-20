@@ -24,6 +24,8 @@ export interface BinderPickerProps {
   selection: Record<string, boolean>;
   /** Toggle callback. */
   onToggle: (binderName: string, checked: boolean) => void;
+  /** Bulk set callback — used by Select all / Deselect all to flip every binder in ONE parent render (D-15). */
+  onBulkSet: (binderNames: string[], checked: boolean) => void;
 }
 
 /**
@@ -44,6 +46,7 @@ export function BinderPicker({
   binders,
   selection,
   onToggle,
+  onBulkSet,
 }: BinderPickerProps) {
   const sorted = useMemo(() => {
     const newBinders: BinderSummary[] = [];
@@ -77,6 +80,30 @@ export function BinderPicker({
         >
           Select binders to import ({selectedCount} of {binders.length})
         </h2>
+        <div className="flex items-center gap-2">
+          <button type="button"
+            onClick={() =>
+              onBulkSet(
+                binders.map((b) => b.name),
+                true,
+              )
+            }
+            className="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Select all
+          </button>
+          <button type="button"
+            onClick={() =>
+              onBulkSet(
+                binders.map((b) => b.name),
+                false,
+              )
+            }
+            className="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Deselect all
+          </button>
+        </div>
       </header>
       <div className="space-y-2">
         {sorted.map((binder) => {
