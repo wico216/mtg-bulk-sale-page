@@ -55,47 +55,12 @@ describe("useBinderImportStore", () => {
     expect(state.lastUsedAt).toBeNull();
   });
 
-  it("defaultCheckedFor returns false for unsorted regardless of lastSelection (D-08)", () => {
-    useBinderImportStore.getState().setLastSelection({ unsorted: true });
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "unsorted", isNew: true }),
-    ).toBe(false);
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "unsorted", isNew: false }),
-    ).toBe(false);
-  });
-
-  it("defaultCheckedFor falls back to isNew when binder is absent from lastSelection", () => {
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "a02", isNew: true }),
-    ).toBe(true);
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "a02", isNew: false }),
-    ).toBe(false);
-  });
-
-  it("defaultCheckedFor uses lastSelection over isNew when present", () => {
-    useBinderImportStore.getState().setLastSelection({ a02: true });
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "a02", isNew: false }),
-    ).toBe(true);
-    useBinderImportStore.getState().setLastSelection({ a02: false });
-    expect(
-      useBinderImportStore
-        .getState()
-        .defaultCheckedFor({ name: "a02", isNew: true }),
-    ).toBe(false);
-  });
+  // Phase 23 / v1.4 D-05: the Phase 19 D-08/D-09/D-10 `defaultCheckedFor`
+  // memory getter is REMOVED. The picker now opens UNCHECKED every session.
+  // The three test cases that exercised the removed getter (D-08 unsorted
+  // override, isNew fallback, lastSelection-over-isNew) have been deleted.
+  // Reintroduction is guarded at the parent level by a `@ts-expect-error`
+  // type-level assertion in import-client.test.tsx (Plan 23-02 Task 3).
 
   it("knownBinderNames returns sorted Object.keys", () => {
     useBinderImportStore.getState().setLastSelection({

@@ -2,18 +2,30 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 /**
- * Phase 19 D-09 / D-10 — operator's binder selection memory.
+ * Phase 23 / v1.4 D-05 — operator's binder selection memory (post-removal).
  *
- * Mirrors the cart-store.ts persist pattern but JSON-native (no Map
- * serialization needed for `Record<string, boolean>`).
+ * v1.4 invariant: the import binder picker opens with every binder
+ * UNCHECKED on every session, regardless of any prior `lastSelection`
+ * content. The "Select all" and "Deselect all" buttons in
+ * `binder-picker.tsx` are the operator's recovery affordances. The
+ * earlier "remembered selection memory" getter that derived per-binder
+ * initial checks from `lastSelection` is REMOVED (Plan 23-02, Shape B
+ * from `.planning/phases/23-import-ux-price-refresh/23-PATTERNS.md`).
  *
- * Stored under localStorage key `viki-binder-import-selection` with version 1.
- * The `version` + future `migrate` hooks let us evolve the shape without
- * orphaning existing operators' preferences.
+ * Why `lastSelection` and `recordCommit` are still RETAINED:
+ * `computeMissingBinders` at `binder-picker.tsx:33-39` consumes
+ * `knownBinderNames()` (derived from `lastSelection`) to compute the
+ * will-delete amber panel set rendered by `import-client.tsx` (see line
+ * 250 — the `initialWillDelete` loop). Removing `lastSelection` would
+ * break the v1.3 D-11 will-delete behavior, which is UNCHANGED in v1.4
+ * (D-05 explicit: only the picker's per-binder memory is dropped; the
+ * amber will-delete panel default-CHECKED behavior is unaffected).
  *
- * D-08: `unsorted` is FORCED to default-UNCHECKED on every render regardless
- * of `lastSelection` content (the operator must opt in each time so a
- * mass-delete of "unsorted" rows is a deliberate act).
+ * Stored under localStorage key `viki-binder-import-selection` with
+ * version 1 (unchanged). No migration is needed: the removed getter
+ * was a derived function, never persisted state — `partialize` below
+ * only persists `lastSelection` and `lastUsedAt`, both retained.
+ * Removing the orphan getter has zero on-disk consequence.
  */
 export interface BinderImportState {
   /** Map of normalized binder name -> last-checked state. */
@@ -27,7 +39,6 @@ export interface BinderImportState {
   clearSelection: () => void;
 
   // Derived
-  defaultCheckedFor: (binder: { name: string; isNew: boolean }) => boolean;
   knownBinderNames: () => string[];
 }
 
@@ -49,13 +60,6 @@ export const useBinderImportStore = create<BinderImportState>()(
         }),
 
       clearSelection: () => set({ lastSelection: {}, lastUsedAt: null }),
-
-      defaultCheckedFor: ({ name, isNew }) => {
-        // D-08: unsorted always defaults UNCHECKED, regardless of lastSelection.
-        if (name === "unsorted") return false;
-        const prior = get().lastSelection[name];
-        return prior ?? isNew;
-      },
 
       knownBinderNames: () => Object.keys(get().lastSelection).sort(),
     }),
