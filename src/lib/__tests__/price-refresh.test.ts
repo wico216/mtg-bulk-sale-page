@@ -1,0 +1,375 @@
+/**
+ * Phase 23 Plan 23-01 Task 2 — runPriceRefresh shared service.
+ *
+ * Default-run: this test is NOT env-gated and NOT skipped. It runs as
+ * part of the standard `npm test` invocation. Tier-1 only per D-01 / D-11
+ * (the v1.3.5 retrospective lesson — env-gated tests silently skip in CI).
+ * Live-DB integration is intentionally out of scope here; advisory-lock
+ * contention is verified by operator UAT against the deployed cron.
+ *
+ * Coverage matrix (eight cases, all default-run, all assert against mocks):
+ *   1. Happy-path: fetches with deduped scryfallIds
+ *   2. Rows without a scryfallId increment `skipped`
+ *   3. Scryfall `not_found` (id absent from response Map) preserves price
+ *   4. Scryfall `prices.usd === null` writes priceCents=null (explicit overwrite)
+ *   5. Two rows, same scryfallId, different finish -> different priceCents
+ *   6. UPDATE statements join on cards.id, never scryfall_id
+ *   7. Audit metadata is exactly { trigger, updated, unchanged, failed, skipped, durationMs }
+ *   8. Advisory lock returns acquired=false -> throws PriceRefreshLockedError
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ScryfallCard } from "@/lib/types";
+
+// ----- Hoisted mock state ---------------------------------------------------
+// `vi.hoisted` returns refs we can both attach to vi.mock factories AND read
+// from inside individual it() blocks for per-test setup. The `state` object
+// is shared by reference across all mock factories so per-test mutations
+// (e.g. flipping `advisoryAcquired` to false) take effect immediately.
+const {
+  state,
+  mockSelectRows,
+  mockExecute,
+  mockExecuteCalls,
+  mockFetchCards,
+  mockCreateAudit,
+  mockLogEvent,
+} = vi.hoisted(() => {
+  const state = { advisoryAcquired: true };
+  const executeCalls: Array<{ sqlText: string }> = [];
+  return {
+    state,
+    mockSelectRows: vi.fn<() => unknown[]>(() => []),
+    mockExecute: vi.fn(),
+    mockExecuteCalls: executeCalls,
+    mockFetchCards: vi.fn(),
+    mockCreateAudit: vi.fn(),
+    mockLogEvent: vi.fn(),
+  };
+});
+
+vi.mock("server-only", () => ({}));
+
+vi.mock("@/db/client", () => {
+  // Helper to flatten a Drizzle SQL fragment to a string. Walks queryChunks
+  // recursively, dereferences StringChunk (`value: string[]`) and Param
+  // (`value: unknown`) so the captured text contains BOTH the static SQL
+  // skeleton AND the parametrized id / cents values. Used by Cases 5/6 to
+  // assert per-finish prices and the cards.id join key.
+  const sqlToString = (q: unknown): string => {
+    if (q === null || q === undefined) return "";
+    if (typeof q === "string") return q;
+    if (typeof q !== "object") return String(q);
+    const obj = q as Record<string, unknown>;
+    if (Array.isArray(obj.queryChunks)) {
+      return (obj.queryChunks as unknown[]).map(sqlToString).join("");
+    }
+    if ("value" in obj) {
+      const v = obj.value;
+      if (Array.isArray(v)) return v.join(" ");
+      return sqlToString(v);
+    }
+    return "";
+  };
+
+  const select = vi.fn(() => ({
+    from: vi.fn(async () => mockSelectRows()),
+  }));
+
+  const execute = vi.fn(async (query: unknown) => {
+    const text = sqlToString(query);
+    mockExecuteCalls.push({ sqlText: text });
+    mockExecute(text);
+    if (text.includes("pg_try_advisory_lock")) {
+      return { rows: [{ acquired: state.advisoryAcquired }] };
+    }
+    return { rows: [] };
+  });
+
+  return {
+    db: { select, execute },
+  };
+});
+
+vi.mock("@/lib/scryfall", () => ({
+  fetchCardsByScryfallIds: (...args: unknown[]) => mockFetchCards(...args),
+}));
+
+vi.mock("@/db/queries", () => ({
+  createAdminAuditEntry: (...args: unknown[]) => mockCreateAudit(...args),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
+}));
+
+// Import AFTER mocks so the module's top-level imports resolve to mocks.
+const { runPriceRefresh, PriceRefreshLockedError } = await import(
+  "@/lib/price-refresh"
+);
+
+// ---- Helpers ---------------------------------------------------------------
+function makeRow(
+  overrides: Partial<{
+    id: string;
+    scryfallId: string | null;
+    finish: "normal" | "foil" | "etched";
+    currentPriceCents: number | null;
+  }>,
+) {
+  // NOTE: scryfallId/currentPriceCents are intentionally `in`-checked rather
+  // than `??`-defaulted so the caller can pass an explicit `null` to test
+  // the "no scryfallId" / "no current price" branches.
+  return {
+    id: overrides.id ?? "lea-232-normal-near_mint-a01",
+    scryfallId: "scryfallId" in overrides ? overrides.scryfallId! : "sf-001",
+    finish: overrides.finish ?? "normal",
+    currentPriceCents:
+      "currentPriceCents" in overrides ? overrides.currentPriceCents! : 100,
+  };
+}
+
+function makeScryfallCard(
+  prices: Partial<ScryfallCard["prices"]>,
+): ScryfallCard {
+  return {
+    name: "Test Card",
+    set: "lea",
+    set_name: "Alpha",
+    collector_number: "232",
+    rarity: "rare",
+    foil: false,
+    prices: {
+      usd: prices.usd ?? null,
+      usd_foil: prices.usd_foil ?? null,
+      usd_etched: prices.usd_etched ?? null,
+    },
+    image_uris: {
+      small: "https://example.com/small.png",
+      normal: "https://example.com/normal.png",
+      large: "https://example.com/large.png",
+      png: "https://example.com/card.png",
+      art_crop: "https://example.com/art.png",
+      border_crop: "https://example.com/border.png",
+    },
+    color_identity: [],
+  } as unknown as ScryfallCard;
+}
+
+beforeEach(() => {
+  mockSelectRows.mockReset();
+  mockExecute.mockClear();
+  mockExecuteCalls.length = 0;
+  mockFetchCards.mockReset();
+  mockCreateAudit.mockReset();
+  mockCreateAudit.mockResolvedValue({});
+  mockLogEvent.mockReset();
+  state.advisoryAcquired = true;
+});
+
+describe("runPriceRefresh", () => {
+  it("Case 1: fetches Scryfall with deduped scryfallIds (happy path)", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A" }),
+      makeRow({ id: "row-2", scryfallId: "sf-A" }), // duplicate scryfallId
+      makeRow({ id: "row-3", scryfallId: "sf-B" }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([
+        ["sf-A", makeScryfallCard({ usd: "1.50" })],
+        ["sf-B", makeScryfallCard({ usd: "2.00" })],
+      ]),
+    );
+
+    await runPriceRefresh({ trigger: "cron" });
+
+    expect(mockFetchCards).toHaveBeenCalledTimes(1);
+    const callArg = mockFetchCards.mock.calls[0][0] as string[];
+    expect([...callArg].sort()).toEqual(["sf-A", "sf-B"]); // deduped
+  });
+
+  it("Case 2: rows with null scryfallId increment skipped and are not requested from Scryfall", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-no-sf", scryfallId: null }),
+      makeRow({ id: "row-with-sf", scryfallId: "sf-X" }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([["sf-X", makeScryfallCard({ usd: "1.25" })]]),
+    );
+
+    const summary = await runPriceRefresh({ trigger: "cron" });
+
+    expect(summary.skipped).toBe(1);
+    const callArg = mockFetchCards.mock.calls[0][0] as string[];
+    expect(callArg).toEqual(["sf-X"]);
+    expect(callArg).not.toContain(null);
+  });
+
+  it("Case 3: Scryfall not_found preserves existing price (failed++) and never issues an UPDATE for that row", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({
+        id: "row-not-found",
+        scryfallId: "sf-MISSING",
+        currentPriceCents: 999,
+      }),
+    ]);
+    // Empty Map — Scryfall returned not_found for sf-MISSING.
+    mockFetchCards.mockResolvedValue(new Map());
+
+    const summary = await runPriceRefresh({ trigger: "cron" });
+
+    expect(summary.failed).toBe(1);
+    expect(summary.updated).toBe(0);
+    expect(summary.unchanged).toBe(0);
+    // No UPDATE statement was issued for row-not-found. The only execute
+    // calls were the advisory-lock acquire.
+    const updateCalls = mockExecuteCalls.filter((c) =>
+      c.sqlText.toUpperCase().includes("UPDATE CARDS"),
+    );
+    expect(updateCalls).toHaveLength(0);
+    // Structured logger captured per-card detail (D-04: failure detail flows
+    // through the logger, not audit metadata).
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "price_refresh.not_found",
+        metadata: expect.objectContaining({
+          cardId: "row-not-found",
+          scryfallId: "sf-MISSING",
+        }),
+      }),
+    );
+  });
+
+  it("Case 4: Scryfall prices.usd === null writes priceCents=null (legitimate explicit overwrite)", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({
+        id: "row-null-price",
+        scryfallId: "sf-NULL",
+        currentPriceCents: 500,
+      }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([["sf-NULL", makeScryfallCard({ usd: null })]]),
+    );
+
+    const summary = await runPriceRefresh({ trigger: "cron" });
+
+    expect(summary.updated).toBe(1);
+    // UPDATE statement was issued — find it.
+    const updateCalls = mockExecuteCalls.filter((c) =>
+      c.sqlText.toUpperCase().includes("UPDATE CARDS"),
+    );
+    expect(updateCalls).toHaveLength(1);
+  });
+
+  it("Case 5: two rows with same scryfallId but different finish receive DIFFERENT priceCents (per-row finish ladder)", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({
+        id: "row-normal",
+        scryfallId: "sf-MULTI",
+        finish: "normal",
+        currentPriceCents: 0,
+      }),
+      makeRow({
+        id: "row-etched",
+        scryfallId: "sf-MULTI",
+        finish: "etched",
+        currentPriceCents: 0,
+      }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([
+        [
+          "sf-MULTI",
+          makeScryfallCard({
+            usd: "1.00", // normal -> 100
+            usd_foil: "5.00",
+            usd_etched: "16.05", // etched -> 1605
+          }),
+        ],
+      ]),
+    );
+
+    const summary = await runPriceRefresh({ trigger: "cron" });
+
+    expect(summary.updated).toBe(2);
+    // The captured UPDATE SQL fragment carries both id literals AND both
+    // cents values. Drizzle parametrizes them — for our string-based capture
+    // they show up via the chunk fragment values. Assert both ids are
+    // present in the captured SQL, and both prices.
+    const updateText = mockExecuteCalls
+      .filter((c) => c.sqlText.toUpperCase().includes("UPDATE CARDS"))
+      .map((c) => c.sqlText)
+      .join("\n");
+    expect(updateText).toContain("row-normal");
+    expect(updateText).toContain("row-etched");
+    expect(updateText).toContain("100"); // normal cents
+    expect(updateText).toContain("1605"); // etched cents
+  });
+
+  it("Case 6: UPDATE SQL joins on cards.id and never references scryfall_id", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A", currentPriceCents: 0 }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([["sf-A", makeScryfallCard({ usd: "1.00" })]]),
+    );
+
+    await runPriceRefresh({ trigger: "cron" });
+
+    const updateText = mockExecuteCalls
+      .filter((c) => c.sqlText.toUpperCase().includes("UPDATE CARDS"))
+      .map((c) => c.sqlText)
+      .join("\n");
+    expect(updateText).toMatch(/cards\.id\s*=\s*v\.id/);
+    // D-09: NEVER address rows by scryfall_id in the UPDATE path.
+    expect(updateText).not.toMatch(/scryfall_id/);
+  });
+
+  it("Case 7: audit metadata is exactly { trigger, updated, unchanged, failed, skipped, durationMs }", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A", currentPriceCents: 100 }),
+      makeRow({ id: "row-2", scryfallId: null }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([["sf-A", makeScryfallCard({ usd: "1.00" })]]),
+    );
+
+    await runPriceRefresh({ trigger: "manual", actorEmail: "ops@example.com" });
+
+    expect(mockCreateAudit).toHaveBeenCalledTimes(1);
+    const auditInput = mockCreateAudit.mock.calls[0][0];
+    expect(auditInput).toMatchObject({
+      action: "price_refresh",
+      actorEmail: "ops@example.com",
+      targetType: "inventory",
+      targetId: null,
+    });
+    const metadataKeys = Object.keys(auditInput.metadata).sort();
+    expect(metadataKeys).toEqual([
+      "durationMs",
+      "failed",
+      "skipped",
+      "trigger",
+      "unchanged",
+      "updated",
+    ]);
+    // No forbidden keys
+    expect(auditInput.metadata).not.toHaveProperty("failedSample");
+    expect(auditInput.metadata).not.toHaveProperty("errors");
+    expect(auditInput.metadata).not.toHaveProperty("notFoundIds");
+  });
+
+  it("Case 8: advisory lock returns acquired=false -> throws PriceRefreshLockedError; Scryfall is never called", async () => {
+    state.advisoryAcquired = false;
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A" }),
+    ]);
+
+    await expect(runPriceRefresh({ trigger: "cron" })).rejects.toBeInstanceOf(
+      PriceRefreshLockedError,
+    );
+    expect(mockFetchCards).not.toHaveBeenCalled();
+    expect(mockCreateAudit).not.toHaveBeenCalled();
+  });
+});
