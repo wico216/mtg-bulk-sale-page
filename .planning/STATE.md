@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
 status: executing
-last_updated: "2026-05-20T19:37:12.046Z"
-last_activity: 2026-05-20 -- Phase 23 planning complete
+last_updated: "2026-05-20T20:12:51.633Z"
+last_activity: 2026-05-20 -- Plan 23-01 Daily Price Refresh complete (vercel cron + manual button + advisory lock)
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **23 — Import UX & Price Refresh** (not started)
-Plan: **23-01 Daily Price Refresh** (next — write-side; ships first because operator UAT happens against the deployed cron)
-Status: Ready to execute
-Last activity: 2026-05-20 -- Phase 23 planning complete
+Phase: **23 — Import UX & Price Refresh** (in progress — 1/2 plans complete)
+Plan: **23-02 Import Picker UX** (next — UI-only; LOW risk; Plan 23-01 shipped)
+Status: Ready to execute Plan 23-02
+Last activity: 2026-05-20 -- Plan 23-01 Daily Price Refresh complete (Tasks 1-4 + SUMMARY committed on `main`; SDK metric helpers not wired to this STATE.md layout — manual position update applied)
 
 ## v1.4 Phase Sequence
 
@@ -81,6 +81,7 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Recently Completed
 
+- 2026-05-20 — Plan 23-01 Daily Price Refresh shipped (`feat(23-01)` x4: `f4835d2`, `27ef9a9`, `4a4f030`, `bdf8cbe`). Vercel cron + admin manual button + Postgres advisory-lock single-flight + lastPriceRefreshAt + cronSecret env check on `/admin/health`. 530/2 skipped tests; PRICE-REFRESH-01..11 complete. Operator setup: provision `CRON_SECRET` in Vercel env before first deploy (runbook inline in 23-01-SUMMARY.md).
 - 2026-05-20 — v1.4 ROADMAP.md appended with Phase 23 (Import UX & Price Refresh); 2 plans, 16 requirements, 100% coverage
 - 2026-05-20 — v1.4 milestone bootstrap: PROJECT.md updated, REQUIREMENTS.md authored (16 requirements), research synthesis complete (STACK/FEATURES/ARCHITECTURE/PITFALLS + SUMMARY)
 - 2026-05-14 — Quick task wave (260514-7z2..gxr): buyer_phone end-to-end, storefront set-filter search, GitHub issues #8-#16 (search/modal/finish-text/double-faced flip/Type+Set filter defaults/Price filter reorder/sold-out hide/verified sender)
@@ -90,20 +91,22 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 ## Blockers/Concerns
 
 - No active blocker.
-- **CRITICAL pre-Plan-23-01 check:** `vercel.json` does NOT currently exist at repo root (verified during research). Plan 23-01 introduces it; operator must provision `CRON_SECRET` in Vercel env BEFORE first deploy (else cron fires and 401s silently — see Pitfall 6).
-- The Plan 23-01 unit test MUST NOT gate on `TEST_DATABASE_URL` or `CRON_SECRET`. Use `vi.stubEnv` instead. This is the load-bearing lesson from the v1.3.5 hotfix.
+- **Operator action required for Plan 23-01 to ship:** provision `CRON_SECRET` in Vercel env BEFORE first deploy of the merged feature (else cron fires at 09:00 UTC and 401s silently — `/admin/health` page is the audible signal, showing `Cron secret · Missing` and `ok: false`). Inline runbook in `.planning/phases/23-import-ux-price-refresh/23-01-SUMMARY.md` → "Operator Setup".
+- Plan 23-01 tests are default-run (NOT env-gated) per D-01 / D-11 — the v1.3.5 hotfix lesson is now encoded in the test files' literal `"NOT env-gated"` headers and a phase-level grep gate.
 
 ## Operator Next Steps
 
-1. **(NEXT) Plan Phase 23-01** with `/gsd:plan-phase 23` (or `/gsd:plan-phase 23 01` if multi-plan invocation is supported). Resolve open decisions: Tier 2 integration-test opt-in/skip, `CRON_SECRET` rotation runbook doc.
-2. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; same harness pattern Plan 23-01 will mirror IF Tier 2 is opted in.
-3. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
+1. **Provision `CRON_SECRET` in Vercel env + redeploy** (Plan 23-01 ship gate). Runbook inline in `.planning/phases/23-import-ux-price-refresh/23-01-SUMMARY.md` → "Operator Setup" (4 steps: `openssl rand -hex 32` → paste into Vercel env → redeploy → verify `cronSecret: "configured"` on `/admin/health`).
+2. **(NEXT) Execute Plan 23-02 Import Picker UX** with `/gsd:execute-phase 23 02` — UI-only, LOW risk, fully independent of Plan 23-01 (different files, no shared state per CONTEXT D-17).
+3. After first cron firing window (09:00–09:59 UTC, post-deploy), confirm one new `admin_audit_log` row with `action='price_refresh'` per day. PITFALLS Pitfall 9 (Vercel Hobby cron drift ±59min within the hour) is normal — do NOT report as a bug.
+4. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; deliberately NOT folded into Plan 23-01 per D-01.
+5. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
 
 ## Session Continuity
 
-Last session: 2026-05-20T18:54:22.388Z
+Last session: 2026-05-20T20:12:46.995Z
 
-Next action: `/gsd:plan-phase 23` to decompose Plan 23-01 (Daily Price Refresh) and Plan 23-02 (Import Picker UX) into executable PLAN.md files.
+Next action: `/gsd:execute-phase 23 02` to ship the Import Picker UX (Plan 23-02). Independent of Plan 23-01; can interleave with the operator's CRON_SECRET provisioning step.
 
 ## Quick Tasks Completed
 

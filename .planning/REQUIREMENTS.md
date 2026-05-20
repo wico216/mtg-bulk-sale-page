@@ -18,17 +18,17 @@ Requirements for v1.4 Import UX & Price Refresh. Each maps to roadmap phases.
 
 ### Price Refresh
 
-- [ ] **PRICE-REFRESH-01**: A daily Vercel Cron at `0 9 * * *` UTC triggers a refresh of all card prices via the existing batched Scryfall `/cards/collection` fetcher
-- [ ] **PRICE-REFRESH-02**: The cron route rejects requests without `Authorization: Bearer ${CRON_SECRET}` (returns 401) and fails closed when the env var is missing
-- [ ] **PRICE-REFRESH-03**: Each refresh writes one `admin_audit_log` row with `action='price_refresh'` and metadata `{ trigger, updated, unchanged, failed, skipped, durationMs }`
-- [ ] **PRICE-REFRESH-04**: A refresh NEVER overwrites an existing price with NULL when Scryfall returns `not_found`; only updates when Scryfall returns a numeric price; rows with no `scryfallId` are skipped entirely
-- [ ] **PRICE-REFRESH-05**: A refresh updates each card row by its 5-segment composite `cards.id`, applying the per-finish `getPrice(prices, finish)` ladder per row (NEVER UPDATE-by-scryfall_id)
-- [ ] **PRICE-REFRESH-06**: Concurrent cron+manual invocations are single-flighted via a Postgres advisory lock; the second caller returns 409
-- [ ] **PRICE-REFRESH-07**: Admin can trigger a manual refresh via `POST /api/admin/prices/refresh`, protected by `requireAdmin()` + `ADMIN_BULK` rate-limit
-- [ ] **PRICE-REFRESH-08**: `/admin/health` JSON response includes `lastPriceRefreshAt` (ISO string or null)
-- [ ] **PRICE-REFRESH-09**: `/admin/health` page renders a "Last Price Refresh" tile (replacing the dead "Notification failures (24h)" tile) showing the most recent refresh timestamp
-- [ ] **PRICE-REFRESH-10**: `/admin/health` page renders a "Refresh now" admin button next to the Last Price Refresh tile, calling `POST /api/admin/prices/refresh` and re-rendering the page on success
-- [ ] **PRICE-REFRESH-11**: `envChecks()` reports `cronSecret` as `"configured"` or `"missing"` (literal only, never the actual value); `/admin/health` `ok` flips to `false` when missing
+- [x] **PRICE-REFRESH-01**: A daily Vercel Cron at `0 9 * * *` UTC triggers a refresh of all card prices via the existing batched Scryfall `/cards/collection` fetcher
+- [x] **PRICE-REFRESH-02**: The cron route rejects requests without `Authorization: Bearer ${CRON_SECRET}` (returns 401) and fails closed when the env var is missing
+- [x] **PRICE-REFRESH-03**: Each refresh writes one `admin_audit_log` row with `action='price_refresh'` and metadata `{ trigger, updated, unchanged, failed, skipped, durationMs }`
+- [x] **PRICE-REFRESH-04**: A refresh NEVER overwrites an existing price with NULL when Scryfall returns `not_found`; only updates when Scryfall returns a numeric price; rows with no `scryfallId` are skipped entirely
+- [x] **PRICE-REFRESH-05**: A refresh updates each card row by its 5-segment composite `cards.id`, applying the per-finish `getPrice(prices, finish)` ladder per row (NEVER UPDATE-by-scryfall_id)
+- [x] **PRICE-REFRESH-06**: Concurrent cron+manual invocations are single-flighted via a Postgres advisory lock; the second caller returns 409
+- [x] **PRICE-REFRESH-07**: Admin can trigger a manual refresh via `POST /api/admin/prices/refresh`, protected by `requireAdmin()` + `ADMIN_BULK` rate-limit
+- [x] **PRICE-REFRESH-08**: `/admin/health` JSON response includes `lastPriceRefreshAt` (ISO string or null)
+- [x] **PRICE-REFRESH-09**: `/admin/health` page renders a "Last Price Refresh" tile (replacing the dead "Notification failures (24h)" tile) showing the most recent refresh timestamp
+- [x] **PRICE-REFRESH-10**: `/admin/health` page renders a "Refresh now" admin button next to the Last Price Refresh tile, calling `POST /api/admin/prices/refresh` and re-rendering the page on success
+- [x] **PRICE-REFRESH-11**: `envChecks()` reports `cronSecret` as `"configured"` or `"missing"` (literal only, never the actual value); `/admin/health` `ok` flips to `false` when missing
 
 ## v2 Requirements (Deferred)
 

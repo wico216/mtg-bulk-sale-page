@@ -108,4 +108,4 @@ _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 | 20. Storefront Aggregation & Cart Migration | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 21. Admin Visibility & Audit                | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 22. Hardening & UAT                         | v1.3 | 2/2 | Complete | 2026-05-11 |
-| 23. Import UX & Price Refresh               | v1.4 | 0/2 | Not started | —          |
+| 23. Import UX & Price Refresh               | v1.4 | 1/2 | In Progress|  |
