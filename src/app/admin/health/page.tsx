@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { getAdminHealthSnapshot } from "@/db/admin-health";
+import { RefreshPricesButton } from "./_components/refresh-prices-button";
 
 /**
  * Phase 15-02: Admin operational health page.
@@ -246,7 +247,7 @@ export default async function AdminHealthPage() {
             <dd className="mt-2 text-sm font-medium">
               {formatTimestamp(snapshot.lastPriceRefreshAt)}
             </dd>
-            {/* RefreshPricesButton inserted by Task 4 */}
+            <RefreshPricesButton />
           </div>
         </dl>
       </section>
