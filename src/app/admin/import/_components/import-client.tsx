@@ -132,6 +132,17 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     Record<string, boolean>
   >({});
   const abortControllerRef = useRef<AbortController | null>(null);
+  // `filesByStageRef` holds the actual File objects between handleFiles
+  // (stage 1) and handleConfirmPicker (stage 2). The DropZone passes
+  // File[] to handleFiles; we store them here so we can re-build
+  // FormData without requiring the operator to re-drop.
+  // REVIEW WR-05: declared here next to `abortControllerRef` so both
+  // hook calls live at the top of the component body. The previous
+  // mid-component declaration worked (useRef is hook-call-order safe;
+  // handlers don't read the ref until events fire) but read as a TDZ
+  // violation at first glance and would break a maintainer who reordered
+  // handlers without rederiving that the late `useRef` was still in scope.
+  const filesByStageRef = useRef<File[] | null>(null);
 
   // Individual selectors keep re-renders minimal (zustand best practice).
   // REVIEW WR-04: removed the `setLastSelection` selector — the only call
@@ -521,13 +532,9 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     filesByStageRef.current = null;
   }
 
-  // Ref holds the actual File objects between handleFiles (stage 1) and
-  // handleConfirmPicker (stage 2). The DropZone passes File[] to
-  // handleFiles; we store them here so we can re-build FormData without
-  // requiring the operator to re-drop.
-  const filesByStageRef = useRef<File[] | null>(null);
-
   // Wrap the public handleFiles to capture the File[] in the ref.
+  // (`filesByStageRef` is declared at the top of the component body next
+  // to `abortControllerRef` — see WR-05 in the REVIEW.)
   async function onFilesFromDropZone(files: File[]) {
     filesByStageRef.current = files;
     await handleFiles(files);
