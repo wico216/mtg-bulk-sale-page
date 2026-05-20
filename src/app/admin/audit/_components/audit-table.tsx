@@ -21,6 +21,8 @@ const ACTION_LABELS: Record<AdminAuditAction, string> = {
   "order.status_update": "Order workflow",
   "order.cancel": "Order cancel",
   "order.restore_inventory": "Inventory restore",
+  // Phase 23 (Plan 23-01): daily Scryfall price refresh + manual escape hatch.
+  price_refresh: "Price refresh",
 };
 
 const ACTION_CLASSES: Record<AdminAuditAction, string> = {
@@ -32,6 +34,8 @@ const ACTION_CLASSES: Record<AdminAuditAction, string> = {
   "order.status_update": "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300",
   "order.cancel": "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   "order.restore_inventory": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
+  // Phase 23 (Plan 23-01): teal -- distinct from inventory blue and order indigo.
+  price_refresh: "bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-300",
 };
 
 function formatDate(value: string): string {

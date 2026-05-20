@@ -8,15 +8,20 @@ import { logError } from "@/lib/logger";
  * - Admin-only: returns 401/403 via `requireAdmin()` before any check runs.
  * - Configuration checks read env presence but NEVER echo values back. The
  *   response uses literal "configured" / "missing" strings.
- * - DB reachability + last order/import/audit timestamps come from
- *   `getAdminHealthSnapshot()`. The helper short-circuits to `database: "error"`
- *   when even SELECT 1 fails so the response stays predictable.
- * - `notificationFailuresLast24h` is exposed as a structured field. It is
- *   currently `null` because Phase 15-01 emits notification.*_failed log lines
- *   to Vercel function logs and there is no queryable log source on the
- *   serverless side yet. Phase 15 CONTEXT explicitly documented this deferral.
- *   Keeping the field present (with value `null`) lets the admin page render
- *   "unknown" without a UI conditional later when the log drain lands.
+ * - DB reachability + last order/import/audit/price-refresh timestamps come
+ *   from `getAdminHealthSnapshot()`. The helper short-circuits to
+ *   `database: "error"` when even SELECT 1 fails so the response stays
+ *   predictable.
+ *
+ * Phase 23 (Plan 23-01) extensions:
+ * - `cronSecret` env check (literal "configured" / "missing" only) is reported
+ *   alongside the existing env checks. Top-level `ok` flips to `false` when
+ *   `cronSecret === "missing"` (D-13) so deploys missing `CRON_SECRET` light
+ *   up immediately on the health page.
+ * - `lastPriceRefreshAt` REPLACES the retired notification-failure deferral
+ *   field (D-06). The deferral row has been obsoleted; the queryable
+ *   log-drain idea is now superseded by the durable `admin_audit_log` row
+ *   written on every refresh.
  */
 
 export interface AdminHealthCheckStatuses {
@@ -24,13 +29,23 @@ export interface AdminHealthCheckStatuses {
   authSecret: "configured" | "missing";
   googleOAuth: "configured" | "missing";
   email: "configured" | "missing";
+  /**
+   * Phase 23 D-13: presence-only literal for `CRON_SECRET`. Never echoes the
+   * value. `/admin/health` top-level `ok` flips to `false` when missing.
+   */
+  cronSecret: "configured" | "missing";
 }
 
 export interface AdminHealthRecent {
   lastOrderAt: string | null;
   lastImportAt: string | null;
   lastAuditAt: string | null;
-  notificationFailuresLast24h: number | null;
+  /**
+   * Phase 23 D-06: timestamp of the most recent admin_audit_log row with
+   * `action='price_refresh'`. Replaces the retired notification-failure
+   * deferral field.
+   */
+  lastPriceRefreshAt: string | null;
 }
 
 export interface AdminHealthResponse {
@@ -53,7 +68,9 @@ function envChecks(): Omit<AdminHealthCheckStatuses, "database"> {
     isPresent(process.env.RESEND_API_KEY) && isPresent(process.env.SELLER_EMAIL)
       ? "configured"
       : "missing";
-  return { authSecret, googleOAuth, email };
+  // Phase 23 D-13: presence-only; NEVER serialize the value.
+  const cronSecret = isPresent(process.env.CRON_SECRET) ? "configured" : "missing";
+  return { authSecret, googleOAuth, email, cronSecret };
 }
 
 export async function GET(_request: Request) {
@@ -77,6 +94,7 @@ export async function GET(_request: Request) {
       lastOrderAt: null,
       lastImportAt: null,
       lastAuditAt: null,
+      lastPriceRefreshAt: null,
     };
   }
 
@@ -85,13 +103,15 @@ export async function GET(_request: Request) {
     authSecret: envState.authSecret,
     googleOAuth: envState.googleOAuth,
     email: envState.email,
+    cronSecret: envState.cronSecret,
   };
 
   const ok =
     checks.database === "ok" &&
     checks.authSecret === "configured" &&
     checks.googleOAuth === "configured" &&
-    checks.email === "configured";
+    checks.email === "configured" &&
+    checks.cronSecret === "configured";
 
   const body: AdminHealthResponse = {
     ok,
@@ -100,9 +120,10 @@ export async function GET(_request: Request) {
       lastOrderAt: snapshot.lastOrderAt,
       lastImportAt: snapshot.lastImportAt,
       lastAuditAt: snapshot.lastAuditAt,
-      // D-deferred: queryable notification-failure log source is not built yet.
-      // See 15-01 SUMMARY "Known Limitations / Deferred Observability".
-      notificationFailuresLast24h: null,
+      // Phase 23 D-06: replaces the retired notification-failure deferral.
+      // The daily Vercel cron writes one admin_audit_log row per run; this
+      // field surfaces the timestamp of the most recent.
+      lastPriceRefreshAt: snapshot.lastPriceRefreshAt,
     },
   };
 
