@@ -263,7 +263,8 @@ export type AdminAuditAction =
   | "inventory.import_commit"
   | "order.status_update"
   | "order.cancel"
-  | "order.restore_inventory";
+  | "order.restore_inventory"
+  | "price_refresh";
 
 export type AdminAuditTargetType = "card" | "inventory" | "order" | "import";
 
@@ -448,6 +449,7 @@ function normalizeAdminAuditAction(value: string): AdminAuditAction {
     "order.status_update",
     "order.cancel",
     "order.restore_inventory",
+    "price_refresh",
   ];
   return allowed.includes(value as AdminAuditAction)
     ? (value as AdminAuditAction)

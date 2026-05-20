@@ -28,6 +28,7 @@ function envChecks(): {
   authSecret: "configured" | "missing";
   googleOAuth: "configured" | "missing";
   email: "configured" | "missing";
+  cronSecret: "configured" | "missing";
 } {
   return {
     authSecret: isPresent(process.env.AUTH_SECRET) ? "configured" : "missing",
@@ -39,6 +40,8 @@ function envChecks(): {
       isPresent(process.env.RESEND_API_KEY) && isPresent(process.env.SELLER_EMAIL)
         ? "configured"
         : "missing",
+    // Phase 23 D-13: presence-only; never serialize the secret value.
+    cronSecret: isPresent(process.env.CRON_SECRET) ? "configured" : "missing",
   };
 }
 
@@ -98,6 +101,7 @@ export default async function AdminHealthPage() {
       lastOrderAt: null,
       lastImportAt: null,
       lastAuditAt: null,
+      lastPriceRefreshAt: null,
     };
     snapshotError = error instanceof Error ? error.message : "Unknown error";
   }
@@ -139,13 +143,25 @@ export default async function AdminHealthPage() {
           ? "RESEND_API_KEY and SELLER_EMAIL are set."
           : "Order notifications cannot be sent until RESEND_API_KEY and SELLER_EMAIL are set.",
     },
+    {
+      // Phase 23 D-13: presence-only check; the secret value is never read or
+      // rendered. STATUS_LABELS handles the literal -> UI translation.
+      key: "cronSecret",
+      label: "Cron secret",
+      status: envState.cronSecret,
+      hint:
+        envState.cronSecret === "configured"
+          ? "CRON_SECRET is set; Vercel cron can authenticate to /api/cron/refresh-prices."
+          : "CRON_SECRET is not set. Generate with: openssl rand -hex 32. Daily price refresh will 401 until configured.",
+    },
   ];
 
   const overallOk =
     snapshot.database === "ok" &&
     envState.authSecret === "configured" &&
     envState.googleOAuth === "configured" &&
-    envState.email === "configured";
+    envState.email === "configured" &&
+    envState.cronSecret === "configured";
 
   return (
     <div className="space-y-8">
@@ -225,22 +241,14 @@ export default async function AdminHealthPage() {
           </div>
           <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Notification failures (24h)
+              Last price refresh
             </dt>
-            <dd className="mt-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              Unknown — log drain not yet wired
+            <dd className="mt-2 text-sm font-medium">
+              {formatTimestamp(snapshot.lastPriceRefreshAt)}
             </dd>
+            {/* RefreshPricesButton inserted by Task 4 */}
           </div>
         </dl>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Notification failure counts are emitted to Vercel function logs by{" "}
-          <code className="rounded bg-zinc-100 px-1 py-0.5 text-[0.7rem] dark:bg-zinc-900">
-            src/lib/notifications.ts
-          </code>{" "}
-          (events <code>notification.seller_email_failed</code> /{" "}
-          <code>notification.buyer_email_failed</code>). A queryable count surface
-          is intentionally deferred — see 15-01 SUMMARY.
-        </p>
       </section>
 
       <section className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">

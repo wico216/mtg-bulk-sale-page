@@ -111,7 +111,7 @@ function getManaValue(card: ScryfallCard): number | null {
  *
  * Scryfall returns prices as strings like "16.05".
  */
-function getPrice(
+export function getPrice(
   prices: ScryfallCard["prices"],
   finish: Finish,
 ): number | null {
