@@ -10,7 +10,7 @@ export interface NotifyResult {
 }
 
 export const DEFAULT_ORDER_EMAIL_FROM =
-  "Viki MTG Store <orders@wikospellbinder.com>";
+  "Wiko's Spellbook <orders@wikospellbinder.com>";
 
 function getOrderEmailFrom(): string {
   return process.env.ORDER_EMAIL_FROM?.trim() || DEFAULT_ORDER_EMAIL_FROM;

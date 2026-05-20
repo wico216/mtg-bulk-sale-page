@@ -26,7 +26,7 @@ export function buildBuyerEmailHtml(order: OrderData): string {
 <body style="margin: 0; padding: 0; background: #f5f5f5;">
   <div style="max-width: 600px; margin: 0 auto; background: #ffffff; font-family: Arial, Helvetica, sans-serif;">
     <div style="padding: 16px 24px; border-bottom: 2px solid #4f46e5;">
-      <span style="font-size: 14px; font-weight: bold; color: #4f46e5;">Viki MTG Store</span>
+      <span style="font-size: 14px; font-weight: bold; color: #4f46e5;">Wiko's Spellbook</span>
     </div>
     <div style="padding: 24px;">
       <h1 style="font-size: 20px; font-weight: bold; color: #171717; margin: 0 0 16px;">Thanks for your order, ${escapeHtml(order.buyerName)}!</h1>
