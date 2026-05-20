@@ -287,7 +287,6 @@ export async function runPriceRefresh(opts: {
       }
 
       updates.push({ id: row.id, priceCents });
-      updated++;
     }
 
     // ---- D-09: chunked UPDATE by 5-segment cards.id ----------------------
@@ -300,19 +299,32 @@ export async function runPriceRefresh(opts: {
     // `scryfall_id` here would re-introduce the v1.2 etched-mispricing
     // bug because the same scryfallId maps to N rows (one per finish x
     // condition x binder).
+    //
+    // REVIEW WR-03: `updated` is incremented by the ACTUAL rows-affected
+    // count returned by each chunk's UPDATE, not by classification-time
+    // intent. The neon-http driver populates `rowCount` on every result
+    // (NeonHttpQueryResult inherits FullQueryResults.rowCount from
+    // @neondatabase/serverless). If `rowCount` is absent (e.g. unit-test
+    // mock without rowCount in its return) we fall back to `chunk.length`
+    // so the count is never silently zero in tests; the production
+    // driver always populates it, so the fallback is a guardrail not a
+    // load-bearing path.
     for (let i = 0; i < updates.length; i += UPDATE_CHUNK_SIZE) {
       const chunk = updates.slice(i, i + UPDATE_CHUNK_SIZE);
       const valuesSql = sql.join(
         chunk.map((u) => sql`(${u.id}::text, ${u.priceCents}::integer)`),
         sql`, `,
       );
-      await db.execute(sql`
+      const result = await db.execute(sql`
         UPDATE cards
         SET price = v.price,
             updated_at = NOW()
         FROM (VALUES ${valuesSql}) AS v(id, price)
         WHERE cards.id = v.id
       `);
+      const affected =
+        typeof result?.rowCount === "number" ? result.rowCount : chunk.length;
+      updated += affected;
     }
 
     const durationMs = Date.now() - started;

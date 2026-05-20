@@ -43,7 +43,15 @@ const {
   mockCreateAudit,
   mockLogEvent,
 } = vi.hoisted(() => {
-  const state = { lockAcquired: true };
+  // Phase 23 REVIEW WR-03: `updateRowCount` (when not null) is the value
+  // the mock returns as `rowCount` on every UPDATE statement. The
+  // production neon-http driver populates rowCount via FullQueryResults
+  // (see @neondatabase/serverless index.d.ts:277); leaving it null here
+  // exercises the `chunk.length` fallback path in the production code.
+  const state: { lockAcquired: boolean; updateRowCount: number | null } = {
+    lockAcquired: true,
+    updateRowCount: null,
+  };
   const executeCalls: Array<{ sqlText: string }> = [];
   return {
     state,
@@ -99,6 +107,14 @@ vi.mock("@/db/client", () => {
       text.includes("RETURNING id")
     ) {
       return state.lockAcquired ? { rows: [{ id: 1 }] } : { rows: [] };
+    }
+    // REVIEW WR-03: return rowCount on UPDATE statements when the test
+    // sets state.updateRowCount; otherwise return undefined so the
+    // production code exercises the `chunk.length` fallback.
+    if (text.toUpperCase().includes("UPDATE CARDS")) {
+      return state.updateRowCount === null
+        ? { rows: [] }
+        : { rows: [], rowCount: state.updateRowCount };
     }
     return { rows: [] };
   });
@@ -182,6 +198,7 @@ beforeEach(() => {
   mockCreateAudit.mockResolvedValue({});
   mockLogEvent.mockReset();
   state.lockAcquired = true;
+  state.updateRowCount = null;
 });
 
 describe("runPriceRefresh", () => {
@@ -464,5 +481,37 @@ describe("runPriceRefresh", () => {
       c.sqlText.toUpperCase().includes("DELETE FROM PRICE_REFRESH_LOCK"),
     );
     expect(failureReleaseCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Case 11 (REVIEW WR-03): summary.updated reflects driver rowCount, not classification-time intent", async () => {
+    // Two rows are classified as "would update" (priceCents differs from
+    // currentPriceCents). The production code now reads each UPDATE's
+    // rowCount instead of incrementing at classification time. We
+    // simulate a scenario where the DB reports FEWER rows affected than
+    // the classification expected (e.g. someone deleted a row between
+    // SELECT and UPDATE, or the UPDATE chunk hit a row that had been
+    // concurrently re-priced to the same value). The audit `updated`
+    // must reflect what the DB actually did, not what we wanted.
+    state.updateRowCount = 1; // driver says 1 row affected per UPDATE call
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-1", scryfallId: "sf-A", currentPriceCents: 0 }),
+      makeRow({ id: "row-2", scryfallId: "sf-B", currentPriceCents: 0 }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([
+        ["sf-A", makeScryfallCard({ usd: "1.00" })],
+        ["sf-B", makeScryfallCard({ usd: "2.00" })],
+      ]),
+    );
+
+    const summary = await runPriceRefresh({ trigger: "cron" });
+
+    // Classification intended 2 updates → one chunk → mock returns
+    // rowCount=1 → summary.updated should be 1, not 2.
+    expect(summary.updated).toBe(1);
+    // Audit row carries the actual count too.
+    const auditInput = mockCreateAudit.mock.calls[0][0];
+    expect(auditInput.metadata.updated).toBe(1);
+    expect(auditInput.targetCount).toBe(1);
   });
 });
