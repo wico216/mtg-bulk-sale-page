@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Import UX & Price Refresh
 status: milestone_complete
-last_updated: "2026-05-20T22:10:00.000Z"
-last_activity: 2026-05-20 -- Phase 23 human UAT complete (4/4 pass on live dev server); milestone v1.4 feature-complete and human-verified. Operator action (CRON_SECRET in Vercel) still pending for first deployed cron run, but does not block milestone close.
+last_updated: "2026-05-20T23:00:00.000Z"
+last_activity: 2026-05-20 -- v1.4 shipped to prod + post-deploy bug discovered/fixed/backfilled. Push of 28 unshipped commits landed `mtg-bulk-sale-page-o6mn3t1hs` then redeployed `p1391v06s` with CRON_SECRET. cardToRow bug found (every Manabox import silently dropped scryfallId since v1.0); 1-line fix `f1312ad` + companion backfill script `c78893a` populated 2353 prod rows. First real price refresh on prod: `updated:1102 unchanged:1251 skipped:0` (vs the dead-on-arrival `skipped:2353` pre-fix).
 progress:
   total_phases: 1
   completed_phases: 1
@@ -81,6 +81,13 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Recently Completed
 
+- 2026-05-20 — **v1.4 shipped to prod**: pushed all 28 backlog commits (`aa72121..5521bda`) to origin, Vercel auto-deployed `mtg-bulk-sale-page-o6mn3t1hs` (27s build), then redeployed `p1391v06s` after `CRON_SECRET` was added to Vercel env. Both `/api/admin/health` and the new `/api/cron/refresh-prices` route confirmed live (401 fail-closed on missing/wrong Bearer; route exists per HTTP code, not 404).
+- 2026-05-20 — **`cardToRow` bug discovery + fix + backfill chain** (post-deploy verification turned up a real defect that made v1.4 dead-on-arrival on existing data):
+  - **Root cause**: `src/db/seed.ts:cardToRow` hardcoded `scryfallId: null` from the legacy `cards.json` seed path. When `src/db/queries.ts:6` later imported the same function for `replaceCardsForBinders` (the Manabox CSV commit path), every import since v1.0 silently dropped the Scryfall UUID extracted by `csv-parser.ts:181`. All 2353 prod rows had `scryfall_id IS NULL` — making `runPriceRefresh` skip every row per D-10.
+  - **Fix `f1312ad`**: 1-line change to forward `card.scryfallId ?? null` through `cardToRow`. 2 new tests (positive forwarding + undefined fallback). `545/2/0` test suite (was 543/2). TypeScript clean.
+  - **Backfill `c78893a`**: one-shot `scripts/backfill-scryfall-ids.ts` using Scryfall `/cards/collection` batch endpoint with `(set, collector_number)` identifiers. 1861 unique printings → 100% match → 2353 prod rows populated in 160.6s. Idempotent (`WHERE scryfall_id IS NULL`).
+  - **End-to-end validation**: clicked "Refresh now" on prod `/admin/health`. Audit row: `trigger='manual' updated:1102 unchanged:1251 failed:0 skipped:0 durationMs:9690 actor=wico216@gmail.com`. 1102 prices actually changed (top mover: Shadow Rift +$3.01; biggest drop: Stolen by the Fae -$2.73). Foil rows correctly received different prices than normal rows of the same printing (e.g. Reya Dawnbringer foil +$1.28) — `getPrice(prices, finish)` ladder per row working as designed. Vercel `mtg-bulk-sale-page-9zwph54xs` (Ready) carries the fix; later script-only redeploy `77jk94cka` followed.
+- 2026-05-20 — Phase 23 human UAT complete (4/4 pass on local dev server pointed at live Neon DB). 23-HUMAN-UAT.md status=passed, 23-VERIFICATION.md status human_needed→verified. Commit `5521bda`.
 - 2026-05-20 — Plan 23-02 Import Picker UX shipped (`refactor(23-02)` `6e9ce34`, `feat(23-02)` `2e45ab2`, `test(23-02)` `4c156c7` + docs SUMMARY commit). `defaultCheckedFor` removed from zustand store (Shape B per PATTERNS.md); BinderPicker gains Select all + Deselect all native buttons with `onBulkSet(names, checked)` callback (D-15 single render); picker opens UNCHECKED every session (D-05 / IMPORT-UX-03); Continue button surfaces helper text via `aria-describedby` when disabled (IMPORT-UX-04 + PITFALLS Pitfall 8). 540/2 skipped tests (net +10 over Plan 23-01 baseline); IMPORT-UX-01..05 complete. Will-delete amber panel default-CHECKED behavior UNCHANGED per D-05 explicit clause.
 - 2026-05-20 — Plan 23-01 Daily Price Refresh shipped (`feat(23-01)` x4: `f4835d2`, `27ef9a9`, `4a4f030`, `bdf8cbe`). Vercel cron + admin manual button + Postgres advisory-lock single-flight + lastPriceRefreshAt + cronSecret env check on `/admin/health`. 530/2 skipped tests; PRICE-REFRESH-01..11 complete. Operator setup: provision `CRON_SECRET` in Vercel env before first deploy (runbook inline in 23-01-SUMMARY.md).
 - 2026-05-20 — v1.4 ROADMAP.md appended with Phase 23 (Import UX & Price Refresh); 2 plans, 16 requirements, 100% coverage
@@ -92,25 +99,32 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 ## Blockers/Concerns
 
 - No active blocker.
-- **Operator action required for Plan 23-01 to ship:** provision `CRON_SECRET` in Vercel env BEFORE first deploy of the merged feature (else cron fires at 09:00 UTC and 401s silently — `/admin/health` page is the audible signal, showing `Cron secret · Missing` and `ok: false`). Inline runbook in `.planning/phases/23-import-ux-price-refresh/23-01-SUMMARY.md` → "Operator Setup".
+- ~~Operator action required for Plan 23-01 to ship: provision `CRON_SECRET` in Vercel env~~ **DONE 2026-05-20**: secret added and a redeploy (`p1391v06s`) baked it into the running prod deployment.
 - Plan 23-01 tests are default-run (NOT env-gated) per D-01 / D-11 — the v1.3.5 hotfix lesson is now encoded in the test files' literal `"NOT env-gated"` headers and a phase-level grep gate.
+- **`cardToRow` bug class to watch for in future cross-format mappers**: the function was originally written for one input shape (cards.json seed, no scryfallId) and silently misfit when reused for another (Manabox CSV, has scryfallId). Hardcoded `null`/default values in shared mappers are a smell — prefer `?? null` over literal `null` so the field is transparent. Worth a pattern note in a future learnings extract; no immediate code action.
 
 ## Operator Next Steps
 
-1. **Provision `CRON_SECRET` in Vercel env + redeploy** (Plan 23-01 ship gate). Runbook inline in `.planning/phases/23-import-ux-price-refresh/23-01-SUMMARY.md` → "Operator Setup" (4 steps: `openssl rand -hex 32` → paste into Vercel env → redeploy → verify `cronSecret: "configured"` on `/admin/health`).
-2. **UAT Plan 23-02 Import Picker UX on a live Manabox CSV** — drop a real multi-binder CSV into `/admin/import`, confirm the picker opens with every binder unchecked, click Select all, observe the live "X of Y selected" counter, verify the will-delete amber panel still default-checks any missing prior binder, click Continue and confirm the rest of the import flow is unchanged. Keyboard-only walkthrough + screen-reader announcement of the disabled-Continue helper text complete the UAT.
-3. After first cron firing window (09:00–09:59 UTC, post-deploy), confirm one new `admin_audit_log` row with `action='price_refresh'` per day. PITFALLS Pitfall 9 (Vercel Hobby cron drift ±59min within the hour) is normal — do NOT report as a bug.
-4. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; deliberately NOT folded into Plan 23-01 per D-01.
-5. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`).
-6. **Complete v1.4 milestone** with `/gsd:complete-milestone` once Plan 23-01 cron has run successfully against the deployed environment and Plan 23-02 UAT passes.
+1. ~~Provision `CRON_SECRET` in Vercel env~~ **DONE 2026-05-20** (redeploy `p1391v06s` carries it).
+2. ~~UAT Plan 23-02 Import Picker UX~~ **DONE 2026-05-20** (4/4 PASS, see 23-HUMAN-UAT.md).
+3. **Observe first prod cron firing**: at the next 09:00–09:59 UTC window after the redeploy, confirm one new `admin_audit_log` row with `action='price_refresh'` and `metadata.trigger='cron'` (the manual `trigger='manual'` row from 2026-05-20T22:58Z proved the shared `runPriceRefresh` service works against live data; only the Bearer-auth wrapper + Vercel scheduler are still untested in prod). PITFALLS Pitfall 9 (Vercel Hobby cron drift ±59min within the hour) is normal — do NOT report as a bug.
+4. **Complete v1.4 milestone** with `/gsd:complete-milestone` after step 3 confirms (or earlier, since the cron firing is observational not blocking).
+5. Provision `TEST_DATABASE_URL` and run the Phase 18 concurrent-proof harness (runbook: `.planning/todos/pending/01-phase-18-concurrent-proof.md`) — still pending from v1.3 close; carry forward into v1.5 unless promoted.
+6. Run the deferred Phase 22 5-scenario live-deployment UAT against `wikos-spellbinder.vercel.app` (runbook: `22-HUMAN-UAT.md`) — also v1.3 carry-forward.
 
 ## Session Continuity
 
-Last session: 2026-05-20T22:10:00.000Z
+Last session: 2026-05-20T23:00:00.000Z
 
-Next action: Run `/gsd:complete-milestone` to archive v1.4 — all UAT and verification gates are cleared. The remaining `CRON_SECRET` Vercel-env provisioning is a deploy-time operator action and intentionally NOT a milestone-close blocker (D-13 + Operator Next Step #1 in the carried-forward runbook). Live cron firing windowing (09:00–09:59 UTC) verification can happen post-deploy without re-opening v1.4.
+Next action: Wait for the first prod cron firing window (~next 09:00–09:59 UTC) to record one `trigger='cron'` row in `admin_audit_log`, then `/gsd:complete-milestone` to archive v1.4. The cron observation is non-blocking — milestone can be closed now if you don't want to wait. v1.5 / next-milestone planning is the natural continuation.
 
-Resume hint: human UAT was just completed on 2026-05-20 against the live Neon DB on localhost:3000 dev server. UAT 1 wrote 2 harmless `admin_audit_log` rows (`action='price_refresh'`, both `skipped:2353` since local cards lack `scryfallId`). UAT 2-4 wrote nothing. Dev server stopped (task `brlnx22dg`). Local password login was added to `.env.local` (`ADMIN_USERNAME=admin` + generated `ADMIN_PASSWORD`) for the UAT walkthrough — safe to keep or remove for next session.
+Resume hint: v1.4 is fully shipped and live on `wikos-spellbinder.vercel.app`. Latest prod deploy `77jk94cka` (post-backfill-script commit). Prod `cards.scryfall_id` is 2353/2353 populated. First real price refresh succeeded (audit row 2026-05-20T22:58Z, `updated:1102`). Before/after snapshots at `/tmp/prices-before-1779316713.tsv` and `/tmp/prices-after-1779317933.tsv` (will disappear on reboot — not persisted to repo).
+
+Local-env state on this workstation:
+- `.env.local` has `ADMIN_USERNAME=admin` + a generated `ADMIN_PASSWORD` from the UAT session — safe to delete if you don't need local password login. `CRON_SECRET` is NOT set locally (still intentionally absent — was used to validate the missing-state surfaces correctly on `/admin/health`).
+- No local processes running. Dev server stopped earlier (task `brlnx22dg`).
+
+Pattern to remember for future cross-format mappers: hardcoded `null`/default values in shared mappers (like the original `cardToRow: scryfallId: null`) silently misbehave when the function gets reused for a richer input. Prefer `card.field ?? null` over literal `null` so the field is transparent through the mapper. See 2026-05-20 Blockers note.
 
 ## Quick Tasks Completed
 
