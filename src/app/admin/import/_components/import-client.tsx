@@ -134,7 +134,11 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Individual selectors keep re-renders minimal (zustand best practice).
-  const setLastSelection = useBinderImportStore((s) => s.setLastSelection);
+  // REVIEW WR-04: removed the `setLastSelection` selector — the only call
+  // site was the redundant post-commit mirror at handleConfirmCommit, which
+  // `recordCommit` already covered. The store still exports
+  // `setLastSelection` for ad-hoc callers (and the test suite asserts the
+  // signature) so the selector is intentionally absent here, not unused.
   const recordCommit = useBinderImportStore((s) => s.recordCommit);
   const knownBinderNamesFn = useBinderImportStore((s) => s.knownBinderNames);
 
@@ -475,12 +479,17 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     // the upload (will-delete entries are NOT preserved; they are GONE
     // from inventory, so a future import shouldn't surface them as
     // missing-and-checkable).
+    //
+    // REVIEW WR-04: `recordCommit` handles BOTH `lastSelection` and
+    // `lastUsedAt` in ONE set() call (binder-import-store.ts:56-60).
+    // Do NOT also call `setLastSelection` — calling it after
+    // `recordCommit` would re-set `lastSelection` to the same value WITHOUT
+    // touching `lastUsedAt`, which is at best a no-op and at worst a
+    // regression if `setLastSelection` is ever changed to preserve
+    // additional fields. One write, one source of truth.
     const newSelection: Record<string, boolean> = {};
     for (const b of selectedBinders) newSelection[b] = true;
     recordCommit(newSelection);
-    // Mirror into setLastSelection too (recordCommit handles this, but
-    // we set explicitly so a future store schema change doesn't drift).
-    setLastSelection(newSelection);
 
     const totalSkipped = payload.parseSkipped + payload.scryfallSkipped;
     const message =
