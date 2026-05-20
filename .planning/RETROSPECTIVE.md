@@ -2,6 +2,53 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.4 — Import UX & Price Refresh
+
+**Shipped:** 2026-05-20
+**Phases:** 1 (Phase 23) | **Plans:** 2 | **Commits:** 32 + 4 follow-up | **Code:** +8,260 / −2,331 across 46 files | **Tests:** 540 → 545 passing + 2 skipped
+**Timeline:** ~5.5 hours wall-clock from milestone bootstrap (2026-05-20 13:34 ET) to shipped-and-verified-on-prod (19:13 ET), all in one session
+
+### What Was Built
+
+- **Plan 23-01 — Daily Price Refresh:** Vercel cron at `0 9 * * *` UTC + admin `Refresh now` button on `/admin/health` both call a shared `runPriceRefresh({trigger, actorEmail?})` server-only service. Row-based lease in `price_refresh_lock` table (CR-01 fix — replaced broken `pg_try_advisory_lock` design after REVIEW found the neon-http session-scoped lock was a no-op). `timingSafeEqual` Bearer-token comparison (WR-01). Audit metadata distinguishes `updated / unchanged / failed (not_found) / skipped (no scryfallId)`. `lastPriceRefreshAt` tile + `cronSecret: configured | missing` literal on `/admin/health` (D-13: top-level `ok=false` flips on missing secret). Tier-1 unit tests default-run with literal `"NOT env-gated"` header (v1.3.5 lesson encoded).
+- **Plan 23-02 — Import Picker UX:** Explicit opt-in binder selection. Dropped `defaultCheckedFor` memory from the zustand store (Option A per D-05). Select all / Deselect all native buttons in picker header with `onBulkSet(names, checked)` single-render callback (D-15 — avoids N renders). Picker opens UNCHECKED every session. Disabled-Continue helper text via `aria-describedby`. Will-delete amber panel's v1.3 default-CHECKED behavior intentionally preserved (separate component, separate concern).
+
+### What Worked
+
+- **One-day end-to-end ship including human UAT against live prod DB**: bootstrap → research → plan → execute (with intentional sequential mode after Wave-1 worktree path-drift surfaced) → code review + auto-fix → verification → 4-item human UAT → prod deploy → bug discovery + fix + backfill → first real refresh confirmation, all within ~5.5h wall-clock.
+- **Discovering the `cardToRow` bug after the prod push (not before)** was, paradoxically, the right outcome. The unit tests + verification pipeline NEVER would have caught it — `cardToRow` was test-covered but the tests asserted `expect(row.scryfallId).toBeNull()` when no input field was provided, which silently codified the bug. Only end-to-end verification with a snapshot of `cards.scryfall_id IS NULL` count (2353/2353) made the smell obvious. **Lesson:** post-deploy "did the data move?" smoke checks catch bugs that unit + integration tests can't.
+- **Cross-cutting constraints listed at the TOP of STATE.md** ("UPDATE by `cards.id` not `scryfall_id`", "row-based lease not advisory lock", "cents not dollars", etc.) — these were enforced through code review and were the right shape: short, declarative, paired with the prior incident they're protecting against (e.g. "v1.2 etched-mispricing bug"). They survived contact with reality unchanged.
+- **The audit-row contract** (`{trigger, updated, unchanged, failed, skipped, durationMs}`) was a small data structure but enabled fast post-refresh diagnosis. Looking at one audit row tells you whether your data is healthy without any client-side instrumentation.
+
+### What Was Inefficient
+
+- **`gsd-sdk query phase.complete <n> --dry-run` flag was ignored** by the SDK and applied destructive STATE.md changes (flattened narrative; set `completed_plans: 47` — a cross-milestone-aggregate bug). I had to revert and surgically re-apply. The same SDK's `milestone.complete` later ran more cleanly. **Lesson:** before trusting SDK dry-run flags, snapshot first.
+- **`gsd-sdk query audit-open` reported 19 "open items" but ~all were carry-forwards or scanner false positives.** Quick tasks listed as "missing" despite STATE.md "Quick Tasks Completed" table showing all done with commit hashes. UAT files with `status: passed` and 0 open scenarios still counted as gaps. Acknowledging required dedup against the existing v1.3 Deferred Items table. **Lesson:** the audit-open scanner needs awareness of carry-forward state to avoid scaring future operators.
+- **`vercel.json` cron registers automatically on each `vercel build`, but env vars on the running deployment are immutable** — adding `CRON_SECRET` after the initial deploy required a redeploy before the running cron could see it. Worth surfacing this in the operator runbook because the first-instinct expectation is "I set the env var, it should work."
+- **`scripts/backfill-scryfall-ids.ts` passed `npx tsx` locally but failed `next build`'s strict TS pass** with `Type 'Printing' does not satisfy the constraint 'Record<string, unknown>'`. tsx is a runtime runner, not a strict typechecker. Required a follow-up 1-line fix commit. **Lesson for future migration-style scripts:** `npx tsc --noEmit` before pushing.
+
+### Patterns Established
+
+- **Hardcoded `null` / default values in shared mappers are a smell.** The `cardToRow` bug originated from a shared function written for one input shape (cards.json seed, no scryfallId) being reused for another (Manabox CSV, has scryfallId) without updating the mapping. Prefer `card.field ?? null` over literal `null` so the field is transparent through the mapper. Recorded in STATE.md Blockers/Concerns for pattern-mining.
+- **One-shot backfill scripts pair with one-line bug fixes.** When fixing a write-path bug that left dirty data behind, the same PR should include the backfill script (or it should land as a clearly-named companion commit). The script's dry-run output + 100% match rate is the proof that the fix is safe to deploy.
+- **Pre-flight DB snapshot for any destructive `gsd-sdk` operation.** Cheap (~1s `cp`) and saved the session twice (`phase.complete` STATE.md narrative flatten + `milestone.complete` minor field changes I wanted to verify).
+
+### Key Lessons
+
+1. **Post-deploy smoke checks find bugs that the verification pipeline can't.** Test suites + verification docs + code review all passed, but a `SELECT count(*) WHERE scryfall_id IS NULL` against prod surfaced the cardToRow bug in seconds. Add "post-deploy data-shape spot-check" as an explicit verification step for write-path features.
+2. **Trust SDK queries that match a documented contract; treat SDK queries with destructive side effects (phase.complete, milestone.complete) as needing snapshot + verify.**
+3. **`vercel env add <KEY> production` doesn't propagate to existing deployments.** Operator runbook should say "set secret → redeploy → verify" not just "set secret".
+4. **Manabox CSVs do include Scryfall ID.** Future inventory-mutation features can assume `scryfall_id IS NOT NULL` after this milestone (modulo any imports from non-Manabox sources).
+5. **Single-session full-stack milestones work when scope is small (≤2 plans, ≤16 requirements).** v1.4's 5.5h-from-bootstrap-to-verified-on-prod was viable because Phase 23 was narrowly scoped. Multi-phase milestones (v1.3 was 7 phases) need autonomous-run support, which we used last time.
+
+### Cost Observations
+
+- Session: 1 continuous (no /clear between phases)
+- Model mix: predominantly Opus 4.7 (1M context) throughout
+- Notable: the single-session run enabled the live UAT walkthrough to flow directly into the bug-fix + backfill arc without context handoff overhead. Splitting milestones across sessions would have lost the post-deploy verification momentum.
+
+---
+
 ## Milestone: v1.3 — Binder-Aware Inventory & Pick Workflow
 
 **Shipped:** 2026-05-11
