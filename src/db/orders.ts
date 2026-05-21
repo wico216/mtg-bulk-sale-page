@@ -884,6 +884,132 @@ export async function getOrderById(
 }
 
 /**
+ * Single event on an order's status history, derived from the
+ * `admin_audit_log` table. Backed entries (status_update / cancel /
+ * restore_inventory) carry actor + timestamp; the synthetic "created"
+ * entry comes from `orders.created_at` so a fresh order still renders a
+ * one-event timeline before any admin action.
+ */
+export interface OrderTimelineEvent {
+  /** Stable kind drives the timeline icon and label. */
+  kind:
+    | "created"
+    | "status_update"
+    | "cancel"
+    | "restore_inventory"
+    | "other";
+  /** Display string ("Pending → Confirmed", "Order cancelled", …). */
+  label: string;
+  /** ISO 8601 timestamp. */
+  at: string;
+  /** Email of the admin who triggered the event; null for "created". */
+  actorEmail: string | null;
+  /** Selected metadata fields surfaced to the UI (status, restored count…). */
+  metadata: Record<string, unknown>;
+}
+
+/**
+ * Resolve the timeline of admin actions on a given order. Reads the
+ * `admin_audit_log` rows where `target_type = 'order'` and prepends a
+ * synthetic `created` event sourced from the order's `created_at`.
+ *
+ * Read-only, indexed via `admin_audit_log_target_type_idx`. Returns an
+ * empty array if the order doesn't exist (mirrors getOrderById's null
+ * shape; callers should sanity-check the order separately).
+ *
+ * The synthesized "created" event is always at the head so the rendered
+ * timeline reads chronologically without a special case in the UI.
+ */
+export async function getOrderTimeline(
+  orderId: string,
+): Promise<OrderTimelineEvent[]> {
+  const orderResult = await db.execute<{ createdAt: string | Date }>(sql`
+    SELECT created_at AS "createdAt"
+    FROM orders
+    WHERE id = ${orderId}
+    LIMIT 1
+  `);
+  const orderRow = orderResult.rows[0];
+  if (!orderRow) return [];
+
+  const auditResult = await db.execute<{
+    action: string;
+    actorEmail: string | null;
+    metadata: Record<string, unknown> | null;
+    createdAt: string | Date;
+  }>(sql`
+    SELECT
+      action,
+      actor_email AS "actorEmail",
+      metadata,
+      created_at AS "createdAt"
+    FROM admin_audit_log
+    WHERE target_type = 'order' AND target_id = ${orderId}
+    ORDER BY created_at ASC, id ASC
+  `);
+
+  const events: OrderTimelineEvent[] = [
+    {
+      kind: "created",
+      label: "Order created",
+      at: toIsoString(orderRow.createdAt),
+      actorEmail: null,
+      metadata: {},
+    },
+  ];
+
+  for (const row of auditResult.rows) {
+    const metadata = row.metadata ?? {};
+    let kind: OrderTimelineEvent["kind"];
+    let label: string;
+
+    switch (row.action) {
+      case "order.status_update": {
+        const status = String(metadata.status ?? "");
+        kind = "status_update";
+        // The audit log records the destination status, not the source —
+        // surfacing "Marked confirmed" / "Marked completed" reads cleaner
+        // than "→ Confirmed" without knowing where we came from.
+        label = status
+          ? `Marked ${status}`
+          : "Status updated";
+        break;
+      }
+      case "order.cancel":
+        kind = "cancel";
+        label = "Order cancelled";
+        break;
+      case "order.restore_inventory":
+        kind = "restore_inventory";
+        // Optional restored counts are populated by cancelOrder; coerce
+        // defensively because the audit metadata blob is freeform.
+        {
+          const qty = Number(metadata.restoredQuantity ?? 0);
+          const rows = Number(metadata.restoredRows ?? 0);
+          label =
+            qty > 0
+              ? `Restored ${qty} cop${qty === 1 ? "y" : "ies"} across ${rows} inventory row${rows === 1 ? "" : "s"}`
+              : "Inventory restore (no copies returned)";
+        }
+        break;
+      default:
+        kind = "other";
+        label = row.action;
+    }
+
+    events.push({
+      kind,
+      label,
+      at: toIsoString(row.createdAt),
+      actorEmail: row.actorEmail,
+      metadata,
+    });
+  }
+
+  return events;
+}
+
+/**
  * Bulk-fetch a set of orders with their items in a single round-trip.
  *
  * Called from the pick-batch route handler (`/admin/orders/pick`) where the

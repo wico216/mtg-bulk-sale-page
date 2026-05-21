@@ -1,12 +1,17 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import type { AdminOrderDetail, OrderStatus, OrderWorkflowStatus } from "@/db/orders";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  AdminOrderDetail,
+  OrderStatus,
+  OrderTimelineEvent,
+  OrderWorkflowStatus,
+} from "@/db/orders";
 import { conditionToAbbr } from "@/lib/condition-map";
 import { formatBinderForDisplay } from "@/lib/binder-name";
+import { binderColor } from "../../_components/binder-color";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -20,6 +25,16 @@ const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-US", {
 const absoluteDateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
+});
+
+const stampFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
 });
 
 function formatCurrency(value: number | null): string {
@@ -40,6 +55,49 @@ function relativeTime(iso: string): string {
   if (Math.abs(diffDay) < 30) return relativeTimeFormatter.format(diffDay, "day");
   const diffMonth = Math.round(diffMs / (30 * 86_400_000));
   return relativeTimeFormatter.format(diffMonth, "month");
+}
+
+function stampString(iso: string): string {
+  // Format as `YYYY-MM-DD · HH:mm UTC` — terse, monospaced-friendly,
+  // matches the mockup's timeline stamps. We pin to UTC so the picker's
+  // workflow is locale-agnostic.
+  const date = new Date(iso);
+  const parts = stampFormatter.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")} · ${get("hour")}:${get("minute")} utc`;
+}
+
+function statusChipStyle(status: OrderStatus): React.CSSProperties {
+  switch (status) {
+    case "pending":
+      return {
+        background: "color-mix(in oklab, var(--accent) 22%, transparent)",
+        color: "var(--accent)",
+      };
+    case "confirmed":
+      return {
+        background:
+          "color-mix(in oklab, oklch(0.72 0.13 245) 28%, transparent)",
+        color: "oklch(0.85 0.12 245)",
+      };
+    case "completed":
+      return {
+        background:
+          "color-mix(in oklab, oklch(0.74 0.16 145) 20%, transparent)",
+        color: "oklch(0.74 0.16 145)",
+      };
+    case "cancelled":
+      return {
+        background: "transparent",
+        color: "var(--muted)",
+        border: "1px solid var(--border)",
+      };
+  }
+}
+
+function statusLabel(status: OrderStatus): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 interface CancelSkippedItem {
@@ -72,250 +130,16 @@ function describeCancellation(result: CancelOrderSuccessResult): string {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Status workflow stepper
+// Order detail (top-level)
 // ─────────────────────────────────────────────────────────────────
 
-const WORKFLOW: ReadonlyArray<{
-  value: OrderWorkflowStatus;
-  label: string;
-  helper: string;
-}> = [
-  { value: "pending", label: "Pending", helper: "Awaiting acceptance" },
-  {
-    value: "confirmed",
-    label: "Confirmed",
-    helper: "Accepted, fulfilling",
-  },
-  { value: "completed", label: "Completed", helper: "Shipped / handed off" },
-];
-
-function StepperDot({
-  state,
+export function OrderDetail({
+  order,
+  timeline,
 }: {
-  state: "done" | "current" | "future" | "cancelled";
+  order: AdminOrderDetail;
+  timeline: OrderTimelineEvent[];
 }) {
-  if (state === "cancelled") {
-    return (
-      <span
-        aria-hidden="true"
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full"
-        style={{
-          background: "var(--surface-2)",
-          border: "1.5px solid var(--border-strong)",
-        }}
-      />
-    );
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full transition-colors"
-      style={{
-        background:
-          state === "done" || state === "current"
-            ? "var(--accent)"
-            : "var(--surface-2)",
-        border:
-          state === "current"
-            ? "3px solid color-mix(in oklab, var(--accent) 28%, transparent)"
-            : `1.5px solid ${state === "done" ? "var(--accent)" : "var(--border-strong)"}`,
-        boxShadow:
-          state === "current"
-            ? "0 0 0 4px color-mix(in oklab, var(--accent) 14%, transparent)"
-            : undefined,
-      }}
-    />
-  );
-}
-
-function StatusWorkflowStepper({
-  status,
-  onAdvance,
-  advancing,
-}: {
-  status: OrderStatus;
-  onAdvance: (next: OrderWorkflowStatus) => Promise<void>;
-  advancing: OrderWorkflowStatus | null;
-}) {
-  const isCancelled = status === "cancelled";
-  const currentIndex = isCancelled
-    ? -1
-    : WORKFLOW.findIndex((s) => s.value === status);
-  const nextStep =
-    currentIndex >= 0 && currentIndex < WORKFLOW.length - 1
-      ? WORKFLOW[currentIndex + 1]
-      : null;
-
-  return (
-    <section
-      aria-label="Order workflow"
-      className="rounded-2xl p-5 sm:p-6"
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-      }}
-    >
-      <header className="flex items-baseline justify-between mb-4">
-        <h2
-          className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-          style={{ color: "var(--muted)" }}
-        >
-          Workflow
-        </h2>
-        {isCancelled && (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
-            style={{
-              background: "color-mix(in oklab, var(--ink) 8%, transparent)",
-              color: "var(--muted)",
-            }}
-          >
-            <span
-              aria-hidden="true"
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: "var(--muted)" }}
-            />
-            Cancelled
-          </span>
-        )}
-      </header>
-
-      {/* Stepper rail */}
-      <div className="relative">
-        {/* Background track */}
-        <div
-          aria-hidden="true"
-          className="absolute left-[7px] right-[7px] top-[6px] h-0.5 rounded-full"
-          style={{
-            background: "var(--border)",
-          }}
-        />
-        {/* Filled track up to current step */}
-        {!isCancelled && currentIndex > 0 && (
-          <div
-            aria-hidden="true"
-            className="absolute left-[7px] top-[6px] h-0.5 rounded-full transition-all"
-            style={{
-              width: `calc(${(currentIndex / (WORKFLOW.length - 1)) * 100}% - 14px)`,
-              background: "var(--accent)",
-            }}
-          />
-        )}
-        <ol className="relative grid grid-cols-3 gap-2">
-          {WORKFLOW.map((step, idx) => {
-            const state: "done" | "current" | "future" | "cancelled" =
-              isCancelled
-                ? "cancelled"
-                : idx < currentIndex
-                ? "done"
-                : idx === currentIndex
-                ? "current"
-                : "future";
-            return (
-              <li
-                key={step.value}
-                className="flex flex-col items-start min-w-0"
-              >
-                <StepperDot state={state} />
-                <div
-                  className="mt-2 text-sm font-medium leading-tight"
-                  style={{
-                    color:
-                      state === "current"
-                        ? "var(--ink)"
-                        : state === "done"
-                        ? "var(--ink)"
-                        : "var(--muted)",
-                  }}
-                >
-                  {step.label}
-                </div>
-                <div
-                  className="mt-0.5 text-[11px] leading-tight"
-                  style={{ color: "var(--muted)" }}
-                >
-                  {step.helper}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      {/* Primary advance action */}
-      {nextStep && !isCancelled && (
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onAdvance(nextStep.value)}
-            disabled={advancing !== null}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
-            }}
-          >
-            {advancing === nextStep.value ? (
-              <span>Advancing…</span>
-            ) : (
-              <>
-                <span>Mark as {nextStep.label}</span>
-                <span aria-hidden="true">→</span>
-              </>
-            )}
-          </button>
-          <span className="text-xs" style={{ color: "var(--muted)" }}>
-            Or use the timeline above to jump steps.
-          </span>
-        </div>
-      )}
-
-      {/* Backwards / skip controls — quieter ghost buttons */}
-      {!isCancelled && (
-        <div
-          className="mt-4 flex flex-wrap items-center gap-1.5 pt-4"
-          style={{ borderTop: "1px solid var(--border)" }}
-        >
-          <span
-            className="text-[11px] font-semibold uppercase tracking-wider mr-1"
-            style={{ color: "var(--muted)" }}
-          >
-            Jump to
-          </span>
-          {WORKFLOW.map((step) => {
-            const isCurrent = step.value === status;
-            return (
-              <button
-                key={step.value}
-                type="button"
-                onClick={() => onAdvance(step.value)}
-                disabled={isCurrent || advancing !== null}
-                aria-current={isCurrent ? "step" : undefined}
-                className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed"
-                style={{
-                  background: isCurrent
-                    ? "color-mix(in oklab, var(--accent) 16%, transparent)"
-                    : "transparent",
-                  border: `1px solid ${isCurrent ? "var(--accent)" : "var(--border)"}`,
-                  color: isCurrent ? "var(--ink)" : "var(--muted)",
-                  opacity: advancing === step.value ? 0.6 : 1,
-                }}
-              >
-                {advancing === step.value ? "…" : step.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Order detail
-// ─────────────────────────────────────────────────────────────────
-
-export function OrderDetail({ order }: { order: AdminOrderDetail }) {
   const router = useRouter();
   const [adminNote, setAdminNote] = useState(order.adminNote ?? "");
   const [noteSavedAt, setNoteSavedAt] = useState<number | null>(null);
@@ -331,7 +155,6 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
     | null
   >(null);
 
-  // Reset when order prop changes (e.g. router.refresh)
   useEffect(() => {
     setAdminNote(order.adminNote ?? "");
     setShowCancelConfirmation(false);
@@ -340,7 +163,6 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
     setNoteError(null);
   }, [order.orderRef, order.status, order.adminNote]);
 
-  // Auto-dismiss the top message after 4s
   useEffect(() => {
     if (!topMessage) return;
     const t = setTimeout(() => setTopMessage(null), 4000);
@@ -351,7 +173,33 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
   const isTerminal =
     order.status === "completed" || order.status === "cancelled";
 
-  // ── Status transitions ─────────────────────────────────────────
+  // Quick-action primary CTA — same logic as the inline-row Confirm/Done
+  // buttons on the list view, just spelled out.
+  const nextStep: OrderWorkflowStatus | null =
+    order.status === "pending"
+      ? "confirmed"
+      : order.status === "confirmed"
+        ? "completed"
+        : null;
+
+  // Subtotal + binder summary derived from the items list. Both are pure
+  // computations of `order.items` so they live behind useMemo to avoid
+  // re-running on every keystroke in the admin-note textarea.
+  const subtotal = useMemo(
+    () => order.items.reduce((sum, item) => sum + (item.lineTotal ?? 0), 0),
+    [order.items],
+  );
+
+  const binderSummary = useMemo(() => {
+    const distinct = Array.from(new Set(order.items.map((i) => i.binder)));
+    distinct.sort((a, b) => {
+      if (a === "unsorted" && b !== "unsorted") return 1;
+      if (b === "unsorted" && a !== "unsorted") return -1;
+      return a.localeCompare(b);
+    });
+    return distinct;
+  }, [order.items]);
+
   async function handleAdvance(next: OrderWorkflowStatus) {
     if (advancing) return;
     setAdvancing(next);
@@ -371,10 +219,7 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
         setTopMessage({ kind: "error", text: error });
         return;
       }
-      setTopMessage({
-        kind: "success",
-        text: `Status updated to ${next}.`,
-      });
+      setTopMessage({ kind: "success", text: `Status updated to ${next}.` });
       router.refresh();
     } catch (error) {
       setTopMessage({
@@ -386,7 +231,6 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
     }
   }
 
-  // ── Note auto-save (debounced on blur) ─────────────────────────
   const initialNoteRef = useRef(order.adminNote ?? "");
   useEffect(() => {
     initialNoteRef.current = order.adminNote ?? "";
@@ -421,7 +265,6 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
     }
   }
 
-  // ── Cancel order ───────────────────────────────────────────────
   async function handleCancelOrder() {
     setIsCancelling(true);
     setTopMessage(null);
@@ -470,99 +313,180 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
     }
   }
 
-  // ── Derived bits ────────────────────────────────────────────────
-  const subtotal = order.items.reduce(
-    (sum, item) => sum + (item.lineTotal ?? 0),
-    0,
-  );
+  const { dollars, cents } = (() => {
+    const totalCents = Math.round(order.totalPrice * 100);
+    return {
+      dollars: Math.floor(totalCents / 100).toLocaleString(),
+      cents: (totalCents % 100).toString().padStart(2, "0"),
+    };
+  })();
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-32">
       {/* Back link */}
-      <div>
-        <Link
-          href="/admin/orders"
-          className="inline-flex items-center gap-1 text-sm transition-colors hover:underline"
-          style={{ color: "var(--muted)" }}
-        >
-          <span aria-hidden="true">←</span> Back to Orders
-        </Link>
-      </div>
+      <Link
+        href="/admin/orders"
+        className="inline-block"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 11,
+          color: "var(--muted)",
+          letterSpacing: "0.06em",
+          textDecoration: "none",
+        }}
+      >
+        ← back to queue
+      </Link>
 
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* Heading + total — editorial band */}
+      <header
+        className="grid items-end gap-8 pb-6"
+        style={{
+          gridTemplateColumns: "1fr auto",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
         <div className="min-w-0">
-          <div className="flex items-baseline gap-3 flex-wrap">
+          <p
+            className="m-0 mb-2"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
+          >
+            Section · 02.a — Order detail
+          </p>
+          <div className="flex items-baseline gap-4 flex-wrap">
             <h1
-              className="font-mono text-xl sm:text-2xl font-semibold tracking-tight"
-              style={{ color: "var(--ink)" }}
+              className="m-0"
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontWeight: 600,
+                fontSize: 28,
+                color: "var(--ink)",
+                letterSpacing: "0.02em",
+              }}
             >
               {order.orderRef}
             </h1>
-            <StatusTopBadge status={order.status} />
-          </div>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-            Placed{" "}
             <span
+              className="inline-flex items-center"
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                padding: "5px 10px",
+                borderRadius: 4,
+                ...statusChipStyle(order.status),
+              }}
+            >
+              {statusLabel(order.status)}
+            </span>
+          </div>
+          <p
+            className="mt-2"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              color: "var(--muted)",
+              letterSpacing: "0.04em",
+              lineHeight: 1.5,
+            }}
+          >
+            Placed{" "}
+            <strong
+              style={{ color: "var(--ink-soft)", fontWeight: 600 }}
               title={absoluteDateFormatter.format(new Date(order.createdAt))}
             >
               {relativeTime(order.createdAt)}
-            </span>
-            {" · "}
-            {order.totalItems} {order.totalItems === 1 ? "item" : "items"}
+            </strong>{" "}
+            ·{" "}
+            <strong style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+              {order.items.length}{" "}
+              {order.items.length === 1 ? "line" : "lines"}
+            </strong>{" "}
+            ·{" "}
+            <strong style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+              {order.totalItems}{" "}
+              {order.totalItems === 1 ? "copy" : "copies"}
+            </strong>
+            {binderSummary.length > 0 && (
+              <>
+                {" · binders "}
+                <strong style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+                  {binderSummary
+                    .map((b) => formatBinderForDisplay(b))
+                    .join(" · ")}
+                </strong>
+              </>
+            )}
           </p>
         </div>
 
-        {/* Totals card */}
-        <div
-          className="rounded-2xl px-5 py-4 text-right shrink-0"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            minWidth: 200,
-          }}
-        >
+        {/* Total */}
+        <div className="text-right shrink-0">
           <div
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 9,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
           >
             Order total
           </div>
           <div
-            className="mt-1 text-2xl font-semibold tabular-nums leading-none"
+            className="mt-1.5"
             style={{
+              fontFamily:
+                "var(--font-instrument-serif), ui-serif, Georgia, serif",
+              fontWeight: 400,
+              fontSize: 44,
               color: "var(--ink)",
-              fontFamily: "var(--font-display)",
+              lineHeight: 1,
             }}
           >
-            {currencyFormatter.format(order.totalPrice)}
+            <span style={{ color: "var(--dim)", fontSize: 24, marginRight: 2 }}>
+              $
+            </span>
+            {dollars}
+            <span style={{ color: "var(--muted)", fontSize: 24 }}>.{cents}</span>
           </div>
           <div
-            className="mt-2 text-xs tabular-nums"
-            style={{ color: "var(--muted)" }}
+            className="mt-2"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              color: "var(--muted)",
+              letterSpacing: "0.04em",
+            }}
           >
-            {order.totalItems}{" "}
-            {order.totalItems === 1 ? "item" : "items"} ·{" "}
             {order.items.length}{" "}
-            {order.items.length === 1 ? "row" : "rows"}
+            {order.items.length === 1 ? "line" : "lines"}
           </div>
         </div>
       </header>
 
-      {/* Top-of-page feedback */}
+      {/* Top messages */}
       {topMessage && (
         <div
           role={topMessage.kind === "error" ? "alert" : "status"}
-          className="rounded-lg px-4 py-3 text-sm"
+          className="rounded-lg px-4 py-3"
           style={{
+            fontSize: 13,
             background:
               topMessage.kind === "success"
                 ? "color-mix(in oklab, var(--accent) 12%, transparent)"
-                : "rgb(220 38 38 / 0.1)",
+                : "color-mix(in oklab, var(--bad) 10%, transparent)",
             borderLeft: `3px solid ${
-              topMessage.kind === "success"
-                ? "var(--accent)"
-                : "rgb(248 113 113)"
+              topMessage.kind === "success" ? "var(--accent)" : "var(--bad)"
             }`,
             color: "var(--ink)",
           }}
@@ -571,342 +495,531 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
         </div>
       )}
 
-      {/* Workflow */}
-      <StatusWorkflowStepper
-        status={order.status}
-        onAdvance={handleAdvance}
-        advancing={advancing}
-      />
-
-      {/* Buyer + Message */}
-      <section
-        className="rounded-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2"
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-        }}
+      {/* Main two-column grid: items + note (left) / actions + buyer (right) */}
+      <div
+        className="grid gap-10"
+        style={{ gridTemplateColumns: "minmax(0,1fr) 320px" }}
       >
-        <div
-          className="p-5 sm:p-6"
-          style={{
-            borderRight: "1px solid var(--border)",
-          }}
-        >
-          <h2
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
-          >
-            Buyer
-          </h2>
-          <p
-            className="mt-2 text-base font-medium"
-            style={{ color: "var(--ink)" }}
-          >
-            {order.buyerName}
-          </p>
-          <a
-            href={`mailto:${order.buyerEmail}`}
-            className="text-sm transition-colors hover:underline"
-            style={{ color: "var(--accent)" }}
-          >
-            {order.buyerEmail}
-          </a>
-          {/* Quick 260514-7z2 — admin-only tel: link for shipping/pickup
-              coordination. Mirrors the "No message provided." italic-
-              muted fallback used in the message card. */}
-          {order.buyerPhone ? (
-            <a
-              href={`tel:${order.buyerPhone}`}
-              className="block text-sm transition-colors hover:underline mt-1"
-              style={{ color: "var(--accent)" }}
-            >
-              {order.buyerPhone}
-            </a>
-          ) : (
-            <p
-              className="mt-1 text-xs italic"
-              style={{ color: "var(--muted)" }}
-            >
-              No phone provided.
-            </p>
-          )}
-        </div>
-        <div className="p-5 sm:p-6">
-          <h2
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
-          >
-            Buyer message
-          </h2>
-          {order.message ? (
-            <p
-              className="mt-2 whitespace-pre-wrap text-sm leading-relaxed"
-              style={{ color: "var(--ink)" }}
-            >
-              {order.message}
-            </p>
-          ) : (
-            <p
-              className="mt-2 text-sm italic"
-              style={{ color: "var(--muted)" }}
-            >
-              No message provided.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Items */}
-      <section
-        className="rounded-2xl overflow-hidden"
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-        }}
-      >
-        <header
-          className="flex items-baseline justify-between px-5 sm:px-6 py-4"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <h2
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
-          >
-            Items
-          </h2>
-          <span
-            className="text-xs tabular-nums"
-            style={{ color: "var(--muted)" }}
-          >
-            {order.items.length}{" "}
-            {order.items.length === 1 ? "line" : "lines"} · {order.totalItems}{" "}
-            {order.totalItems === 1 ? "copy" : "copies"}
-          </span>
-        </header>
-        <ul
-          role="list"
-          className="divide-y"
-          style={{ borderColor: "var(--border)" }}
-        >
-          {order.items.map((item) => (
-            <li
-              // Phase 21 D-07: include binder in the React key so multi-binder
-              // same-card lines (two OrderItems with identical cardId+qty but
-              // different binders) reconcile as distinct rows.
-              key={`${item.cardId}-${item.binder}-${item.quantity}`}
-              className="flex items-center gap-4 px-5 sm:px-6 py-4"
-              style={{ borderTopColor: "var(--border)" }}
-            >
-              <div
-                className="h-[80px] w-[58px] flex-shrink-0 overflow-hidden rounded-lg"
+        <main className="min-w-0 space-y-8">
+          {/* Items */}
+          <section>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2
+                className="m-0"
                 style={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  color: "var(--dim)",
                 }}
               >
-                {item.imageUrl ? (
-                  <Image
-                    src={item.imageUrl}
-                    alt=""
-                    aria-hidden="true"
-                    width={58}
-                    height={80}
-                    className="h-[80px] w-[58px] object-cover"
-                  />
-                ) : (
-                  <div
-                    className="flex h-full w-full items-center justify-center text-[10px]"
-                    style={{ color: "var(--muted)" }}
-                  >
-                    no img
-                  </div>
-                )}
-              </div>
+                Items · pick list
+              </h2>
+              <span
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                grouped as the picker will see it
+              </span>
+            </div>
 
-              <div className="min-w-0 flex-1">
-                {/* Phase 21 D-05/D-06: [binder] pill sourced from
-                    item.binder snapshot — NEVER joined to live `cards`.
-                    Survives re-imports. Legacy pre-v1.3 rows render
-                    '[unsorted]' (Phase 16 D-09 migration default). */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: "var(--ink)" }}
-                  >
-                    {item.name}
-                  </span>
-                  <span
-                    data-binder-pill
-                    className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <ul role="list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {order.items.map((item) => (
+                  <li
+                    key={`${item.cardId}-${item.binder}-${item.quantity}`}
+                    className="grid items-center"
                     style={{
-                      background: "var(--surface-2)",
-                      color: "var(--muted)",
-                      border: "1px solid var(--border)",
+                      gridTemplateColumns: "56px minmax(0,1fr) auto auto",
+                      gap: 14,
+                      padding: "12px 18px",
+                      borderTop:
+                        "1px solid color-mix(in oklab, var(--border) 60%, transparent)",
                     }}
                   >
-                    [{formatBinderForDisplay(item.binder)}]
+                    <div
+                      className="overflow-hidden rounded"
+                      style={{
+                        width: 56,
+                        height: 78,
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                          className="block h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="flex h-full w-full items-center justify-center text-[10px]"
+                          style={{ color: "var(--muted)" }}
+                        >
+                          no img
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <span
+                        className="block truncate"
+                        style={{
+                          fontFamily:
+                            "var(--font-instrument-serif), ui-serif, Georgia, serif",
+                          fontSize: 16,
+                          color: "var(--ink)",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                      <span
+                        className="block mt-1"
+                        style={{
+                          fontFamily: "var(--font-geist-mono), monospace",
+                          fontSize: 10,
+                          fontWeight: 500,
+                          letterSpacing: "0.06em",
+                          color: "var(--muted)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "var(--ink-soft)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.setCode.toUpperCase()}
+                        </span>
+                        <span style={{ color: "var(--dim)", margin: "0 4px" }}>
+                          ·
+                        </span>
+                        <span>#{item.collectorNumber}</span>
+                        <span style={{ color: "var(--dim)", margin: "0 4px" }}>
+                          ·
+                        </span>
+                        <span>{item.setName}</span>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 5px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 2,
+                            fontSize: 9,
+                            letterSpacing: "0.1em",
+                            marginLeft: 6,
+                            color: "var(--muted)",
+                          }}
+                        >
+                          {conditionToAbbr(item.condition)}
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Binder chip */}
+                    <span
+                      data-binder-pill
+                      className="inline-flex items-center"
+                      style={{
+                        fontFamily: "var(--font-geist-mono), monospace",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: "0.1em",
+                        padding: "4px 8px",
+                        border: "1px solid var(--border)",
+                        borderLeft: `3px solid ${binderColor(item.binder)}`,
+                        borderRadius: 3,
+                        color: "var(--ink-soft)",
+                        background: "var(--surface-2)",
+                      }}
+                    >
+                      [{formatBinderForDisplay(item.binder)}]
+                    </span>
+
+                    {/* Price */}
+                    <div className="text-right">
+                      <div
+                        style={{
+                          fontFamily: "var(--font-geist-mono), monospace",
+                          fontVariantNumeric: "tabular-nums",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "var(--ink)",
+                        }}
+                      >
+                        {formatCurrency(item.price)} × {item.quantity}
+                      </div>
+                      <div
+                        className="mt-1"
+                        style={{
+                          fontFamily: "var(--font-geist-mono), monospace",
+                          fontSize: 10,
+                          fontWeight: 500,
+                          color: "var(--muted)",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {formatCurrency(item.lineTotal)}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Subtotal/total footer */}
+              <footer
+                className="grid items-baseline px-5 py-3 gap-x-6 gap-y-1"
+                style={{
+                  gridTemplateColumns: "1fr auto",
+                  background: "var(--surface-2)",
+                  borderTop: "1px solid var(--border)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Subtotal
+                </span>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: 12,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {currencyFormatter.format(subtotal)}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Total
+                </span>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--font-instrument-serif), ui-serif, Georgia, serif",
+                    fontWeight: 400,
+                    fontSize: 22,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {currencyFormatter.format(order.totalPrice)}
+                </span>
+              </footer>
+            </div>
+          </section>
+
+          {/* Event timeline (replaces the workflow stepper) */}
+          <EventTimeline events={timeline} status={order.status} />
+
+          {/* Internal note */}
+          <section>
+            <div className="flex items-baseline justify-between mb-2">
+              <label
+                htmlFor="admin-note"
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  color: "var(--dim)",
+                }}
+              >
+                Internal note
+              </label>
+              <NoteSaveStatus
+                saving={noteSaving}
+                savedAt={noteSavedAt}
+                error={noteError}
+                dirty={adminNote !== initialNoteRef.current}
+              />
+            </div>
+            <textarea
+              id="admin-note"
+              value={adminNote}
+              onChange={(event) => {
+                setAdminNote(event.target.value);
+                setNoteError(null);
+              }}
+              onBlur={persistNote}
+              maxLength={1000}
+              rows={3}
+              placeholder="Private fulfillment notes for the seller."
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-y"
+              style={{
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                color: "var(--ink)",
+                minHeight: 80,
+                fontFamily: "var(--font-inter), system-ui, sans-serif",
+              }}
+            />
+            <div
+              className="mt-1.5 flex items-center justify-between"
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: 10,
+                color: "var(--muted)",
+                letterSpacing: "0.04em",
+              }}
+            >
+              <span>Private admin-only note. Not shown to buyers.</span>
+              <span className="tabular-nums">{adminNote.length} / 1000</span>
+            </div>
+          </section>
+        </main>
+
+        {/* Right rail */}
+        <aside className="space-y-4">
+          {/* Quick actions */}
+          {nextStep && (
+            <Card title="Quick actions">
+              <ActionButton
+                tone="primary"
+                onClick={() => handleAdvance(nextStep)}
+                disabled={advancing !== null}
+              >
+                {advancing === nextStep
+                  ? "Advancing…"
+                  : `→ Mark ${nextStep}`}
+              </ActionButton>
+              {order.status === "pending" && (
+                <ActionButton
+                  tone="ghost"
+                  onClick={() => handleAdvance("completed")}
+                  disabled={advancing !== null}
+                >
+                  {advancing === "completed" ? "…" : "Skip to done"}
+                </ActionButton>
+              )}
+              <ActionButton
+                tone="ghost"
+                onClick={() => {
+                  window.location.href = `mailto:${order.buyerEmail}`;
+                }}
+              >
+                Email buyer
+              </ActionButton>
+            </Card>
+          )}
+
+          {/* Buyer */}
+          <Card title="Buyer">
+            <p
+              className="m-0"
+              style={{
+                fontFamily:
+                  "var(--font-instrument-serif), ui-serif, Georgia, serif",
+                fontSize: 18,
+                color: "var(--ink)",
+                lineHeight: 1.2,
+              }}
+            >
+              {order.buyerName}
+            </p>
+            <p className="mt-2 m-0">
+              <a
+                href={`mailto:${order.buyerEmail}`}
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 11,
+                  color: "var(--accent)",
+                  letterSpacing: "0.04em",
+                  textDecoration: "none",
+                }}
+              >
+                {order.buyerEmail}
+              </a>
+            </p>
+            {order.buyerPhone ? (
+              <p className="mt-1 m-0">
+                <a
+                  href={`tel:${order.buyerPhone}`}
+                  style={{
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: 11,
+                    color: "var(--accent)",
+                    letterSpacing: "0.04em",
+                    textDecoration: "none",
+                  }}
+                >
+                  {order.buyerPhone}
+                </a>
+              </p>
+            ) : (
+              <p
+                className="mt-1 m-0"
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 10,
+                  fontStyle: "italic",
+                  color: "var(--muted)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                No phone provided.
+              </p>
+            )}
+          </Card>
+
+          {/* Buyer message */}
+          <Card title="Buyer message">
+            {order.message ? (
+              <p
+                className="m-0"
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  fontStyle: "italic",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                &ldquo;{order.message}&rdquo;
+              </p>
+            ) : (
+              <p
+                className="m-0"
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 11,
+                  fontStyle: "italic",
+                  color: "var(--muted)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                No message provided.
+              </p>
+            )}
+          </Card>
+
+          {/* Picker hints */}
+          {binderSummary.length > 0 && (
+            <Card title="Picker hints">
+              <p
+                className="m-0"
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  letterSpacing: "0.04em",
+                  lineHeight: 1.5,
+                }}
+              >
+                Walk binders{" "}
+                {binderSummary.map((b, i) => (
+                  <span key={b}>
+                    <strong
+                      style={{ color: "var(--ink-soft)", fontWeight: 600 }}
+                    >
+                      {formatBinderForDisplay(b)}
+                    </strong>
+                    {i < binderSummary.length - 1 ? " · " : ""}
                   </span>
-                </div>
-                <div
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--muted)" }}
-                >
-                  <span className="font-mono">
-                    {item.setCode.toUpperCase()}
-                  </span>
-                  {" · "}#{item.collectorNumber}
-                  {" · "}
-                  {item.setName}
-                  {" · "}
-                  {conditionToAbbr(item.condition)}
-                </div>
-              </div>
+                ))}
+                .
+              </p>
+              <p
+                className="mt-2 m-0"
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  letterSpacing: "0.04em",
+                  lineHeight: 1.5,
+                }}
+              >
+                {order.items.length}{" "}
+                {order.items.length === 1 ? "card" : "cards"} ·{" "}
+                {order.totalItems}{" "}
+                {order.totalItems === 1 ? "copy" : "copies"}.
+              </p>
+            </Card>
+          )}
+        </aside>
+      </div>
 
-              <div className="text-right tabular-nums shrink-0">
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--muted)" }}
-                >
-                  {formatCurrency(item.price)} × {item.quantity}
-                </div>
-                <div
-                  className="mt-0.5 text-sm font-semibold"
-                  style={{ color: "var(--ink)" }}
-                >
-                  {formatCurrency(item.lineTotal)}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        {/* Items summary footer */}
-        <footer
-          className="px-5 sm:px-6 py-4 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 items-baseline"
-          style={{
-            background: "var(--surface-2)",
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <span className="text-xs" style={{ color: "var(--muted)" }}>
-            Subtotal
-          </span>
-          <span
-            className="text-sm tabular-nums"
-            style={{ color: "var(--ink)" }}
-          >
-            {currencyFormatter.format(subtotal)}
-          </span>
-          <span
-            className="text-sm font-semibold"
-            style={{ color: "var(--ink)" }}
-          >
-            Total
-          </span>
-          <span
-            className="text-base font-semibold tabular-nums"
-            style={{
-              color: "var(--ink)",
-              fontFamily: "var(--font-display)",
-            }}
-          >
-            {currencyFormatter.format(order.totalPrice)}
-          </span>
-        </footer>
-      </section>
-
-      {/* Internal note */}
-      <section
-        className="rounded-2xl p-5 sm:p-6"
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-        }}
-      >
-        <div className="flex items-baseline justify-between mb-2">
-          <label
-            htmlFor="admin-note"
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
-          >
-            Internal note
-          </label>
-          <NoteSaveStatus
-            saving={noteSaving}
-            savedAt={noteSavedAt}
-            error={noteError}
-            dirty={adminNote !== initialNoteRef.current}
-          />
-        </div>
-        <textarea
-          id="admin-note"
-          value={adminNote}
-          onChange={(event) => {
-            setAdminNote(event.target.value);
-            setNoteError(null);
-          }}
-          onBlur={persistNote}
-          maxLength={1000}
-          rows={3}
-          placeholder="Private fulfillment notes for the seller."
-          className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-y"
-          style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            color: "var(--ink)",
-            minHeight: 80,
-          }}
-        />
-        <div
-          className="mt-1 flex items-center justify-between text-[11px]"
-          style={{ color: "var(--muted)" }}
-        >
-          <span>Private admin-only note. Not shown to buyers.</span>
-          <span className="tabular-nums">{adminNote.length}/1000</span>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          Danger zone — destructive actions live at the bottom,
-          de-emphasized, behind a confirmation gate.
-          ───────────────────────────────────────────────────────── */}
+      {/* Danger zone */}
       <section
         aria-labelledby="danger-zone-heading"
         className="pt-8"
-        style={{ marginTop: "2rem" }}
+        style={{ marginTop: "2rem", borderTop: "1px solid var(--border)" }}
       >
-        <div className="mb-3 flex items-center gap-3">
+        <div className="mb-3 flex items-center gap-3 pt-6">
           <h2
             id="danger-zone-heading"
-            className="text-[11px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: "var(--muted)" }}
+            className="m-0"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
           >
             Danger zone
           </h2>
-          <div
-            className="flex-1 h-px"
-            style={{ background: "var(--border)" }}
-          />
         </div>
 
         <div
-          className="rounded-2xl p-5 sm:p-6"
+          className="rounded-lg p-5"
           style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
+            background: "color-mix(in oklab, var(--bad) 5%, var(--surface))",
+            border:
+              "1px solid color-mix(in oklab, var(--bad) 25%, var(--border))",
           }}
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-md">
               <h3
-                className="text-sm font-semibold"
-                style={{ color: "var(--ink)" }}
+                className="m-0"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                }}
               >
                 Cancel this order
               </h3>
               <p
-                className="mt-1 text-xs leading-relaxed"
-                style={{ color: "var(--muted)" }}
+                className="mt-1 m-0"
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: "var(--muted)",
+                }}
               >
                 Marks the order as cancelled without deleting history. Item
                 snapshots are preserved. You&rsquo;ll have the option to
@@ -921,19 +1034,31 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
                   setShowCancelConfirmation(true);
                 }}
                 disabled={showCancelConfirmation || isCancelling}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 style={{
+                  padding: "8px 14px",
                   background: "transparent",
-                  border: "1px solid rgb(248 113 113 / 0.4)",
-                  color: "rgb(248 113 113)",
+                  border: "1px solid color-mix(in oklab, var(--bad) 40%, var(--border-strong))",
+                  color: "var(--bad-soft)",
+                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
                 }}
               >
                 Cancel order…
               </button>
             ) : (
               <p
-                className="text-xs italic max-w-[180px]"
-                style={{ color: "var(--muted)" }}
+                style={{
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  fontSize: 10,
+                  fontStyle: "italic",
+                  color: "var(--muted)",
+                  maxWidth: 180,
+                  letterSpacing: "0.04em",
+                  margin: 0,
+                }}
               >
                 {order.status === "completed"
                   ? "Completed orders can't be cancelled."
@@ -946,29 +1071,34 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
             <div
               role="alertdialog"
               aria-label={`Confirm cancellation of ${order.orderRef}`}
-              className="mt-5 rounded-xl p-4"
+              className="mt-5 rounded p-4"
               style={{
-                background: "rgb(220 38 38 / 0.08)",
-                border: "1px solid rgb(220 38 38 / 0.3)",
+                background: "color-mix(in oklab, var(--bad) 8%, transparent)",
+                border:
+                  "1px solid color-mix(in oklab, var(--bad) 30%, transparent)",
               }}
             >
               <h4
-                className="text-sm font-semibold"
-                style={{ color: "var(--ink)" }}
+                className="m-0"
+                style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}
               >
                 Cancel {order.orderRef}?
               </h4>
               <p
-                className="mt-1 text-xs leading-relaxed"
-                style={{ color: "var(--muted)" }}
+                className="mt-1 m-0"
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: "var(--muted)",
+                }}
               >
                 This marks the order as cancelled without deleting history.
                 Choose whether to restore matching inventory rows below.
               </p>
 
               <label
-                className="mt-4 flex items-start gap-2.5 text-sm cursor-pointer"
-                style={{ color: "var(--ink)" }}
+                className="mt-4 flex items-start gap-2.5 cursor-pointer"
+                style={{ fontSize: 13, color: "var(--ink)" }}
               >
                 <input
                   type="checkbox"
@@ -979,14 +1109,14 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
                   className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                 />
                 <span>
-                  <span className="font-medium">
+                  <span style={{ fontWeight: 500 }}>
                     Restore inventory quantities
                   </span>
                   <span
-                    className="block text-xs mt-0.5"
-                    style={{ color: "var(--muted)" }}
+                    className="block mt-0.5"
+                    style={{ fontSize: 11, color: "var(--muted)" }}
                   >
-                    Missing cards rows (from re-import) will be skipped and
+                    Missing card rows (from re-import) will be skipped and
                     reported.
                   </span>
                 </span>
@@ -994,7 +1124,10 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
 
               <div
                 className="mt-4 pt-4 flex flex-wrap items-center justify-end gap-2"
-                style={{ borderTop: "1px solid rgb(220 38 38 / 0.2)" }}
+                style={{
+                  borderTop:
+                    "1px solid color-mix(in oklab, var(--bad) 20%, transparent)",
+                }}
               >
                 <button
                   type="button"
@@ -1003,11 +1136,15 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
                     setRestoreInventory(false);
                   }}
                   disabled={isCancelling}
-                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                  className="rounded disabled:opacity-50"
                   style={{
+                    padding: "6px 12px",
                     background: "transparent",
                     border: "1px solid var(--border)",
                     color: "var(--ink)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
                   }}
                 >
                   Keep order
@@ -1016,10 +1153,15 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
                   type="button"
                   onClick={handleCancelOrder}
                   disabled={isCancelling}
-                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="rounded disabled:opacity-70 disabled:cursor-not-allowed"
                   style={{
-                    background: "rgb(220 38 38)",
+                    padding: "6px 12px",
+                    background: "var(--bad)",
                     color: "white",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    border: 0,
                   }}
                 >
                   {isCancelling ? "Cancelling…" : "Confirm cancellation"}
@@ -1031,11 +1173,17 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
 
         {isTerminal && (
           <p
-            className="mt-3 text-[11px] italic"
-            style={{ color: "var(--muted)" }}
+            className="mt-3"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              fontStyle: "italic",
+              color: "var(--muted)",
+              letterSpacing: "0.04em",
+            }}
           >
-            This order is in a terminal state. No further destructive
-            actions are available.
+            This order is in a terminal state. No further destructive actions
+            are available.
           </p>
         )}
       </section>
@@ -1044,59 +1192,269 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Small atoms
+// Event timeline
 // ─────────────────────────────────────────────────────────────────
 
-function StatusTopBadge({ status }: { status: OrderStatus }) {
-  const config: Record<
-    OrderStatus,
-    { bg: string; fg: string; dot: string; label: string }
-  > = {
-    pending: {
-      bg: "color-mix(in oklab, var(--accent) 16%, transparent)",
-      fg: "var(--accent)",
-      dot: "var(--accent)",
-      label: "Pending",
-    },
-    confirmed: {
-      bg: "color-mix(in oklab, rgb(96 165 250) 20%, transparent)",
-      fg: "rgb(147 197 253)",
-      dot: "rgb(96 165 250)",
-      label: "Confirmed",
-    },
-    completed: {
-      bg: "color-mix(in oklab, var(--ink) 8%, transparent)",
-      fg: "var(--muted)",
-      dot: "rgb(74 222 128)",
-      label: "Completed",
-    },
-    cancelled: {
-      bg: "transparent",
-      fg: "var(--muted)",
-      dot: "var(--muted)",
-      label: "Cancelled",
-    },
-  };
-  const c = config[status];
+function EventTimeline({
+  events,
+  status,
+}: {
+  events: OrderTimelineEvent[];
+  status: OrderStatus;
+}) {
+  // Each timeline node sits under the rail; the rail itself is a single
+  // 1.5px line absolutely positioned behind the dots. We assert "current"
+  // on the last non-terminal event so it pulses; if the order is in a
+  // terminal state (completed/cancelled) the last event IS the terminal
+  // event and gets the done styling instead.
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
-      style={{
-        background: c.bg,
-        color: c.fg,
-        border:
-          status === "cancelled"
-            ? "1px solid var(--border)"
-            : "1px solid transparent",
-      }}
+    <section>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2
+          className="m-0"
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: "var(--dim)",
+          }}
+        >
+          Event timeline
+        </h2>
+        <span
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 11,
+            color: "var(--muted)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          stamped history · not aspirational state
+        </span>
+      </div>
+
+      <ol
+        className="relative m-0 p-0"
+        style={{ listStyle: "none" }}
+      >
+        {/* Rail */}
+        <span
+          aria-hidden="true"
+          className="absolute"
+          style={{
+            left: 7,
+            top: 6,
+            bottom: 14,
+            width: 1.5,
+            background: "var(--border)",
+          }}
+        />
+        {events.map((event, idx) => {
+          const isLast = idx === events.length - 1;
+          const isTerminal = status === "completed" || status === "cancelled";
+          const isCurrent = isLast && !isTerminal;
+          return (
+            <TimelineEvent
+              key={`${event.kind}-${event.at}-${idx}`}
+              event={event}
+              isCurrent={isCurrent}
+              isTerminal={isLast && isTerminal}
+            />
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function TimelineEvent({
+  event,
+  isCurrent,
+  isTerminal,
+}: {
+  event: OrderTimelineEvent;
+  isCurrent: boolean;
+  isTerminal: boolean;
+}) {
+  const dotState =
+    event.kind === "cancel"
+      ? "cancel"
+      : isCurrent
+        ? "current"
+        : isTerminal
+          ? "done"
+          : "done";
+
+  return (
+    <li
+      className="relative"
+      style={{ padding: "4px 0 18px 28px" }}
     >
+      <TimelineDot state={dotState} />
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--ink)",
+          fontFamily: "var(--font-inter), system-ui, sans-serif",
+          fontWeight: 500,
+          lineHeight: 1.3,
+        }}
+      >
+        {event.label}
+        {event.actorEmail && (
+          <span
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              fontWeight: 500,
+              color: "var(--muted)",
+              letterSpacing: "0.04em",
+              marginLeft: 8,
+            }}
+          >
+            · by {event.actorEmail}
+          </span>
+        )}
+      </div>
+      <div
+        className="mt-1"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 10,
+          color: "var(--muted)",
+          letterSpacing: "0.04em",
+          lineHeight: 1.4,
+        }}
+        title={absoluteDateFormatter.format(new Date(event.at))}
+      >
+        {stampString(event.at)} · {relativeTime(event.at)}
+      </div>
+    </li>
+  );
+}
+
+function TimelineDot({
+  state,
+}: {
+  state: "current" | "done" | "cancel";
+}) {
+  const styles: React.CSSProperties = {
+    position: "absolute",
+    left: 0,
+    top: 6,
+    width: 14,
+    height: 14,
+    borderRadius: "50%",
+  };
+  if (state === "cancel") {
+    return (
       <span
         aria-hidden="true"
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ background: c.dot }}
+        style={{
+          ...styles,
+          background: "var(--surface-2)",
+          border: "1.5px solid var(--muted)",
+        }}
       />
-      {c.label}
-    </span>
+    );
+  }
+  if (state === "current") {
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          ...styles,
+          background: "var(--accent)",
+          border: "1.5px solid var(--accent)",
+          boxShadow:
+            "0 0 0 4px color-mix(in oklab, var(--accent) 14%, transparent)",
+        }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        ...styles,
+        background: "var(--accent)",
+        border: "1.5px solid var(--accent)",
+      }}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Small atoms (Card / ActionButton / NoteSaveStatus)
+// ─────────────────────────────────────────────────────────────────
+
+function Card({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-lg p-4"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <h3
+        className="m-0 mb-2.5"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 9,
+          fontWeight: 600,
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: "var(--dim)",
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+  tone,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  tone: "primary" | "ghost";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="block w-full text-left mb-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{
+        padding: "10px 12px",
+        borderRadius: 4,
+        background:
+          tone === "primary" ? "var(--accent)" : "transparent",
+        border: `1px solid ${tone === "primary" ? "var(--accent)" : "var(--border)"}`,
+        color: tone === "primary" ? "var(--accent-fg)" : "var(--ink)",
+        fontFamily: "var(--font-inter), system-ui, sans-serif",
+        fontSize: 12,
+        fontWeight: tone === "primary" ? 600 : 500,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1111,27 +1469,24 @@ function NoteSaveStatus({
   error: string | null;
   dirty: boolean;
 }) {
+  const base: React.CSSProperties = {
+    fontFamily: "var(--font-geist-mono), monospace",
+    fontSize: 11,
+    letterSpacing: "0.04em",
+  };
   if (error) {
     return (
-      <span
-        className="text-xs"
-        style={{ color: "rgb(248 113 113)" }}
-        role="alert"
-      >
+      <span role="alert" style={{ ...base, color: "var(--bad-soft)" }}>
         {error}
       </span>
     );
   }
   if (saving) {
-    return (
-      <span className="text-xs" style={{ color: "var(--muted)" }}>
-        Saving…
-      </span>
-    );
+    return <span style={{ ...base, color: "var(--muted)" }}>Saving…</span>;
   }
   if (dirty) {
     return (
-      <span className="text-xs" style={{ color: "var(--muted)" }}>
+      <span style={{ ...base, color: "var(--muted)" }}>
         Unsaved · save on blur
       </span>
     );
@@ -1139,12 +1494,18 @@ function NoteSaveStatus({
   if (savedAt) {
     return (
       <span
-        className="inline-flex items-center gap-1 text-xs"
-        style={{ color: "var(--accent)" }}
+        style={{
+          ...base,
+          color: "var(--accent)",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+        }}
       >
         <svg
           aria-hidden="true"
-          className="h-3 w-3"
+          width={11}
+          height={11}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

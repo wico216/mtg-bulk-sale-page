@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getOrderById } from "@/db/orders";
+import { getOrderById, getOrderTimeline } from "@/db/orders";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { OrderDetail } from "../_components/order-detail";
 
@@ -27,11 +27,14 @@ export default async function AdminOrderDetailPage({
   }
 
   const { id } = await params;
-  const order = await getOrderById(id);
+  const [order, timeline] = await Promise.all([
+    getOrderById(id),
+    getOrderTimeline(id),
+  ]);
 
   if (!order) {
     notFound();
   }
 
-  return <OrderDetail order={order} />;
+  return <OrderDetail order={order} timeline={timeline} />;
 }

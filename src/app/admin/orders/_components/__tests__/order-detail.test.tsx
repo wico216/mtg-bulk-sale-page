@@ -78,7 +78,7 @@ function makeOrder(overrides: Partial<AdminOrderDetail> = {}): AdminOrderDetail 
 
 describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
   it("renders [binder] pill identifiable + distinct from name text (ADM-01)", () => {
-    render(<OrderDetail order={makeOrder()} />);
+    render(<OrderDetail order={makeOrder()} timeline={[]} />);
     const pill = screen.getByText("[A02]");
     expect(pill).toBeInTheDocument();
     // Behaviour-level checks (post-v1.4 admin redesign): the pill is now
@@ -109,7 +109,7 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
     const order = makeOrder({
       items: [makeItem({ binder: "unsorted" })],
     });
-    render(<OrderDetail order={order} />);
+    render(<OrderDetail order={order} timeline={[]} />);
     expect(screen.getByText("[Unsorted]")).toBeInTheDocument();
   });
 
@@ -134,7 +134,7 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
         }),
       ],
     });
-    render(<OrderDetail order={order} />);
+    render(<OrderDetail order={order} timeline={[]} />);
     const a02Pill = screen.getByText("[A02]");
     const a05Pill = screen.getByText("[A05]");
     expect(a02Pill).toBeInTheDocument();
@@ -158,12 +158,12 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
         }),
       ],
     });
-    render(<OrderDetail order={order} />);
+    render(<OrderDetail order={order} timeline={[]} />);
     expect(screen.getByText("[A02]")).toBeInTheDocument();
   });
 
   it("renders [binder] pill adjacent to the card name (DOM proximity)", () => {
-    render(<OrderDetail order={makeOrder()} />);
+    render(<OrderDetail order={makeOrder()} timeline={[]} />);
     const pill = screen.getByText("[A02]");
     const name = screen.getByText("Lightning Bolt");
     // Both should share a common ancestor — the items.map row container.
@@ -178,16 +178,109 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
 
 describe("OrderDetail buyer phone (Quick 260514-7z2)", () => {
   it("renders a tel: link when buyerPhone is set", () => {
-    render(<OrderDetail order={makeOrder({ buyerPhone: "555-1234" })} />);
+    render(
+      <OrderDetail
+        order={makeOrder({ buyerPhone: "555-1234" })}
+        timeline={[]}
+      />,
+    );
     const phoneLink = screen.getByRole("link", { name: "555-1234" });
     expect(phoneLink).toBeInTheDocument();
     expect(phoneLink.getAttribute("href")).toBe("tel:555-1234");
   });
 
   it("renders 'No phone provided.' fallback when buyerPhone is null", () => {
-    render(<OrderDetail order={makeOrder({ buyerPhone: null })} />);
+    render(
+      <OrderDetail
+        order={makeOrder({ buyerPhone: null })}
+        timeline={[]}
+      />,
+    );
     expect(screen.getByText(/no phone provided/i)).toBeInTheDocument();
     // And the tel: link MUST NOT exist in this branch.
     expect(screen.queryByRole("link", { name: /tel:/ })).toBeNull();
+  });
+});
+
+// ─── Event timeline (post-v1.4 orders redesign) ─────────────────────
+//
+// The detail page replaced the workflow stepper with a stamped event
+// timeline. These tests pin the load-bearing behaviour: a timeline is
+// always rendered (at minimum the synthetic `created` event from
+// `orders.created_at`); audit-log entries surface as additional events
+// with actor + label.
+
+describe("OrderDetail event timeline", () => {
+  it("renders the 'Order created' entry for a fresh pending order with no audit entries", () => {
+    render(
+      <OrderDetail
+        order={makeOrder()}
+        timeline={[
+          {
+            kind: "created",
+            label: "Order created",
+            at: "2026-05-11T12:00:00.000Z",
+            actorEmail: null,
+            metadata: {},
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Event timeline")).toBeInTheDocument();
+    expect(screen.getByText("Order created")).toBeInTheDocument();
+  });
+
+  it("renders status-change events with the acting admin's email", () => {
+    render(
+      <OrderDetail
+        order={makeOrder({ status: "confirmed" })}
+        timeline={[
+          {
+            kind: "created",
+            label: "Order created",
+            at: "2026-05-11T12:00:00.000Z",
+            actorEmail: null,
+            metadata: {},
+          },
+          {
+            kind: "status_update",
+            label: "Marked confirmed",
+            at: "2026-05-11T13:00:00.000Z",
+            actorEmail: "wiko@novapointofsale.com",
+            metadata: { status: "confirmed" },
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Marked confirmed")).toBeInTheDocument();
+    // Actor email is surfaced inline as part of the event label block.
+    expect(
+      screen.getByText(/by wiko@novapointofsale\.com/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the cancellation entry for a cancelled order", () => {
+    render(
+      <OrderDetail
+        order={makeOrder({ status: "cancelled" })}
+        timeline={[
+          {
+            kind: "created",
+            label: "Order created",
+            at: "2026-05-11T12:00:00.000Z",
+            actorEmail: null,
+            metadata: {},
+          },
+          {
+            kind: "cancel",
+            label: "Order cancelled",
+            at: "2026-05-12T08:30:00.000Z",
+            actorEmail: "wiko@novapointofsale.com",
+            metadata: {},
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Order cancelled")).toBeInTheDocument();
   });
 });
