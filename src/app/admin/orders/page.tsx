@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import {
   getAdminOrders,
   getAdminOrderStatusCounts,
-  type OrderStatus,
+  type OrderQueryStatus,
 } from "@/db/orders";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { OrdersTable } from "./_components/orders-table";
@@ -15,11 +15,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const ORDER_STATUSES: readonly OrderStatus[] = [
+const ORDER_QUERY_STATUSES: readonly OrderQueryStatus[] = [
+  "queue",
   "pending",
   "confirmed",
   "completed",
   "cancelled",
+  "all",
 ];
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -37,11 +39,38 @@ function parseSearch(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function parseStatus(value: string | undefined): OrderStatus | "all" {
-  if (!value || value === "all") return "all";
-  return ORDER_STATUSES.includes(value as OrderStatus)
-    ? (value as OrderStatus)
-    : "all";
+/**
+ * Resolve the requested tab. Default = `"queue"` (pending + confirmed) per
+ * the post-v1.4 orders redesign — the operator's landing view should be
+ * everything-that-needs-action, not the full archive.
+ */
+function parseStatus(value: string | undefined): OrderQueryStatus {
+  if (!value) return "queue";
+  return ORDER_QUERY_STATUSES.includes(value as OrderQueryStatus)
+    ? (value as OrderQueryStatus)
+    : "queue";
+}
+
+/**
+ * Relative-age signal used in the ticker. Reads the oldest pending+confirmed
+ * order's createdAt and bucketizes it the same way the row's `data-age`
+ * attribute does, so the ticker's color matches the loudest row's color.
+ */
+function formatAge(iso: string): { text: string; band: "warm" | "hot" | "" } {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return { text: "just now", band: "" };
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) {
+    const minutes = Math.max(1, Math.floor(ms / 60_000));
+    return { text: `${minutes}m`, band: "" };
+  }
+  if (hours < 24) {
+    return { text: `${hours}h`, band: hours >= 12 ? "warm" : "" };
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  const text = remHours ? `${days}d ${remHours}h` : `${days}d`;
+  return { text, band: days >= 3 ? "hot" : "warm" };
 }
 
 export default async function AdminOrdersPage({
@@ -64,127 +93,85 @@ export default async function AdminOrdersPage({
   const q = parseSearch(firstParam(resolvedSearchParams.q));
   const status = parseStatus(firstParam(resolvedSearchParams.status));
 
+  // For the "oldest unfilled" ticker stat we run an extra tiny query: the
+  // first row of the queue (pending+confirmed) sorted oldest-first. Doing
+  // it as its own request keeps the main list paginated naturally and
+  // costs one indexed lookup. Falls through to null on an empty queue.
+  const oldestUnfilledPromise = getAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "queue",
+  })
+    .then((result) => result.orders[0] ?? null)
+    .catch(() => null);
+
   try {
-    const [result, counts] = await Promise.all([
+    const [result, counts, oldestUnfilled] = await Promise.all([
       getAdminOrders({
         page,
         limit: 25,
         ...(q ? { q } : {}),
+        // `status: "all"` is implicit absence — pass nothing in that case.
         ...(status !== "all" ? { status } : {}),
       }),
       getAdminOrderStatusCounts({ ...(q ? { q } : {}) }),
+      oldestUnfilledPromise,
     ]);
 
+    const oldestAge = oldestUnfilled
+      ? formatAge(oldestUnfilled.createdAt)
+      : null;
+
+    // "Value today" = sum of totals on orders created since the start of
+    // today (UTC). Cheap to derive from the current page if it includes
+    // today's orders; fall back to 0 otherwise so the ticker stays honest
+    // rather than guessing. Improving this would need its own SQL — out
+    // of scope for the redesign port.
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+    const todayValue = result.orders
+      .filter(
+        (o) => new Date(o.createdAt).getTime() >= startOfToday.getTime(),
+      )
+      .reduce((sum, o) => sum + o.totalPrice, 0);
+
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1
-              className="text-2xl font-semibold tracking-tight"
-              style={{
-                fontFamily: "var(--font-display)",
-                color: "var(--ink)",
-              }}
-            >
-              Orders
-            </h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-              Review checkout history, find buyers, and manage workflow.
-            </p>
-          </div>
-
-          <form
-            action="/admin/orders"
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-          >
-            <label className="sr-only" htmlFor="q">
-              Search orders
-            </label>
-            <div className="relative">
-              <svg
-                aria-hidden="true"
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                style={{ color: "var(--muted)" }}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"
-                />
-              </svg>
-              <input
-                id="q"
-                name="q"
-                type="search"
-                defaultValue={q ?? ""}
-                placeholder="Search ref, buyer, or email…"
-                className="w-full min-w-[240px] rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none"
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  color: "var(--ink)",
-                }}
-              />
-            </div>
-            {/* Hidden field preserves the active status when re-submitting the
-                search form. Status itself is changed via the OrdersTable
-                StatusTabs (links, not form submission). */}
-            {status !== "all" && (
-              <input type="hidden" name="status" value={status} />
-            )}
-            <button
-              type="submit"
-              className="rounded-md px-4 py-2 text-sm font-semibold transition-colors"
-              style={{
-                background: "var(--accent)",
-                color: "var(--accent-fg)",
-              }}
-            >
-              Search
-            </button>
-            {q && (
-              <a
-                href={
-                  status === "all" ? "/admin/orders" : `/admin/orders?status=${status}`
-                }
-                className="rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border)",
-                  color: "var(--muted)",
-                }}
-              >
-                Clear
-              </a>
-            )}
-          </form>
-        </div>
-
-        <OrdersTable result={result} counts={counts} q={q} status={status} />
-      </div>
+      <OrdersTable
+        result={result}
+        counts={counts}
+        q={q}
+        status={status}
+        ticker={{
+          queue: counts.queue,
+          pending: counts.pending,
+          confirmed: counts.confirmed,
+          todayValue,
+          oldestAgeText: oldestAge?.text ?? null,
+          oldestAgeBand: oldestAge?.band ?? "",
+        }}
+      />
     );
   } catch (error) {
     console.error("[ADMIN ORDERS] Failed to load orders:", error);
     return (
-      <div>
+      <div className="space-y-4">
         <h1
-          className="text-2xl font-semibold tracking-tight mb-4"
+          className="m-0"
           style={{
-            fontFamily: "var(--font-display)",
+            fontFamily:
+              "var(--font-instrument-serif), ui-serif, Georgia, serif",
+            fontWeight: 400,
+            fontSize: 36,
             color: "var(--ink)",
           }}
         >
-          Orders
+          Orders<em style={{ fontStyle: "italic", color: "var(--accent)" }}>.</em>
         </h1>
         <div
           className="rounded-md p-4 text-sm"
           style={{
-            background: "rgb(220 38 38 / 0.08)",
-            borderLeft: "3px solid rgb(220 38 38)",
+            background: "color-mix(in oklab, var(--bad) 8%, transparent)",
+            borderLeft: "3px solid var(--bad)",
             color: "var(--ink)",
           }}
         >

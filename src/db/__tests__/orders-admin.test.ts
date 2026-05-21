@@ -24,6 +24,11 @@ vi.mock("@/db/client", () => ({
 
 import { cancelOrder, getAdminOrders, getOrderById, updateOrderWorkflow } from "../orders";
 
+// Fixture rows mirror the shape returned by the v1.4-orders-redesign SELECT,
+// which adds three correlated-subquery aggregates per row: distinct binder
+// labels, line count, and a 3-name preview. The fixture leaves binders empty
+// for the simpler row (no items) and populated for the richer one so the
+// assert below also exercises the empty-array coalesce path.
 const orderRows = [
   {
     id: "ORD-20260427-020304-ABC123",
@@ -33,6 +38,9 @@ const orderRows = [
     totalPrice: 425,
     status: "pending",
     createdAt: "2026-04-27T02:03:04.000Z",
+    binders: ["a01", "a05"],
+    lineCount: 2,
+    previewItems: ["Lightning Bolt", "Counterspell"],
   },
   {
     id: "ORD-20260426-010203-XYZ789",
@@ -42,6 +50,9 @@ const orderRows = [
     totalPrice: 50,
     status: "completed",
     createdAt: new Date("2026-04-26T01:02:03.000Z"),
+    binders: [],
+    lineCount: 0,
+    previewItems: [],
   },
 ];
 
@@ -168,7 +179,10 @@ describe("getAdminOrders", () => {
   it("orders list SQL newest first", () => {
     const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
 
-    expect(source).toContain("ORDER BY created_at DESC");
+    // The post-v1.4-redesign query qualifies columns with the `o` alias so it
+    // can join correlated subqueries against `order_items`; the ORDER BY moved
+    // with it. Match the qualified form.
+    expect(source).toContain("ORDER BY o.created_at DESC");
   });
 
   it("filters orders by search text and status in SQL", () => {

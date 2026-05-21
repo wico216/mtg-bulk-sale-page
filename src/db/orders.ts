@@ -214,11 +214,23 @@ export const ORDER_STATUSES: readonly OrderStatus[] = [
   "cancelled",
 ];
 
+/**
+ * Status filter accepted by `getAdminOrders` and `getAdminOrderStatusCounts`.
+ *
+ * - The four real statuses (`pending`/`confirmed`/`completed`/`cancelled`)
+ *   are the actual `order_status` enum values stored on `orders.status`.
+ * - `"all"` opts out of any status filter.
+ * - `"queue"` is a meta-status for the post-v1.4 orders redesign: it merges
+ *   `pending + confirmed` so the operator's default landing view is
+ *   everything-that-needs-action. Persisted nowhere — pure URL/UI concept.
+ */
+export type OrderQueryStatus = OrderStatus | "all" | "queue";
+
 export interface AdminOrdersParams {
   page?: number;
   limit?: number;
   q?: string;
-  status?: OrderStatus | "all";
+  status?: OrderQueryStatus;
 }
 
 export interface AdminOrderSummary {
@@ -229,6 +241,16 @@ export interface AdminOrderSummary {
   totalPrice: number;
   status: OrderStatus;
   createdAt: string;
+  /**
+   * Distinct binder labels touched by this order's items, sorted ASC.
+   * Surfaced on the orders list as a chip cluster (the picker's walking
+   * directions). Empty array for legacy/imported orders with no items.
+   */
+  binders: string[];
+  /** Distinct cardId count for this order. */
+  lineCount: number;
+  /** First 3 line names by insertion order — fuel for the preview column. */
+  previewItems: string[];
 }
 
 export interface AdminOrdersResult {
@@ -291,6 +313,11 @@ interface AdminOrderRow {
   totalPrice: number;
   status: OrderStatus | string;
   createdAt: string | Date;
+  /** Aggregated from order_items at SELECT time. Optional for callers
+   *  (getOrderById) that don't ask for it. */
+  binders?: string[] | null;
+  lineCount?: number | string | null;
+  previewItems?: string[] | null;
 }
 
 interface AdminOrderItemRow extends PersistedOrderItem {
@@ -342,11 +369,22 @@ function normalizeStatus(value: string): OrderStatus {
   return "pending";
 }
 
+/**
+ * Resolves an inbound `status` filter to one of:
+ *   - `undefined` — no status filter (the "all" tab)
+ *   - an array of one or more `OrderStatus` values to match via `status IN (…)`
+ *
+ * `"queue"` (post-v1.4 default landing view) expands to `["pending","confirmed"]`.
+ * Anything else maps to the single concrete status. `buildOrderFilters` always
+ * emits an IN clause so the SQL stays uniform across the single-status and
+ * meta-status paths.
+ */
 function normalizeStatusFilter(
   value: AdminOrdersParams["status"],
-): OrderStatus | undefined {
+): readonly OrderStatus[] | undefined {
   if (!value || value === "all") return undefined;
-  return ORDER_STATUSES.includes(value) ? value : undefined;
+  if (value === "queue") return ["pending", "confirmed"] as const;
+  return ORDER_STATUSES.includes(value) ? ([value] as const) : undefined;
 }
 
 function normalizeSearch(value: string | undefined): string | undefined {
@@ -369,7 +407,11 @@ function buildOrderFilters(params: AdminOrdersParams) {
   }
 
   if (status) {
-    filters.push(sql`status = ${status}::order_status`);
+    const enumValues = sql.join(
+      status.map((s) => sql`${s}::order_status`),
+      sql`, `,
+    );
+    filters.push(sql`status IN (${enumValues})`);
   }
 
   return filters.length > 0 ? sql`WHERE ${sql.join(filters, sql` AND `)}` : sql``;
@@ -409,6 +451,11 @@ function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
     totalPrice: row.totalPrice / 100,
     status: normalizeStatus(row.status),
     createdAt: toIsoString(row.createdAt),
+    // Postgres `array_agg` returns NULL when the source set is empty (e.g.
+    // an order whose items got pruned by a later import); coalesce to [].
+    binders: Array.isArray(row.binders) ? row.binders : [],
+    lineCount: numberFromDb(row.lineCount),
+    previewItems: Array.isArray(row.previewItems) ? row.previewItems : [],
   };
 }
 
@@ -660,18 +707,43 @@ export async function getAdminOrders(
   const whereClause = buildOrderFilters(params);
 
   const [ordersResult, countResult] = await Promise.all([
+    // Each correlated subquery hits `order_items_order_id_idx` (see
+    // src/db/schema.ts), so per-row cost is bounded to ~3 index scans on
+    // tiny per-order item sets. With LIMIT 25 that's <=75 lookups per
+    // request — well below the page-data budget. Doing it inline keeps the
+    // route a single round-trip on neon-http (no interactive transaction).
     db.execute<AdminOrderRow>(sql`
       SELECT
-        id,
-        buyer_name AS "buyerName",
-        buyer_email AS "buyerEmail",
-        total_items AS "totalItems",
-        total_price AS "totalPrice",
-        status,
-        created_at AS "createdAt"
-      FROM orders
+        o.id,
+        o.buyer_name AS "buyerName",
+        o.buyer_email AS "buyerEmail",
+        o.total_items AS "totalItems",
+        o.total_price AS "totalPrice",
+        o.status,
+        o.created_at AS "createdAt",
+        COALESCE(
+          (SELECT array_agg(DISTINCT i.binder ORDER BY i.binder)
+           FROM order_items i WHERE i.order_id = o.id),
+          ARRAY[]::text[]
+        ) AS "binders",
+        COALESCE(
+          (SELECT COUNT(*)::integer FROM order_items i WHERE i.order_id = o.id),
+          0
+        ) AS "lineCount",
+        COALESCE(
+          (SELECT array_agg(name)
+           FROM (
+             SELECT i.name
+             FROM order_items i
+             WHERE i.order_id = o.id
+             ORDER BY i.id ASC
+             LIMIT 3
+           ) preview),
+          ARRAY[]::text[]
+        ) AS "previewItems"
+      FROM orders o
       ${whereClause}
-      ORDER BY created_at DESC, id DESC
+      ORDER BY o.created_at DESC, o.id DESC
       LIMIT ${limit}
       OFFSET ${offset}
     `),
@@ -695,6 +767,12 @@ export async function getAdminOrders(
 
 export type AdminOrderStatusCounts = Record<OrderStatus, number> & {
   all: number;
+  /**
+   * Convenience aggregate = pending + confirmed. Mirrors the "queue" tab
+   * the post-v1.4 orders redesign defaults to (everything that still needs
+   * the operator's attention). Not stored anywhere — derived in the helper.
+   */
+  queue: number;
 };
 
 /**
@@ -718,6 +796,7 @@ export async function getAdminOrderStatusCounts(
 
   const counts: AdminOrderStatusCounts = {
     all: 0,
+    queue: 0,
     pending: 0,
     confirmed: 0,
     completed: 0,
@@ -728,6 +807,7 @@ export async function getAdminOrderStatusCounts(
     counts[row.status] = n;
     counts.all += n;
   }
+  counts.queue = counts.pending + counts.confirmed;
   return counts;
 }
 
