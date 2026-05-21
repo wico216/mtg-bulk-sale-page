@@ -26,47 +26,113 @@ function formatRarityLabel(rarity: string): string {
     .join(" ");
 }
 
-function StatTile({
+/**
+ * Top "ticker" stat band — a single mono row of label:value pairs
+ * separated by interpuncts, anchored under the admin shell header.
+ * Editorial-terminal aesthetic: data-dense, low-chrome, ambient. The
+ * operator reads it in one glance the same way a trader reads a
+ * ticker scroll. Replaces the previous tile grid.
+ *
+ * The `updated` slot reads the server-rendered time once; React doesn't
+ * tick it forward — that's fine, the operator's mental clock for
+ * "is this fresh" is the page reload, not a live timestamp.
+ */
+export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
+  const updated = new Date()
+    .toISOString()
+    .slice(11, 16); // hh:mm UTC
+
+  return (
+    <section
+      aria-labelledby="dashboard-summary-heading"
+      className="sticky z-20 -mx-4 sm:mx-0 px-4 sm:px-0 backdrop-blur"
+      style={{
+        top: 56,
+        background: "color-mix(in oklab, var(--bg) 92%, transparent)",
+        borderBottom: "1px solid var(--border)",
+      }}
+    >
+      <h2 id="dashboard-summary-heading" className="sr-only">
+        Inventory dashboard
+      </h2>
+      <div
+        className="flex items-center gap-x-5 gap-y-1 flex-wrap overflow-x-auto whitespace-nowrap"
+        style={{
+          height: 38,
+          padding: "0 2px",
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 11,
+          letterSpacing: "0.04em",
+        }}
+      >
+        <Stat
+          label="unique"
+          value={formatNumber(stats.inventory.uniqueCards)}
+        />
+        <Sep />
+        <Stat
+          label="copies"
+          value={formatNumber(stats.inventory.totalQuantity)}
+        />
+        <Sep />
+        <Stat
+          label="value"
+          value={formatCurrency(stats.inventory.totalValue)}
+        />
+        <Sep />
+        <Stat
+          label="low"
+          value={formatNumber(stats.inventory.lowStockCount)}
+          warn={stats.inventory.lowStockCount > 0}
+        />
+        <Sep />
+        <Stat
+          label="missing"
+          value={formatNumber(stats.inventory.missingPriceCount)}
+          warn={stats.inventory.missingPriceCount > 0}
+        />
+        <Sep />
+        <Stat label="updated" value={`${updated} utc`} />
+      </div>
+    </section>
+  );
+}
+
+function Stat({
   label,
   value,
-  helper,
-  tone,
+  warn,
 }: {
   label: string;
   value: string;
-  helper: string;
-  tone?: "default" | "warn";
+  warn?: boolean;
 }) {
   return (
-    <div
-      className="px-4 py-3 first:rounded-l-xl last:rounded-r-xl flex flex-col gap-1 min-w-0"
-      style={{
-        background: "var(--surface)",
-        borderRight: "1px solid var(--border)",
-      }}
+    <span
+      className="inline-flex items-baseline gap-1.5 shrink-0"
+      style={{ color: "var(--muted)" }}
     >
-      <div
-        className="text-[10px] font-semibold uppercase tracking-[0.12em] truncate"
-        style={{ color: "var(--muted)" }}
-      >
-        {label}
-      </div>
-      <div
-        className="text-xl sm:text-2xl font-semibold tabular-nums leading-none"
+      <span>{label}</span>
+      <strong
         style={{
-          color: tone === "warn" ? "var(--accent)" : "var(--ink)",
-          fontFamily: "var(--font-display)",
+          color: warn ? "var(--accent)" : "var(--ink)",
+          fontWeight: 600,
         }}
       >
         {value}
-      </div>
-      <div
-        className="text-[10px] tabular-nums truncate"
-        style={{ color: "var(--muted)" }}
-      >
-        {helper}
-      </div>
-    </div>
+      </strong>
+    </span>
+  );
+}
+
+function Sep() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ color: "var(--dim)", flexShrink: 0 }}
+    >
+      ·
+    </span>
   );
 }
 
@@ -129,55 +195,6 @@ function BreakdownSection({
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-/**
- * Tight horizontal stat band — 5 tiles in a single row on desktop, 2-3
- * tiles per row on smaller screens. Designed to be the first thing the
- * operator sees, ambient context for the table below.
- */
-export function DashboardSummary({ stats }: { stats: AdminDashboardStats }) {
-  return (
-    <section aria-labelledby="dashboard-summary-heading">
-      <h2 id="dashboard-summary-heading" className="sr-only">
-        Inventory dashboard
-      </h2>
-      <div
-        className="rounded-xl overflow-hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        style={{ border: "1px solid var(--border)" }}
-      >
-        <StatTile
-          label="Unique"
-          value={formatNumber(stats.inventory.uniqueCards)}
-          helper="rows"
-        />
-        <StatTile
-          label="Total qty"
-          value={formatNumber(stats.inventory.totalQuantity)}
-          helper="copies"
-        />
-        <StatTile
-          label="Value"
-          value={formatCurrency(stats.inventory.totalValue)}
-          helper="missing = $0"
-        />
-        <StatTile
-          label="Low stock"
-          value={formatNumber(stats.inventory.lowStockCount)}
-          helper={stats.inventory.lowStockCount > 0 ? "needs attention" : "—"}
-          tone={stats.inventory.lowStockCount > 0 ? "warn" : "default"}
-        />
-        <StatTile
-          label="Missing prices"
-          value={formatNumber(stats.inventory.missingPriceCount)}
-          helper={
-            stats.inventory.missingPriceCount > 0 ? "N/A on storefront" : "—"
-          }
-          tone={stats.inventory.missingPriceCount > 0 ? "warn" : "default"}
-        />
-      </div>
     </section>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { formatBinderForDisplay } from "@/lib/binder-name";
+import { binderColor } from "./binder-color";
 
 export type InventorySortKey =
   | "name-asc"
@@ -20,110 +21,106 @@ interface FilterRailProps {
   availableSets: string[];
   conditionFilter: string;
   onConditionFilterChange: (value: string) => void;
-  sort: InventorySortKey;
-  onSortChange: (next: InventorySortKey) => void;
   onReset: () => void;
   hasActiveFilter: boolean;
-  // Optional: total cards in the unfiltered universe, shown next to "All binders".
+  // Optional: total cards in the unfiltered universe, shown next to "All".
   totalUniverse: number;
 }
 
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+/**
+ * Group heading — mono, uppercase, wide-tracked. Used as the only chrome
+ * between rail groups; no dividers, just rhythm.
+ */
+function GroupHead({ title }: { title: string }) {
   return (
-    <div>
-      <h3
-        className="text-[10px] font-semibold uppercase tracking-[0.12em] mb-2"
-        style={{ color: "var(--muted)" }}
-      >
-        {label}
-      </h3>
-      {children}
-    </div>
+    <h4
+      className="m-0 mb-2.5 px-1"
+      style={{
+        fontFamily: "var(--font-geist-mono), monospace",
+        fontSize: 9,
+        fontWeight: 600,
+        letterSpacing: "0.2em",
+        lineHeight: 1,
+        textTransform: "uppercase",
+        color: "var(--dim)",
+      }}
+    >
+      {title}
+    </h4>
   );
 }
 
-function RadioRow({
-  checked,
+/**
+ * One option row in a rail group. The mockup's `.rail__opt` style:
+ * leading swatch / glyph, mono label, trailing count. Active state
+ * tints the row in accent-tinted surface.
+ */
+function RailOption({
+  active,
+  onClick,
+  leading,
   label,
-  onSelect,
-  showCount,
-  hint,
+  count,
 }: {
-  checked: boolean;
-  label: string;
-  onSelect: () => void;
-  showCount?: number;
-  hint?: string;
+  active: boolean;
+  onClick: () => void;
+  leading: React.ReactNode;
+  label: React.ReactNode;
+  count?: number;
 }) {
   return (
     <button
       type="button"
-      onClick={onSelect}
-      aria-pressed={checked}
-      className="group w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-sm transition-colors text-left"
+      onClick={onClick}
+      aria-current={active}
+      className="w-full flex items-center gap-2 px-2 py-1 rounded text-left transition-colors"
       style={{
-        background: checked
-          ? "color-mix(in oklab, var(--accent) 14%, transparent)"
+        background: active
+          ? "color-mix(in oklab, var(--accent) 16%, transparent)"
           : "transparent",
-        color: checked ? "var(--ink)" : "var(--muted)",
+        color: active ? "var(--ink)" : "var(--muted)",
+        fontSize: 12,
       }}
       onMouseEnter={(e) => {
-        if (!checked) {
+        if (!active) {
           e.currentTarget.style.background =
-            "color-mix(in oklab, var(--ink) 5%, transparent)";
+            "color-mix(in oklab, var(--ink) 4%, transparent)";
+          e.currentTarget.style.color = "var(--ink)";
         }
       }}
       onMouseLeave={(e) => {
-        if (!checked) e.currentTarget.style.background = "transparent";
+        if (!active) {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "var(--muted)";
+        }
       }}
     >
-      <span className="flex items-center gap-2 min-w-0">
-        <span
-          aria-hidden="true"
-          className="inline-flex h-3 w-3 rounded-full shrink-0 transition-all"
-          style={{
-            background: checked ? "var(--accent)" : "transparent",
-            border: `1.5px solid ${
-              checked ? "var(--accent)" : "var(--border-strong)"
-            }`,
-          }}
-        />
-        <span className="truncate">
-          {label}
-          {hint && (
-            <span className="ml-1" style={{ color: "var(--muted)" }}>
-              {hint}
-            </span>
-          )}
-        </span>
+      {leading}
+      <span
+        className="truncate"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 11,
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
       </span>
-      {typeof showCount === "number" && (
+      {typeof count === "number" && (
         <span
-          className="text-[10px] tabular-nums shrink-0"
-          style={{ color: "var(--muted)" }}
+          className="ml-auto tabular-nums"
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 10,
+            color: active ? "var(--accent)" : "var(--dim)",
+          }}
         >
-          {showCount.toLocaleString()}
+          {count.toLocaleString()}
         </span>
       )}
     </button>
   );
 }
-
-const SORT_OPTIONS: ReadonlyArray<{ value: InventorySortKey; label: string }> =
-  [
-    { value: "name-asc", label: "Name A→Z" },
-    { value: "name-desc", label: "Name Z→A" },
-    { value: "quantity-desc", label: "Qty high→low" },
-    { value: "quantity-asc", label: "Qty low→high" },
-    { value: "price-desc", label: "Price high→low" },
-    { value: "price-asc", label: "Price low→high" },
-  ];
 
 const CONDITION_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "", label: "All conditions" },
@@ -134,6 +131,36 @@ const CONDITION_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "damaged", label: "Damaged" },
 ];
 
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={label}
+      className="w-full rounded px-2 py-1.5 text-xs focus:outline-none"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        color: "var(--ink)",
+        fontFamily: "var(--font-geist-mono), monospace",
+        letterSpacing: "0.04em",
+      }}
+    >
+      {children}
+    </select>
+  );
+}
+
 export function FilterRail({
   binderFilter,
   onBinderFilterChange,
@@ -143,15 +170,13 @@ export function FilterRail({
   availableSets,
   conditionFilter,
   onConditionFilterChange,
-  sort,
-  onSortChange,
   onReset,
   hasActiveFilter,
   totalUniverse,
 }: FilterRailProps) {
   // Sort binders so "unsorted" sinks to the bottom; everything else
   // alphabetical. The operator's primary binders ("a02", "a05") naturally
-  // surface to the top.
+  // surface to the top — matches their physical labelling order.
   const sortedBinders = useMemo(() => {
     return [...availableBinders].sort((a, b) => {
       if (a === "unsorted" && b !== "unsorted") return 1;
@@ -161,94 +186,95 @@ export function FilterRail({
   }, [availableBinders]);
 
   const railBody = (
-    <div className="space-y-6 lg:pr-4">
-      <FilterGroup label="Binder">
+    <div className="space-y-6 text-xs" style={{ fontSize: 12 }}>
+      <section>
+        <GroupHead
+          title={`Binder · ${sortedBinders.length.toLocaleString()}`}
+        />
         <div className="space-y-0.5">
-          <RadioRow
-            checked={binderFilter === ""}
-            label="All binders"
-            onSelect={() => onBinderFilterChange("")}
-            showCount={totalUniverse}
+          <RailOption
+            active={binderFilter === ""}
+            onClick={() => onBinderFilterChange("")}
+            leading={
+              <span
+                aria-hidden="true"
+                className="shrink-0 rounded-[2px]"
+                style={{
+                  width: 8,
+                  height: 14,
+                  background: "transparent",
+                  border: "1px dashed var(--border)",
+                }}
+              />
+            }
+            label="All"
+            count={totalUniverse}
           />
           {sortedBinders.map((b) => (
-            <RadioRow
+            <RailOption
               key={b}
-              checked={binderFilter === b}
+              active={binderFilter === b}
+              onClick={() => onBinderFilterChange(b)}
+              leading={
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 rounded-[2px]"
+                  style={{
+                    width: 8,
+                    height: 14,
+                    background: binderColor(b),
+                  }}
+                />
+              }
               label={formatBinderForDisplay(b)}
-              onSelect={() => onBinderFilterChange(b)}
-              hint={b === "unsorted" ? "(legacy)" : undefined}
             />
           ))}
         </div>
-      </FilterGroup>
+      </section>
 
-      <FilterGroup label="Set">
-        <select
-          value={setFilter}
-          onChange={(e) => onSetFilterChange(e.target.value)}
-          aria-label="Filter by set"
-          className="w-full rounded-md px-2.5 py-1.5 text-sm focus:outline-none"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            color: "var(--ink)",
-          }}
-        >
-          <option value="">All sets</option>
-          {availableSets.map((s) => (
-            <option key={s} value={s}>
-              {s.toUpperCase()}
-            </option>
-          ))}
-        </select>
-      </FilterGroup>
+      {availableSets.length > 0 && (
+        <section>
+          <GroupHead title="Set" />
+          <FilterSelect
+            label="Filter by set"
+            value={setFilter}
+            onChange={onSetFilterChange}
+          >
+            <option value="">All sets</option>
+            {availableSets.map((s) => (
+              <option key={s} value={s}>
+                {s.toUpperCase()}
+              </option>
+            ))}
+          </FilterSelect>
+        </section>
+      )}
 
-      <FilterGroup label="Condition">
-        <select
+      <section>
+        <GroupHead title="Condition" />
+        <FilterSelect
+          label="Filter by condition"
           value={conditionFilter}
-          onChange={(e) => onConditionFilterChange(e.target.value)}
-          aria-label="Filter by condition"
-          className="w-full rounded-md px-2.5 py-1.5 text-sm focus:outline-none"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            color: "var(--ink)",
-          }}
+          onChange={onConditionFilterChange}
         >
           {CONDITION_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
-        </select>
-      </FilterGroup>
-
-      <FilterGroup label="Sort by">
-        <select
-          value={sort}
-          onChange={(e) => onSortChange(e.target.value as InventorySortKey)}
-          aria-label="Sort order"
-          className="w-full rounded-md px-2.5 py-1.5 text-sm focus:outline-none"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            color: "var(--ink)",
-          }}
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </FilterGroup>
+        </FilterSelect>
+      </section>
 
       {hasActiveFilter && (
         <button
           type="button"
           onClick={onReset}
-          className="text-xs underline-offset-2 hover:underline"
-          style={{ color: "var(--muted)" }}
+          className="text-[11px] underline-offset-2 hover:underline"
+          style={{
+            color: "var(--muted)",
+            fontFamily: "var(--font-geist-mono), monospace",
+            letterSpacing: "0.04em",
+          }}
         >
           Reset filters
         </button>
@@ -285,8 +311,11 @@ export function FilterRail({
 
       {/* Desktop: sticky left rail */}
       <aside
-        className="hidden lg:block lg:sticky lg:top-[88px] lg:self-start"
+        className="hidden lg:block lg:sticky lg:top-[80px] lg:self-start lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto lg:py-4 lg:pr-4"
         aria-label="Inventory filters"
+        style={{
+          borderRight: "1px solid var(--border)",
+        }}
       >
         {railBody}
       </aside>

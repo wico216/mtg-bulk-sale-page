@@ -636,8 +636,6 @@ export function InventoryTable() {
           availableSets={availableSets}
           conditionFilter={conditionFilter}
           onConditionFilterChange={setConditionFilter}
-          sort={sort}
-          onSortChange={setSort}
           onReset={resetFilters}
           hasActiveFilter={hasFilter}
           totalUniverse={inventoryTotal}
@@ -649,11 +647,10 @@ export function InventoryTable() {
             onSearchChange={setSearch}
             density={density}
             onDensityChange={setDensity}
+            sort={sort}
+            onSortChange={setSort}
             exporting={exporting}
             onExport={handleExport}
-            displayedCount={total}
-            inventoryTotal={inventoryTotal}
-            hasFilter={hasFilter}
           />
 
           <div className="mt-3">

@@ -30,22 +30,52 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1
-          className="text-2xl sm:text-3xl font-semibold tracking-tight"
-          style={{
-            fontFamily: "var(--font-display)",
-            color: "var(--ink)",
-          }}
-        >
-          Inventory
-        </h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-          Pricing, stock, bulk operations.
-        </p>
+      <DashboardSummary stats={stats} />
+
+      <header
+        className="grid gap-6 items-end pt-2 pb-3"
+        style={{
+          gridTemplateColumns: "1fr",
+        }}
+      >
+        <div>
+          <p
+            className="m-0 mb-2"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
+          >
+            Section · 01 — Inventory
+          </p>
+          <h1
+            className="m-0"
+            style={{
+              fontFamily: "var(--font-instrument-serif), ui-serif, Georgia, serif",
+              fontWeight: 400,
+              fontSize: 44,
+              letterSpacing: "-0.01em",
+              lineHeight: 0.95,
+              color: "var(--ink)",
+            }}
+          >
+            Inventory
+            <em
+              style={{
+                fontStyle: "italic",
+                color: "var(--accent)",
+              }}
+            >
+              .
+            </em>
+          </h1>
+        </div>
       </header>
 
-      <DashboardSummary stats={stats} />
       <DashboardBreakdowns stats={stats} />
 
       <InventoryTable />

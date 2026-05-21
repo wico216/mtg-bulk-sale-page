@@ -2,7 +2,9 @@
 
 import type { InventoryRow as InventoryRowType } from "@/lib/types";
 import { formatBinderForDisplay } from "@/lib/binder-name";
+import { ManaCost } from "@/components/mana-cost";
 import { EditableCell } from "./editable-cell";
+import { binderColor } from "./binder-color";
 import type { RowDensity } from "./density-toggle";
 
 type StockState = "normal" | "low" | "zero";
@@ -22,58 +24,82 @@ interface InventoryRowProps {
   onError: (message: string) => void;
 }
 
-function gutterStyle(stock: StockState, finish: string): React.CSSProperties {
-  if (stock === "zero") return { background: "rgb(220 38 38)" };
-  if (stock === "low") return { background: "var(--accent)" };
-  if (finish === "foil") {
-    return {
-      background:
-        "linear-gradient(to bottom, var(--accent), color-mix(in oklab, var(--accent) 50%, white 30%))",
-    };
-  }
-  if (finish === "etched") {
-    return {
-      background:
-        "repeating-linear-gradient(to bottom, var(--accent) 0 4px, transparent 4px 8px)",
-    };
-  }
-  return { background: "transparent" };
+interface DensityConfig {
+  showArt: boolean;
+  artW: number;
+  artH: number;
+  paddingY: string;
+  titleFamily: string;
+  titleSize: string;
+  gridTemplate: string;
 }
 
 /**
- * Map density to a per-row layout config:
- *   - showThumbnail: render image column at all
- *   - thumbnailSize: [w, h] in px
- *   - rowPadding:  vertical padding inside the row
- *   - twoLineMeta: if false, meta collapses into a single line (compact)
+ * Per-density layout knobs. The grid template is 8 columns wide (or 7
+ * when art collapses in `compact` mode) and matches the mockup's
+ * `.row--compact / --standard / --comfortable` selectors verbatim:
+ *
+ *   check · art · name · cost · price · qty · binder · delete
+ *
+ * Column widths are tuned to keep tabular price/qty/binder text
+ * right-aligned and stable across rows; the name column owns the
+ * `1fr` slack so card titles get the breathing room.
  */
-function densityConfig(density: RowDensity) {
+function densityConfig(density: RowDensity): DensityConfig {
   switch (density) {
     case "compact":
       return {
-        showThumbnail: false,
-        thumbnailWidth: 0,
-        thumbnailHeight: 0,
-        verticalPaddingClass: "py-2",
-        twoLineMeta: false,
-      } as const;
+        showArt: false,
+        artW: 0,
+        artH: 0,
+        paddingY: "6px",
+        titleFamily: "var(--font-inter), system-ui, sans-serif",
+        titleSize: "14px",
+        gridTemplate: "20px minmax(0,1fr) auto 90px 96px 64px 28px",
+      };
     case "comfortable":
       return {
-        showThumbnail: true,
-        thumbnailWidth: 58,
-        thumbnailHeight: 80,
-        verticalPaddingClass: "py-4",
-        twoLineMeta: true,
-      } as const;
+        showArt: true,
+        artW: 64,
+        artH: 88,
+        paddingY: "14px",
+        titleFamily: "var(--font-instrument-serif), ui-serif, Georgia, serif",
+        titleSize: "18px",
+        gridTemplate: "20px 64px minmax(0,1fr) auto 110px 110px 80px 28px",
+      };
     case "standard":
     default:
       return {
-        showThumbnail: true,
-        thumbnailWidth: 36,
-        thumbnailHeight: 50,
-        verticalPaddingClass: "py-2.5",
-        twoLineMeta: true,
-      } as const;
+        showArt: true,
+        artW: 44,
+        artH: 60,
+        paddingY: "10px",
+        titleFamily: "var(--font-instrument-serif), ui-serif, Georgia, serif",
+        titleSize: "16px",
+        gridTemplate: "20px 44px minmax(0,1fr) auto 90px 96px 64px 28px",
+      };
+  }
+}
+
+function rarityLetter(rarity: string): string {
+  const first = rarity.trim().charAt(0).toUpperCase();
+  // Maps "mythic" → "M", "common" → "C", etc. Fallback "?" never appears
+  // for real Scryfall-sourced rows but guards against blank legacy data.
+  return first || "?";
+}
+
+function rarityChipStyle(rarity: string): React.CSSProperties {
+  switch (rarity.trim().toLowerCase()) {
+    case "common":
+      return { background: "#c7c7c7", color: "#2a2a2a" };
+    case "uncommon":
+      return { background: "#c0d8e6", color: "#1a3a4a" };
+    case "rare":
+      return { background: "#d9c279", color: "#4a3a1a" };
+    case "mythic":
+      return { background: "#e58838", color: "#fff" };
+    default:
+      return { background: "var(--border)", color: "var(--muted)" };
   }
 }
 
@@ -91,44 +117,44 @@ export function InventoryRowCard({
     card.quantity === 0 ? "zero" : card.quantity === 1 ? "low" : "normal";
   const config = densityConfig(density);
   const finish = String(card.finish);
-
-  // Grid columns match child count one-to-one. The filmstrip <span> is
-  // `position: absolute` so it's removed from grid auto-placement; do
-  // NOT allocate a column for it.
-  //   children: [checkbox, (thumbnail?), name, price, qty, delete]
-  const gridTemplateColumns = config.showThumbnail
-    ? `20px ${config.thumbnailWidth}px minmax(0,1fr) auto auto 32px`
-    : `20px minmax(0,1fr) auto auto 32px`;
+  const edgeColor = binderColor(card.binder);
 
   return (
     <li
-      className={`group relative grid items-center gap-3 sm:gap-4 px-3 sm:px-4 ${config.verticalPaddingClass} transition-colors`}
+      data-selected={selected ? "true" : "false"}
+      className="group relative grid items-center transition-colors"
       style={{
-        gridTemplateColumns,
-        borderBottom: "1px solid var(--border)",
-        background:
-          stock === "zero"
-            ? "color-mix(in oklab, rgb(220 38 38) 5%, transparent)"
-            : "transparent",
+        gridTemplateColumns: config.gridTemplate,
+        gap: 14,
+        padding: `${config.paddingY} 22px ${config.paddingY} 18px`,
+        borderBottom:
+          "1px solid color-mix(in oklab, var(--border) 70%, transparent)",
+        background: selected
+          ? "color-mix(in oklab, var(--accent) 8%, transparent)"
+          : "transparent",
+        // Custom property consumed by the ::before gutter rule below; we
+        // inline the gutter as an absolute span instead of a pseudo-element
+        // so React doesn't have to ship a stylesheet for it.
+        ["--binder-color" as string]: edgeColor,
       }}
       onMouseEnter={(e) => {
-        if (stock !== "zero") {
+        if (!selected) {
           e.currentTarget.style.background =
-            "color-mix(in oklab, var(--ink) 4%, transparent)";
+            "color-mix(in oklab, var(--ink) 3%, transparent)";
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background =
-          stock === "zero"
-            ? "color-mix(in oklab, rgb(220 38 38) 5%, transparent)"
-            : "transparent";
+        if (!selected) {
+          e.currentTarget.style.background = "transparent";
+        }
       }}
     >
-      {/* Status filmstrip gutter — the load-bearing visual triage signal */}
+      {/* Left gutter — the binder colour stripe. 3px at rest, widens on
+          hover via the group-hover modifier on the parent. */}
       <span
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-[3px]"
-        style={gutterStyle(stock, finish)}
+        className="absolute inset-y-0 left-0 transition-[width] duration-150 group-hover:w-[5px]"
+        style={{ width: 3, background: edgeColor }}
       />
 
       {/* Selection checkbox */}
@@ -142,18 +168,18 @@ export function InventoryRowCard({
         />
       </span>
 
-      {/* Thumbnail (only at standard / comfortable density). Clickable —
-          opens the inspection lightbox so the operator can verify
-          condition / printing without leaving the page. */}
-      {config.showThumbnail && (
+      {/* Card art — opens the inspection lightbox so the operator can verify
+          condition/printing without leaving the page. Hidden at compact density. */}
+      {config.showArt && (
         <button
           type="button"
           onClick={() => onInspect(card)}
           aria-label={`Inspect ${card.name}`}
-          className="group/thumb relative rounded overflow-hidden cursor-zoom-in"
+          className="group/thumb relative overflow-hidden cursor-zoom-in"
           style={{
-            width: config.thumbnailWidth,
-            height: config.thumbnailHeight,
+            width: config.artW,
+            height: config.artH,
+            borderRadius: 3,
             border: "1px solid var(--border)",
             background: "var(--surface-2)",
           }}
@@ -175,40 +201,37 @@ export function InventoryRowCard({
               no img
             </span>
           )}
-          {/* Subtle zoom-in glyph that appears on hover. Not load-bearing
-              (the cursor: zoom-in already signals intent), just polish. */}
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-            style={{
-              background:
-                "color-mix(in oklab, var(--bg) 50%, transparent)",
-              color: "var(--accent)",
-              fontSize: "18px",
-              fontWeight: 700,
-            }}
-          >
-            ⊕
-          </span>
         </button>
       )}
 
-      {/* Name + meta */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span
-            className="truncate text-sm font-medium"
-            style={{ color: "var(--ink)" }}
-            title={card.name}
-          >
-            {card.name}
-          </span>
+      {/* Name + meta block */}
+      <div className="min-w-0 flex flex-col gap-[3px]">
+        <span
+          className="truncate"
+          style={{
+            fontFamily: config.titleFamily,
+            fontSize: config.titleSize,
+            color: "var(--ink)",
+            lineHeight: 1.05,
+            fontWeight: density === "compact" ? 500 : 400,
+          }}
+          title={card.name}
+        >
+          {card.name}
           {finish === "foil" && (
             <span
               aria-label="Foil"
               title="Foil"
-              className="text-xs leading-none"
-              style={{ color: "var(--accent)" }}
+              className="ml-1.5 inline-block align-middle text-[13px] leading-none"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.86 0.16 90), oklch(0.7 0.18 320), oklch(0.78 0.15 200))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+                filter:
+                  "drop-shadow(0 0 4px color-mix(in oklab, var(--accent) 30%, transparent))",
+              }}
             >
               ✦
             </span>
@@ -217,24 +240,54 @@ export function InventoryRowCard({
             <span
               aria-label="Etched"
               title="Etched-foil"
-              className="text-xs leading-none"
-              style={{ color: "var(--accent)" }}
+              className="ml-1.5 inline-block align-middle text-[13px] leading-none"
+              style={{
+                background:
+                  "repeating-linear-gradient(90deg, var(--accent) 0 2px, var(--ink-soft) 2px 4px)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
             >
               ◇
             </span>
           )}
-        </div>
-        {config.twoLineMeta && (
-          <div
-            className="mt-0.5 flex items-center gap-1.5 text-[11px] flex-wrap"
-            style={{ color: "var(--muted)" }}
-          >
-            <span className="font-mono tabular-nums">
-              {card.setCode.toUpperCase()}
+        </span>
+        <span
+          className="flex items-center gap-2 whitespace-nowrap"
+          style={{
+            fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+            fontSize: "10px",
+            fontWeight: 500,
+            letterSpacing: "0.06em",
+            color: "var(--muted)",
+          }}
+        >
+          <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+            {card.setCode.toUpperCase()}
+          </span>
+          <span aria-hidden="true" style={{ color: "var(--dim)" }}>
+            ·
+          </span>
+          <span className="tabular-nums">
+            <span aria-hidden="true" style={{ color: "var(--dim)" }}>
+              #
             </span>
-            <span aria-hidden="true">·</span>
-            <span className="tabular-nums">#{card.collectorNumber}</span>
-            <span aria-hidden="true">·</span>
+            {card.collectorNumber}
+          </span>
+          <span aria-hidden="true" style={{ color: "var(--dim)" }}>
+            ·
+          </span>
+          <span
+            style={{
+              padding: "2px 5px",
+              border: "1px solid var(--border)",
+              borderRadius: 2,
+              fontSize: 9,
+              letterSpacing: "0.1em",
+              color: "var(--muted)",
+            }}
+          >
             <EditableCell
               value={card.condition}
               cardId={card.id}
@@ -243,14 +296,46 @@ export function InventoryRowCard({
               onSave={onSave}
               onError={onError}
             />
-            <span aria-hidden="true">·</span>
-            <BinderChip binder={card.binder} />
-          </div>
-        )}
+          </span>
+        </span>
       </div>
 
-      {/* Price (editable, right-aligned, tabular) */}
-      <div className="text-right tabular-nums shrink-0">
+      {/* Mana cost pips + rarity letter chip. ManaCost handles null/empty
+          gracefully so lands and unresolved Scryfall rows just collapse the
+          pips half; the rarity chip always renders. */}
+      <span className="inline-flex items-center gap-1.5 leading-none">
+        <ManaCost cost={card.manaCost} className="text-[14px]" />
+        <span
+          aria-label={`Rarity ${card.rarity}`}
+          title={card.rarity}
+          className="inline-flex items-center justify-center shrink-0 uppercase"
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 2,
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 9,
+            fontWeight: 700,
+            ...rarityChipStyle(card.rarity),
+          }}
+        >
+          {rarityLetter(card.rarity)}
+        </span>
+      </span>
+
+      {/* Price — editable, right-aligned, mono-tabular. EditableCell renders
+          a `$X.YY` static string at rest and swaps to a number input on
+          click; the wrapper just owns the typography. */}
+      <span
+        className="text-right shrink-0"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
+          fontSize: 14,
+          fontWeight: 500,
+          color: card.price ? "var(--ink)" : "var(--dim)",
+        }}
+      >
         <EditableCell
           value={card.price ?? ""}
           cardId={card.id}
@@ -259,17 +344,22 @@ export function InventoryRowCard({
           onSave={onSave}
           onError={onError}
         />
-      </div>
+      </span>
 
-      {/* Quantity (editable) + stock badge */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span
-          className="text-[11px] tabular-nums"
-          style={{ color: "var(--muted)" }}
-          aria-hidden="true"
-        >
-          ×
-        </span>
+      {/* Qty — editable + stock badge. The badge is rendered alongside the
+          EditableCell rather than via ::after so the editing input doesn't
+          inherit/clip it. */}
+      <span
+        className="flex items-center justify-end gap-1.5 shrink-0"
+        data-stock={stock}
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
+          fontSize: 14,
+          fontWeight: 500,
+          color: stock === "zero" ? "var(--bad)" : "var(--ink)",
+        }}
+      >
         <EditableCell
           value={card.quantity}
           cardId={card.id}
@@ -280,42 +370,72 @@ export function InventoryRowCard({
         />
         {stock === "low" && (
           <span
-            className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
+            title="Only 1 copy remaining"
+            className="inline-flex items-center uppercase"
             style={{
+              padding: "2px 5px",
               background:
                 "color-mix(in oklab, var(--accent) 22%, transparent)",
               color: "var(--accent)",
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              borderRadius: 2,
             }}
-            title="Only 1 copy remaining"
           >
             Low
           </span>
         )}
         {stock === "zero" && (
           <span
-            className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded"
-            style={{
-              background: "rgb(220 38 38 / 0.22)",
-              color: "rgb(248 113 113)",
-            }}
             title="Out of stock"
+            className="inline-flex items-center"
+            style={{
+              padding: "2px 5px",
+              background: "color-mix(in oklab, var(--bad) 18%, transparent)",
+              color: "var(--bad)",
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              borderRadius: 2,
+            }}
           >
             0
           </span>
         )}
-      </div>
+      </span>
 
-      {/* Per-row delete (kept inline for ergonomics; bulk delete is in dock) */}
-      <div className="flex items-center justify-end">
+      {/* Binder chip — display-formatted (A02 not a02) so the operator's
+          physical labels match. */}
+      <span
+        className="inline-flex items-center justify-center text-center"
+        style={{
+          padding: "4px 8px",
+          border: "1px solid var(--border)",
+          borderRadius: 3,
+          background: "var(--surface-2)",
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.1em",
+          color: "var(--muted)",
+        }}
+      >
+        {formatBinderForDisplay(card.binder)}
+      </span>
+
+      {/* Per-row delete (hover-revealed; bulk delete lives in the dock) */}
+      <span className="flex items-center justify-end">
         <button
           type="button"
           onClick={() => onRequestDelete(card.id)}
           aria-label={`Delete ${card.name}`}
-          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-1.5 rounded-md"
+          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-1 rounded"
           style={{ color: "var(--muted)" }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgb(248 113 113)";
-            e.currentTarget.style.background = "rgb(220 38 38 / 0.1)";
+            e.currentTarget.style.color = "var(--bad)";
+            e.currentTarget.style.background =
+              "color-mix(in oklab, var(--bad) 12%, transparent)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = "var(--muted)";
@@ -323,37 +443,22 @@ export function InventoryRowCard({
           }}
         >
           <svg
-            className="w-4 h-4"
-            fill="none"
+            width={14}
+            height={14}
             viewBox="0 0 24 24"
+            fill="none"
             stroke="currentColor"
-            strokeWidth={1.75}
+            strokeWidth={1.5}
             aria-hidden="true"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
             />
           </svg>
         </button>
-      </div>
+      </span>
     </li>
-  );
-}
-
-function BinderChip({ binder }: { binder: string }) {
-  return (
-    <span
-      data-binder-pill
-      className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
-      style={{
-        background: "var(--surface-2)",
-        color: "var(--muted)",
-        border: "1px solid var(--border)",
-      }}
-    >
-      {formatBinderForDisplay(binder)}
-    </span>
   );
 }

@@ -1,153 +1,208 @@
 "use client";
 import Link from "next/link";
 import { DensityToggle, type RowDensity } from "./density-toggle";
+import type { InventorySortKey } from "./filter-rail";
 
 interface ActionBarProps {
   search: string;
   onSearchChange: (value: string) => void;
   density: RowDensity;
   onDensityChange: (next: RowDensity) => void;
+  sort: InventorySortKey;
+  onSortChange: (next: InventorySortKey) => void;
   exporting: boolean;
   onExport: () => void;
-  displayedCount: number;
-  inventoryTotal: number;
-  hasFilter: boolean;
 }
 
+const SORT_OPTIONS: ReadonlyArray<{ value: InventorySortKey; label: string }> =
+  [
+    { value: "name-asc", label: "Name ↑" },
+    { value: "name-desc", label: "Name ↓" },
+    { value: "quantity-desc", label: "Qty ↓" },
+    { value: "quantity-asc", label: "Qty ↑" },
+    { value: "price-desc", label: "Price ↓" },
+    { value: "price-asc", label: "Price ↑" },
+  ];
+
 /**
- * Top-of-content toolbar for the inventory page.
- *
- * Post-v1.4 redesign: this is dramatically slimmer than the original
- * action-bar. Filter chips moved to the left FilterRail; bulk-action
- * buttons moved to the floating SelectionDock; "Delete inventory"
- * moved to the bottom danger zone. What's left here is only the
- * "this is my workbench" controls: search, density, and the two
- * page-level CSV actions (Export current view, Import a new file).
+ * Editorial-terminal toolbar — the band between the heading and the
+ * table. Search input owns most of the width; density + sort + export
+ * + import sit to the right. Sticks under the admin shell header so it
+ * stays in reach while the operator scrolls.
  */
 export function ActionBar({
   search,
   onSearchChange,
   density,
   onDensityChange,
+  sort,
+  onSortChange,
   exporting,
   onExport,
-  displayedCount,
-  inventoryTotal,
-  hasFilter,
 }: ActionBarProps) {
   return (
     <header
-      className="sticky top-[56px] z-10 -mx-4 sm:mx-0 px-4 sm:px-0 py-3 backdrop-blur"
+      className="sticky z-10 -mx-4 sm:mx-0 px-4 sm:px-0 py-3 backdrop-blur"
       style={{
+        top: 56,
         background: "color-mix(in oklab, var(--bg) 88%, transparent)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <svg
+      <div className="grid items-center gap-3 grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_auto_auto_auto_auto]">
+        {/* Search */}
+        <label
+          className="flex items-center gap-2.5 rounded-md px-3 col-span-3 sm:col-span-1"
+          style={{
+            height: 38,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <span
             aria-hidden="true"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+            className="flex items-center"
             style={{ color: "var(--muted)" }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"
-            />
-          </svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </span>
           <input
             type="search"
-            placeholder="Search by name…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            aria-label="Search cards by name"
-            className="w-full rounded-lg pl-8 pr-8 py-2 text-sm focus:outline-none transition-colors"
+            placeholder="Search by name, set, or oracle text…"
+            aria-label="Search inventory"
+            className="flex-1 bg-transparent outline-none text-sm"
             style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
               color: "var(--ink)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
             }}
           />
-          {search && (
+          {search ? (
             <button
               type="button"
               onClick={() => onSearchChange("")}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2"
               style={{ color: "var(--muted)" }}
+              className="leading-none"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              ✕
             </button>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="hidden sm:inline-flex"
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: 10,
+                fontWeight: 500,
+                color: "var(--muted)",
+                background: "color-mix(in oklab, var(--ink) 8%, transparent)",
+                padding: "4px 6px",
+                borderRadius: 3,
+              }}
+            >
+              ⌘ K
+            </span>
           )}
-        </div>
+        </label>
 
+        {/* Density toggle */}
         <DensityToggle value={density} onChange={onDensityChange} />
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* Sort selector */}
+        <SortSelect value={sort} onChange={onSortChange} options={SORT_OPTIONS} />
+
+        {/* Export + Import (Import is the primary editorial CTA) */}
+        <div className="hidden sm:flex items-center gap-2 ml-auto col-start-5">
           <button
             type="button"
             onClick={onExport}
             disabled={exporting}
-            className="rounded-lg px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="rounded px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
             style={{
               background: "transparent",
-              border: "1px solid var(--border)",
+              border: "1px solid var(--border-strong)",
               color: "var(--ink)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
             }}
           >
             {exporting ? "Exporting…" : "Export CSV"}
           </button>
           <Link
             href="/admin/import"
-            className="rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap inline-flex items-center gap-1"
+            className="rounded px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap inline-flex items-center gap-1"
             style={{
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
+              background: "var(--ink)",
+              color: "var(--bg)",
+              border: "1px solid var(--ink)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
             }}
           >
             Import CSV <span aria-hidden="true">→</span>
           </Link>
         </div>
       </div>
-
-      <div
-        className="mt-2 text-[11px] tabular-nums"
-        style={{ color: "var(--muted)" }}
-      >
-        {hasFilter ? (
-          <>
-            Showing{" "}
-            <span style={{ color: "var(--ink)" }}>
-              {displayedCount.toLocaleString()}
-            </span>{" "}
-            of {inventoryTotal.toLocaleString()} cards
-          </>
-        ) : (
-          <>
-            <span style={{ color: "var(--ink)" }}>
-              {inventoryTotal.toLocaleString()}
-            </span>{" "}
-            cards in inventory
-          </>
-        )}
-      </div>
     </header>
+  );
+}
+
+function SortSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: InventorySortKey;
+  onChange: (next: InventorySortKey) => void;
+  options: ReadonlyArray<{ value: InventorySortKey; label: string }>;
+}) {
+  return (
+    <label
+      className="inline-flex items-center gap-2 rounded-md px-3"
+      style={{
+        height: 38,
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "var(--muted)",
+        }}
+      >
+        Sort
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as InventorySortKey)}
+        aria-label="Sort order"
+        className="bg-transparent outline-none text-xs font-medium cursor-pointer"
+        style={{
+          color: "var(--ink)",
+          fontFamily: "var(--font-inter), system-ui, sans-serif",
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

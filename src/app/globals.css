@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Andrew Gioia's mana-font — the canonical Magic mana symbol webfont used
+ * across EDHRec, Archidekt, MTGGoldfish. Loaded globally so the admin
+ * inventory page can render real `{R}` / `{2}{W}` badges via `.ms` classes
+ * (composed in src/components/mana-cost.tsx from the cards.mana_cost column
+ * populated by scripts/backfill-mana-cost.ts). Imported in lowercase via
+ * Next 16's CSS resolver — the package's `main` field points here. */
+@import "mana-font/css/mana.min.css";
+
 /* Wiko's Spellbook — design tokens.
  *
  * Two parallel token layers:
@@ -19,18 +27,26 @@
   --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
 }
 
-/* Dark mode — Arcane midnight. Default when `data-mode` is unset or dark. */
+/* Dark mode — Arcane midnight. Default when `data-mode` is unset or dark.
+ * `--ink-soft`/`--dim` give the editorial-terminal inventory redesign two
+ * extra ink tiers between `--ink` and `--muted` (used by row meta and
+ * dim chrome like ticker separators); `--bad`/`--bad-soft` hold the
+ * zero-stock red so it doesn't drift across files. */
 :root,
 html[data-mode="dark"] {
   --bg: oklch(0.14 0.022 280);
   --surface: oklch(0.18 0.024 280);
   --surface-2: oklch(0.22 0.028 278);
   --ink: oklch(0.96 0.012 85);
+  --ink-soft: oklch(0.88 0.016 85);
   --muted: oklch(0.68 0.028 280);
+  --dim: oklch(0.46 0.024 280);
   --border: oklch(0.27 0.026 280);
   --border-strong: oklch(0.4 0.03 280);
   --accent: oklch(0.72 0.16 295);
   --accent-fg: #0b0618;
+  --bad: rgb(220 38 38);
+  --bad-soft: rgb(248 113 113);
   color-scheme: dark;
 }
 
@@ -40,11 +56,15 @@ html[data-mode="light"] {
   --surface: oklch(0.94 0.014 82);
   --surface-2: oklch(0.91 0.017 80);
   --ink: oklch(0.2 0.035 285);
+  --ink-soft: oklch(0.32 0.03 285);
   --muted: oklch(0.5 0.025 285);
+  --dim: oklch(0.7 0.022 285);
   --border: oklch(0.86 0.018 75);
   --border-strong: oklch(0.7 0.025 75);
   --accent: oklch(0.48 0.16 295);
   --accent-fg: #ffffff;
+  --bad: rgb(220 38 38);
+  --bad-soft: rgb(220 38 38);
   color-scheme: light;
 }
 
