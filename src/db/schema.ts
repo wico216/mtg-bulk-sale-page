@@ -52,6 +52,10 @@ export const cards = pgTable(
     backImageUrl: text("back_image_url"),
     oracleText: text("oracle_text"),
     typeLine: text("type_line"),
+    // Raw Scryfall mana cost string e.g. "{1}{R}", "{X}{W}", "{2}{B}{B}".
+    // Stored verbatim; rendered to mana-font symbols at the UI layer.
+    // Nullable: pre-backfill rows + future Scryfall not_found results stay null.
+    manaCost: text("mana_cost"),
     manaValue: real("mana_value"),
     rarity: text("rarity").notNull(),
     // Phase 16 FIN-01 / D-07: 3-value finish enum (replaces the legacy `foil`

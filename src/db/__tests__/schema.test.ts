@@ -25,11 +25,14 @@ describe("cards table schema", () => {
   // `finish` are added. Quick task 260514-afo adds nullable Scryfall search
   // metadata columns typeLine and manaValue. Quick task 260514-ewz adds
   // nullable backImageUrl for double-faced storefront flip support.
-  it("has all 20 required card columns", () => {
+  // 2026-05-20 adds nullable manaCost (raw Scryfall mana cost string e.g.
+  // "{1}{R}") so the admin inventory UI can render real Magic mana symbols.
+  it("has all 21 required card columns", () => {
     const requiredColumns = [
       "id", "name", "setCode", "setName", "collectorNumber",
       "price", "condition", "quantity", "colorIdentity",
-      "imageUrl", "backImageUrl", "oracleText", "typeLine", "manaValue", "rarity",
+      "imageUrl", "backImageUrl", "oracleText", "typeLine",
+      "manaCost", "manaValue", "rarity",
       "finish", "binder",
       "scryfallId", "createdAt", "updatedAt",
     ];
@@ -37,7 +40,7 @@ describe("cards table schema", () => {
     for (const col of requiredColumns) {
       expect(colRecord[col], `missing column: ${col}`).toBeDefined();
     }
-    expect(Object.keys(columns).length).toBe(20);
+    expect(Object.keys(columns).length).toBe(21);
   });
 
   it("has no foil column (Phase 16 D-07: replaced by finish enum)", () => {

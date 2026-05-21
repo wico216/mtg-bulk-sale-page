@@ -16,7 +16,11 @@
     "migrate:card-search": "tsx scripts/migrate-v1.3.x-card-search-metadata.ts",
     "migrate:card-search:dry-run": "tsx scripts/migrate-v1.3.x-card-search-metadata.ts --dry-run",
     "migrate:card-faces": "tsx scripts/migrate-v1.3.x-card-face-images.ts",
-    "migrate:card-faces:dry-run": "tsx scripts/migrate-v1.3.x-card-face-images.ts --dry-run"
+    "migrate:card-faces:dry-run": "tsx scripts/migrate-v1.3.x-card-face-images.ts --dry-run",
+    "migrate:mana-cost": "tsx scripts/migrate-add-mana-cost.ts",
+    "migrate:mana-cost:dry-run": "tsx scripts/migrate-add-mana-cost.ts --dry-run",
+    "backfill:mana-cost": "tsx scripts/backfill-mana-cost.ts",
+    "backfill:mana-cost:dry-run": "tsx scripts/backfill-mana-cost.ts --dry-run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

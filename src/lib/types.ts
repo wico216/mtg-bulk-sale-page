@@ -67,6 +67,12 @@ export interface PublicCard {
   oracleText: string | null;
   /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
   typeLine?: string | null;
+  /**
+   * Raw Scryfall mana cost string, e.g. `"{1}{R}"`, `"{X}{W}"`, `"{2}{B}{B}"`.
+   * Empty string for lands; null for cards Scryfall couldn't resolve. Rendered
+   * to mana-font symbols at the UI layer (each `{TOKEN}` → one badge).
+   */
+  manaCost?: string | null;
   /** Scryfall mana value / CMC. */
   manaValue?: number | null;
   rarity: string;
@@ -118,6 +124,12 @@ export interface InventoryRow {
   oracleText: string | null;
   /** Scryfall type line, e.g. "Creature — Goblin Wizard". */
   typeLine?: string | null;
+  /**
+   * Raw Scryfall mana cost string, e.g. `"{1}{R}"`, `"{X}{W}"`, `"{2}{B}{B}"`.
+   * Empty string for lands; null for cards Scryfall couldn't resolve. Rendered
+   * to mana-font symbols at the UI layer (each `{TOKEN}` → one badge).
+   */
+  manaCost?: string | null;
   /** Scryfall mana value / CMC. */
   manaValue?: number | null;
   rarity: string;
@@ -158,6 +170,9 @@ export interface ScryfallCard {
   color_identity: string[];
   oracle_text?: string;
   type_line?: string;
+  /** Raw mana cost string for single-faced cards, e.g. `"{1}{R}"`. Missing
+   *  on double-faced cards — use `card_faces[].mana_cost` instead. */
+  mana_cost?: string;
   cmc?: number;
   image_uris?: {
     normal: string;

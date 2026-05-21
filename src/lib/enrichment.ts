@@ -94,6 +94,29 @@ function getManaValue(card: ScryfallCard): number | null {
 }
 
 /**
+ * Extract the raw Scryfall mana_cost string (e.g. "{1}{R}", "{X}{W}").
+ *
+ * Single-faced cards: returned verbatim from `card.mana_cost`.
+ * Double-faced cards: joined as "<front> // <back>" so each face's cost is
+ *   preserved (mirrors Scryfall's own "{2}{B} // {3}{B}" notation). The
+ *   admin renderer can split on " // " and treat each side independently.
+ * Returns `null` only when neither the card nor any face supplies a
+ *   mana_cost — typical for lands ({} is empty-string, not null).
+ */
+function getManaCost(card: ScryfallCard): string | null {
+  if (typeof card.mana_cost === "string") {
+    return card.mana_cost;
+  }
+  const faceCosts =
+    card.card_faces
+      ?.map((face) =>
+        typeof face.mana_cost === "string" ? face.mana_cost : null,
+      )
+      .filter((value): value is string => value !== null) ?? [];
+  return faceCosts.length > 0 ? faceCosts.join(" // ") : null;
+}
+
+/**
  * Extract USD price preferring the printing finish that matches the listing.
  *
  * Phase 17 D-08 — three-branch ladder per finish enum value:
@@ -278,6 +301,7 @@ export async function enrichCards(
     card.colorIdentity = scryfallData.color_identity;
     card.oracleText = getOracleText(scryfallData);
     card.typeLine = getTypeLine(scryfallData);
+    card.manaCost = getManaCost(scryfallData);
     card.manaValue = getManaValue(scryfallData);
 
     if (card.price === null) {

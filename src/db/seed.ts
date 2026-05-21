@@ -31,6 +31,7 @@ export function cardToRow(card: InventoryRow) {
     backImageUrl: card.backImageUrl ?? null,
     oracleText: card.oracleText,
     typeLine: card.typeLine ?? null,
+    manaCost: card.manaCost ?? null,
     manaValue: card.manaValue ?? null,
     rarity: card.rarity,
     finish: card.finish,
