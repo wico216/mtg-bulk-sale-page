@@ -883,6 +883,114 @@ export async function getOrderById(
   };
 }
 
+/**
+ * Bulk-fetch a set of orders with their items in a single round-trip.
+ *
+ * Called from the pick-batch route handler (`/admin/orders/pick`) where the
+ * operator hands in a `?refs=ORD-1,ORD-2,...` list, the server hydrates each
+ * order's full detail (so the picker can render card images + binders +
+ * mana cost), then the client groups by configurable sort tokens.
+ *
+ * Two SELECTs (orders + order_items) joined client-side by orderId. Items
+ * preserve their insertion order via `ORDER BY id ASC` inside each order,
+ * matching the per-order shape returned by `getOrderById`.
+ *
+ * Unknown ids are silently dropped — callers should diff the returned list
+ * against the requested ids and surface any miss to the operator.
+ */
+export async function getOrdersByIds(
+  ids: readonly string[],
+): Promise<AdminOrderDetail[]> {
+  if (ids.length === 0) return [];
+
+  const idValues = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `,
+  );
+
+  const [ordersResult, itemsResult] = await Promise.all([
+    db.execute<AdminOrderRow>(sql`
+      SELECT
+        id,
+        buyer_name AS "buyerName",
+        buyer_email AS "buyerEmail",
+        buyer_phone AS "buyerPhone",
+        message,
+        admin_note AS "adminNote",
+        total_items AS "totalItems",
+        total_price AS "totalPrice",
+        status,
+        created_at AS "createdAt"
+      FROM orders
+      WHERE id IN (${idValues})
+    `),
+    db.execute<AdminOrderItemRow & { orderId: string }>(sql`
+      SELECT
+        order_id AS "orderId",
+        card_id AS "cardId",
+        name,
+        set_name AS "setName",
+        set_code AS "setCode",
+        collector_number AS "collectorNumber",
+        condition,
+        price,
+        quantity,
+        line_total AS "lineTotal",
+        image_url AS "imageUrl",
+        binder
+      FROM order_items
+      WHERE order_id IN (${idValues})
+      ORDER BY order_id ASC, id ASC
+    `),
+  ]);
+
+  // Group items by orderId once so per-order assembly is O(items) instead
+  // of O(items × orders).
+  const itemsByOrderId = new Map<string, OrderItem[]>();
+  for (const row of itemsResult.rows) {
+    const item: OrderItem = {
+      cardId: row.cardId,
+      name: row.name,
+      setName: row.setName,
+      setCode: row.setCode,
+      collectorNumber: row.collectorNumber,
+      condition: row.condition,
+      price: centsToDollars(row.price),
+      quantity: row.quantity,
+      lineTotal: centsToDollars(row.lineTotal),
+      imageUrl: row.imageUrl,
+      binder: row.binder,
+    };
+    const arr = itemsByOrderId.get(row.orderId) ?? [];
+    arr.push(item);
+    itemsByOrderId.set(row.orderId, arr);
+  }
+
+  // Preserve the caller's requested order so the picker honours selection
+  // order if it matters (it doesn't today — but cheap to keep deterministic).
+  const ordersById = new Map(ordersResult.rows.map((r) => [r.id, r]));
+  const out: AdminOrderDetail[] = [];
+  for (const id of ids) {
+    const row = ordersById.get(id);
+    if (!row) continue;
+    out.push({
+      orderRef: row.id,
+      buyerName: row.buyerName,
+      buyerEmail: row.buyerEmail,
+      buyerPhone: row.buyerPhone ?? null,
+      message: row.message ?? undefined,
+      adminNote: row.adminNote ?? null,
+      totalItems: row.totalItems,
+      totalPrice: row.totalPrice / 100,
+      status: normalizeStatus(row.status),
+      createdAt: toIsoString(row.createdAt),
+      items: itemsByOrderId.get(id) ?? [],
+    });
+  }
+
+  return out;
+}
+
 export async function updateOrderWorkflow(
   input: UpdateOrderWorkflowInput,
 ): Promise<AdminOrderDetail | null> {
