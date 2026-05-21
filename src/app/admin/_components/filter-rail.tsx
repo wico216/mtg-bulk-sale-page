@@ -192,6 +192,10 @@ export function FilterRail({
           title={`Binder · ${sortedBinders.length.toLocaleString()}`}
         />
         <div className="space-y-0.5">
+          {/* "All" + the currently-selected binder stay always visible so the
+              operator can see what's filtered without opening the disclosure.
+              The full list (20+ binders) lives inside the <details> below so
+              it doesn't push Set + Condition off-screen on a normal laptop. */}
           <RailOption
             active={binderFilter === ""}
             onClick={() => onBinderFilterChange("")}
@@ -210,11 +214,10 @@ export function FilterRail({
             label="All"
             count={totalUniverse}
           />
-          {sortedBinders.map((b) => (
+          {binderFilter !== "" && sortedBinders.includes(binderFilter) && (
             <RailOption
-              key={b}
-              active={binderFilter === b}
-              onClick={() => onBinderFilterChange(b)}
+              active
+              onClick={() => onBinderFilterChange(binderFilter)}
               leading={
                 <span
                   aria-hidden="true"
@@ -222,14 +225,72 @@ export function FilterRail({
                   style={{
                     width: 8,
                     height: 14,
-                    background: binderColor(b),
+                    background: binderColor(binderFilter),
                   }}
                 />
               }
-              label={formatBinderForDisplay(b)}
+              label={formatBinderForDisplay(binderFilter)}
             />
-          ))}
+          )}
         </div>
+        <details className="mt-1.5 group/binders">
+          <summary
+            className="cursor-pointer list-none flex items-center justify-between px-2 py-1 rounded transition-colors"
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 11,
+              letterSpacing: "0.04em",
+              color: "var(--muted)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--ink)";
+              e.currentTarget.style.background =
+                "color-mix(in oklab, var(--ink) 4%, transparent)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--muted)";
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <span>
+              <span
+                className="inline-block transition-transform group-open/binders:rotate-90"
+                style={{ width: 10 }}
+                aria-hidden="true"
+              >
+                ›
+              </span>{" "}
+              Show all binders
+            </span>
+            <span
+              className="tabular-nums"
+              style={{ color: "var(--dim)", fontSize: 10 }}
+            >
+              {sortedBinders.length.toLocaleString()}
+            </span>
+          </summary>
+          <div className="mt-1 space-y-0.5">
+            {sortedBinders.map((b) => (
+              <RailOption
+                key={b}
+                active={binderFilter === b}
+                onClick={() => onBinderFilterChange(b)}
+                leading={
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 rounded-[2px]"
+                    style={{
+                      width: 8,
+                      height: 14,
+                      background: binderColor(b),
+                    }}
+                  />
+                }
+                label={formatBinderForDisplay(b)}
+              />
+            ))}
+          </div>
+        </details>
       </section>
 
       {availableSets.length > 0 && (
