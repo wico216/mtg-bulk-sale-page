@@ -7,7 +7,7 @@ import { getCardsMeta } from "@/db/queries";
 import { ImportClient } from "./_components/import-client";
 
 export const metadata: Metadata = {
-  title: "Import CSV -- Viki MTG Bulk Store",
+  title: "Import CSV — Wiko's Spellbook",
 };
 
 // Current total must reflect latest DB state on every visit (D-12 delta accuracy)

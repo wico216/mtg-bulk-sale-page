@@ -15,9 +15,9 @@ export default async function AccessDeniedPage() {
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950">
       <div className="max-w-sm mx-auto text-center px-4">
         <h1 className="text-xl font-bold mb-2">
-          <span className="text-accent">Viki</span>{" "}
+          <span className="text-accent">Wiko&apos;s</span>{" "}
           <span className="text-zinc-500 dark:text-zinc-400">
-            MTG Bulk Store
+            Spellbook
           </span>
         </h1>
 

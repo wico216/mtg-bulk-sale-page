@@ -10,7 +10,7 @@ import {
 import { InventoryTable } from "./_components/inventory-table";
 
 export const metadata: Metadata = {
-  title: "Inventory · Viki MTG Bulk Store",
+  title: "Inventory — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

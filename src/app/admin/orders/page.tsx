@@ -10,7 +10,7 @@ import { isAdminEmail } from "@/lib/auth/helpers";
 import { OrdersTable } from "./_components/orders-table";
 
 export const metadata: Metadata = {
-  title: "Orders · Viki MTG Bulk Store",
+  title: "Orders — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

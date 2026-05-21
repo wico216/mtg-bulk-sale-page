@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { InventoryRow } from "@/lib/types";
 import { conditionToAbbr } from "@/lib/condition-map";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 interface InventoryLightboxProps {
   card: InventoryRow | null;
@@ -245,7 +246,7 @@ export function InventoryLightbox({ card, onClose }: InventoryLightboxProps) {
                   border: "1px solid var(--border)",
                 }}
               >
-                {card.binder}
+                {formatBinderForDisplay(card.binder)}
               </span>
             </dd>
 

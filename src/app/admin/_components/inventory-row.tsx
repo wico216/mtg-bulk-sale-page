@@ -1,6 +1,7 @@
 "use client";
 
 import type { InventoryRow as InventoryRowType } from "@/lib/types";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 import { EditableCell } from "./editable-cell";
 import type { RowDensity } from "./density-toggle";
 
@@ -352,7 +353,7 @@ function BinderChip({ binder }: { binder: string }) {
         border: "1px solid var(--border)",
       }}
     >
-      {binder}
+      {formatBinderForDisplay(binder)}
     </span>
   );
 }

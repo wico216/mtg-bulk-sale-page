@@ -14,7 +14,7 @@ import { RefreshPricesButton } from "./_components/refresh-prices-button";
  */
 
 export const metadata: Metadata = {
-  title: "Health -- Viki MTG Bulk Store",
+  title: "Health — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

@@ -52,7 +52,7 @@ export async function GET() {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv",
-      "Content-Disposition": `attachment; filename="viki-inventory-${date}.csv"`,
+      "Content-Disposition": `attachment; filename="wikos-spellbook-inventory-${date}.csv"`,
     },
   });
 }

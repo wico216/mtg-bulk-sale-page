@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBinderName } from "../binder-name";
+import { normalizeBinderName, formatBinderForDisplay } from "../binder-name";
 
 /**
  * Phase 17 Task 1 — normalizeBinderName unit coverage.
@@ -71,4 +71,33 @@ describe("normalizeBinderName", () => {
       expect(normalizeBinderName(2 as unknown as string)).toBe("2");
     },
   );
+});
+
+describe("formatBinderForDisplay", () => {
+  it("upper-cases the letter prefix on letter+digit binder codes (a10 → A10)", () => {
+    expect(formatBinderForDisplay("a10")).toBe("A10");
+    expect(formatBinderForDisplay("a02")).toBe("A02");
+    expect(formatBinderForDisplay("r03")).toBe("R03");
+  });
+
+  it("preserves any text after the digit run", () => {
+    expect(formatBinderForDisplay("a10_overflow")).toBe("A10_overflow");
+  });
+
+  it("title-cases pure-word names (unsorted → Unsorted, not UNSORTED)", () => {
+    expect(formatBinderForDisplay("unsorted")).toBe("Unsorted");
+    expect(formatBinderForDisplay("misc")).toBe("Misc");
+  });
+
+  it("returns 'Unsorted' for empty input (matches normalizeBinderName fallback)", () => {
+    expect(formatBinderForDisplay("")).toBe("Unsorted");
+  });
+
+  it("storage layer is canonical lowercase, display is the only place values change", () => {
+    // formatBinderForDisplay is display-only — never round-trip its output
+    // back through normalizeBinderName. The two are NOT inverses.
+    const canonical = normalizeBinderName("A10");
+    expect(canonical).toBe("a10");
+    expect(formatBinderForDisplay(canonical)).toBe("A10");
+  });
 });

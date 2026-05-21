@@ -6,7 +6,7 @@ import { isAdminEmail } from "@/lib/auth/helpers";
 import { OrderDetail } from "../_components/order-detail";
 
 export const metadata: Metadata = {
-  title: "Order Detail -- Viki MTG Bulk Store",
+  title: "Order Detail — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

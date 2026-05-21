@@ -79,7 +79,7 @@ function makeOrder(overrides: Partial<AdminOrderDetail> = {}): AdminOrderDetail 
 describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
   it("renders [binder] pill identifiable + distinct from name text (ADM-01)", () => {
     render(<OrderDetail order={makeOrder()} />);
-    const pill = screen.getByText("[a02]");
+    const pill = screen.getByText("[A02]");
     expect(pill).toBeInTheDocument();
     // Behaviour-level checks (post-v1.4 admin redesign): the pill is now
     // styled via brand-token inline styles instead of literal Tailwind
@@ -110,7 +110,7 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
       items: [makeItem({ binder: "unsorted" })],
     });
     render(<OrderDetail order={order} />);
-    expect(screen.getByText("[unsorted]")).toBeInTheDocument();
+    expect(screen.getByText("[Unsorted]")).toBeInTheDocument();
   });
 
   it("renders multi-binder same-card lines as separate rows (D-07)", () => {
@@ -135,8 +135,8 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
       ],
     });
     render(<OrderDetail order={order} />);
-    const a02Pill = screen.getByText("[a02]");
-    const a05Pill = screen.getByText("[a05]");
+    const a02Pill = screen.getByText("[A02]");
+    const a05Pill = screen.getByText("[A05]");
     expect(a02Pill).toBeInTheDocument();
     expect(a05Pill).toBeInTheDocument();
     // Both pills exist as distinct DOM nodes (no aggregation).
@@ -148,7 +148,8 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
   it("renders binder from item snapshot — survives missing source card (D-06)", () => {
     // Fixture has binder='a02' but a cardId that would not match any
     // live cards row (deliberately mismatched); the rendering still
-    // shows [a02] proving it reads the snapshot, not a join to live cards.
+    // shows [A02] (display-formatted from stored "a02") proving it reads the
+    // snapshot, not a join to live cards.
     const order = makeOrder({
       items: [
         makeItem({
@@ -158,12 +159,12 @@ describe("OrderDetail [binder] pill (Phase 21 Plan 02 Task 2)", () => {
       ],
     });
     render(<OrderDetail order={order} />);
-    expect(screen.getByText("[a02]")).toBeInTheDocument();
+    expect(screen.getByText("[A02]")).toBeInTheDocument();
   });
 
   it("renders [binder] pill adjacent to the card name (DOM proximity)", () => {
     render(<OrderDetail order={makeOrder()} />);
-    const pill = screen.getByText("[a02]");
+    const pill = screen.getByText("[A02]");
     const name = screen.getByText("Lightning Bolt");
     // Both should share a common ancestor — the items.map row container.
     // Walk up from pill until we find an ancestor that also contains name.

@@ -9,7 +9,7 @@ import { isAdminEmail } from "@/lib/auth/helpers";
 import { AuditTable, ImportHistoryTable } from "./_components/audit-table";
 
 export const metadata: Metadata = {
-  title: "Audit History -- Viki MTG Bulk Store",
+  title: "Audit History — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

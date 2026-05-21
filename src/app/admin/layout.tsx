@@ -43,7 +43,7 @@ export default async function AdminLayout({
                 color: "var(--ink)",
               }}
             >
-              Viki
+              Wiko&apos;s Spellbook
             </span>
             <span
               className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"

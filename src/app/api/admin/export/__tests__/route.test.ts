@@ -103,11 +103,11 @@ describe("GET /api/admin/export", () => {
     expect(response.headers.get("Content-Type")).toBe("text/csv");
   });
 
-  it("returns Content-Disposition with filename pattern viki-inventory-{date}.csv", async () => {
+  it("returns Content-Disposition with filename pattern wikos-spellbook-inventory-{date}.csv", async () => {
     const response = await GET();
     const disposition = response.headers.get("Content-Disposition");
     expect(disposition).toMatch(
-      /attachment; filename="viki-inventory-\d{4}-\d{2}-\d{2}\.csv"/,
+      /attachment; filename="wikos-spellbook-inventory-\d{4}-\d{2}-\d{2}\.csv"/,
     );
   });
 

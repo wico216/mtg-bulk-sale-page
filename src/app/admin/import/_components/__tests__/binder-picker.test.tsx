@@ -100,10 +100,14 @@ describe("BinderPicker", () => {
       .getAllByRole("checkbox")
       .map((cb) => cb.parentElement?.textContent ?? "");
     // Expected order: a99 (NEW alpha), then a02 + a05 (existing alpha), unsorted last.
-    expect(labels[0]).toMatch(/a99/);
-    expect(labels[1]).toMatch(/a02/);
-    expect(labels[2]).toMatch(/a05/);
-    expect(labels[3]).toMatch(/unsorted/);
+    // Labels are now display-formatted (A99 not a99, Unsorted not unsorted)
+    // so the picker matches how the operator labels physical binders. The
+    // picker's selection key still uses the canonical lowercase form
+    // internally — display-only transform.
+    expect(labels[0]).toMatch(/A99/);
+    expect(labels[1]).toMatch(/A02/);
+    expect(labels[2]).toMatch(/A05/);
+    expect(labels[3]).toMatch(/Unsorted/);
   });
 
   it("formats row count with thousands separator (D-06)", () => {

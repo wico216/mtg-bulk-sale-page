@@ -524,7 +524,7 @@ describe("ImportClient — Plan 23-02 picker UX (D-05, IMPORT-UX-01..05)", () =>
     // when the persisted shape pre-checks both binders, the picker still
     // opens unchecked.
     localStorage.setItem(
-      "viki-binder-import-selection",
+      "wikos-spellbook-binder-import-selection",
       JSON.stringify({
         state: {
           lastSelection: { "binder-a": true, "binder-b": true },

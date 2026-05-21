@@ -21,11 +21,12 @@ import { persist, createJSONStorage } from "zustand/middleware";
  * (D-05 explicit: only the picker's per-binder memory is dropped; the
  * amber will-delete panel default-CHECKED behavior is unaffected).
  *
- * Stored under localStorage key `viki-binder-import-selection` with
- * version 1 (unchanged). No migration is needed: the removed getter
- * was a derived function, never persisted state — `partialize` below
- * only persists `lastSelection` and `lastUsedAt`, both retained.
- * Removing the orphan getter has zero on-disk consequence.
+ * Stored under localStorage key `wikos-spellbook-binder-import-selection`
+ * with version 1. Previous releases used the key `viki-binder-import-selection`
+ * (renamed 2026-05-20 with the Wiko's Spellbook rebrand); the rename means any
+ * in-progress import selection from before the rebrand falls back to the
+ * default empty state on first read, which is harmless — Plan 23-02 (D-05)
+ * already opens the picker UNCHECKED every session anyway.
  */
 export interface BinderImportState {
   /** Map of normalized binder name -> last-checked state. */
@@ -42,7 +43,7 @@ export interface BinderImportState {
   knownBinderNames: () => string[];
 }
 
-export const BINDER_IMPORT_STORAGE_KEY = "viki-binder-import-selection";
+export const BINDER_IMPORT_STORAGE_KEY = "wikos-spellbook-binder-import-selection";
 export const BINDER_IMPORT_STORE_VERSION = 1;
 
 export const useBinderImportStore = create<BinderImportState>()(

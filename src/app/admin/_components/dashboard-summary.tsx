@@ -1,4 +1,5 @@
 import type { AdminDashboardStats } from "@/db/queries";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 const numberFormatter = new Intl.NumberFormat("en-US");
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -245,7 +246,7 @@ export function DashboardBreakdowns({ stats }: { stats: AdminDashboardStats }) {
           title="By binder"
           emptyLabel="No binder breakdown yet."
           rows={stats.breakdowns.byBinder.map((row) => ({
-            label: row.binder,
+            label: formatBinderForDisplay(row.binder),
             quantity: row.quantity,
             uniqueCards: row.uniqueCards,
             value: row.value,

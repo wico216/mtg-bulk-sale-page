@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { AdminOrderDetail, OrderStatus, OrderWorkflowStatus } from "@/db/orders";
 import { conditionToAbbr } from "@/lib/condition-map";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -743,7 +744,7 @@ export function OrderDetail({ order }: { order: AdminOrderDetail }) {
                       border: "1px solid var(--border)",
                     }}
                   >
-                    [{item.binder}]
+                    [{formatBinderForDisplay(item.binder)}]
                   </span>
                 </div>
                 <div

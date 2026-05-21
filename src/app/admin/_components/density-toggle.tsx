@@ -3,7 +3,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export type RowDensity = "compact" | "standard" | "comfortable";
 
-const STORAGE_KEY = "viki-admin-row-density";
+const STORAGE_KEY = "wikos-spellbook-admin-row-density";
 const DEFAULT_DENSITY: RowDensity = "standard";
 const DENSITIES: ReadonlyArray<{ value: RowDensity; label: string; sr: string }> = [
   { value: "compact", label: "C", sr: "Compact" },
@@ -30,10 +30,10 @@ function subscribeToDensity(callback: () => void): () => void {
   // The `storage` event fires when localStorage is mutated in *another*
   // tab. Same-tab updates are pushed via window.dispatchEvent below.
   window.addEventListener("storage", callback);
-  window.addEventListener("viki-density-change", callback);
+  window.addEventListener("wikos-spellbook-density-change", callback);
   return () => {
     window.removeEventListener("storage", callback);
-    window.removeEventListener("viki-density-change", callback);
+    window.removeEventListener("wikos-spellbook-density-change", callback);
   };
 }
 
@@ -61,7 +61,7 @@ export function useRowDensity(): [RowDensity, (next: RowDensity) => void] {
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
       // Same-tab notification — `storage` only fires cross-tab.
-      window.dispatchEvent(new Event("viki-density-change"));
+      window.dispatchEvent(new Event("wikos-spellbook-density-change"));
     } catch {
       // Quota exceeded or storage disabled — ignore.
     }

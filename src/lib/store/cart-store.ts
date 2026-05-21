@@ -76,7 +76,7 @@ export const useCartStore = create<CartState>()(
       getQuantity: (cardId) => get().items.get(cardId) ?? 0,
     }),
     {
-      name: "viki-cart",
+      name: "wikos-spellbook-cart",
       storage: createJSONStorage(() => localStorage, {
         replacer: (_key: string, value: unknown) => {
           if (value instanceof Map) {

@@ -55,3 +55,30 @@ export function normalizeBinderName(raw: unknown): string {
 
   return coerced === "" ? "unsorted" : coerced;
 }
+
+/**
+ * Display-formats a normalized (lowercase) binder name for human-facing
+ * surfaces (admin UI chips, order detail, dashboard breakdowns, seller email).
+ * Binder codes that mix a letter run then digits ("a10") get the letter run
+ * upper-cased so they read as "A10" — matches how the operator labels physical
+ * binders. Pure-word names like "unsorted" get title-cased so they read as
+ * "Unsorted" (we don't want UI shouting "UNSORTED").
+ *
+ * Storage layer remains canonical (lowercase) per `normalizeBinderName`;
+ * this helper is display-only and is NEVER fed back into any persisted column,
+ * filter value, picker selection key, or storage key. Compare against the raw
+ * `binder` value, not the formatted output.
+ *
+ * Examples:
+ *   "a10"      → "A10"
+ *   "a02"      → "A02"
+ *   "r03"      → "R03"
+ *   "unsorted" → "Unsorted"
+ *   ""         → "Unsorted" (defensive default; same fallback as normalize)
+ */
+export function formatBinderForDisplay(binder: string): string {
+  if (!binder) return "Unsorted";
+  const match = binder.match(/^([a-z]+)(\d.*)$/i);
+  if (match) return match[1].toUpperCase() + match[2];
+  return binder.charAt(0).toUpperCase() + binder.slice(1);
+}

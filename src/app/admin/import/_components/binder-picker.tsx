@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { BinderSummary } from "@/lib/import-contract";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 /**
  * Phase 19 — hand-rolled binder picker (D-03/D-04/D-05/D-08).
@@ -120,7 +121,7 @@ export function BinderPicker({
                   className="h-4 w-4 rounded border-zinc-300 text-accent focus:ring-accent"
                 />
                 <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-100 truncate">
-                  {binder.name}
+                  {formatBinderForDisplay(binder.name)}
                 </span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
                   {fmt.format(binder.rowCount)}

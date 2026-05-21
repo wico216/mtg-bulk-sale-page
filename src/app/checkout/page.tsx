@@ -4,7 +4,7 @@ import CheckoutClient from "./checkout-client";
 import type { PublicCard } from "@/lib/types";
 
 export const metadata = {
-  title: "Checkout -- Viki MTG Bulk Store",
+  title: "Checkout — Wiko's Spellbook",
 };
 
 export const dynamic = "force-dynamic";

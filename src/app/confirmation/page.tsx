@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import ConfirmationClient from "./confirmation-client";
 
 export const metadata = {
-  title: "Order Confirmed -- Viki MTG Bulk Store",
+  title: "Order Confirmed — Wiko's Spellbook",
 };
 
 export default function ConfirmationPage() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 export type InventorySortKey =
   | "name-asc"
@@ -173,7 +174,7 @@ export function FilterRail({
             <RadioRow
               key={b}
               checked={binderFilter === b}
-              label={b}
+              label={formatBinderForDisplay(b)}
               onSelect={() => onBinderFilterChange(b)}
               hint={b === "unsorted" ? "(legacy)" : undefined}
             />

@@ -77,7 +77,7 @@ describe("useBinderImportStore", () => {
   });
 
   it("persist key matches BINDER_IMPORT_STORAGE_KEY constant", () => {
-    expect(BINDER_IMPORT_STORAGE_KEY).toBe("viki-binder-import-selection");
+    expect(BINDER_IMPORT_STORAGE_KEY).toBe("wikos-spellbook-binder-import-selection");
     expect(BINDER_IMPORT_STORE_VERSION).toBe(1);
     // After a setLastSelection, localStorage should have an entry under the key.
     useBinderImportStore.getState().setLastSelection({ a02: true });

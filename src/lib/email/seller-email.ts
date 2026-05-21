@@ -1,17 +1,6 @@
 import type { OrderData, OrderItem } from "@/lib/types";
 import { escapeHtml } from "@/lib/order";
-
-// Display-formats a stored binder name (lowercase, e.g. "a10", "unsorted") for
-// the seller email. Binder codes that mix letters then digits ("a10") get the
-// letter run upper-cased so they read as "A10" — matches how the operator
-// labels physical binders. Pure-word names like "unsorted" get title-cased so
-// they read as "Unsorted" (we don't want "UNSORTED" shouting in the email).
-function formatBinderForDisplay(binder: string): string {
-  if (!binder) return "Unsorted";
-  const match = binder.match(/^([a-z]+)(\d.*)$/i);
-  if (match) return match[1].toUpperCase() + match[2];
-  return binder.charAt(0).toUpperCase() + binder.slice(1);
-}
+import { formatBinderForDisplay } from "@/lib/binder-name";
 
 function renderItemRow(item: OrderItem): string {
   return `
