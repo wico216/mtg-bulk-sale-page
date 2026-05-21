@@ -44,3 +44,6 @@ next-env.d.ts
 # project data
 data/generated/
 data/cache/
+
+# Claude Code local IDE config — never commit
+.claude/
