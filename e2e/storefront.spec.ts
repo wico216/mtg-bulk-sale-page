@@ -77,3 +77,43 @@ test("card details modal keeps Add to satchel visible on phone screens", async (
   expect(viewportHeight).toBeDefined();
   expect(addButtonBox!.y + addButtonBox!.height).toBeLessThanOrEqual(viewportHeight!);
 });
+
+test("mobile search controls stay pinned below the header while scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const header = page.locator(".wiko-header");
+  const filterButton = page.getByRole("button", { name: /filter/i });
+  const searchInput = page.getByPlaceholder(/Search cards/i);
+  const sortSelect = page.getByRole("combobox");
+
+  await expect(header).toBeVisible();
+  await expect(filterButton).toBeVisible();
+  await expect(searchInput).toBeVisible();
+  await expect(sortSelect).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 700));
+
+  const [headerBox, filterBox, searchBox, sortBox] = await Promise.all([
+    header.boundingBox(),
+    filterButton.boundingBox(),
+    searchInput.boundingBox(),
+    sortSelect.boundingBox(),
+  ]);
+
+  expect(headerBox).not.toBeNull();
+  expect(filterBox).not.toBeNull();
+  expect(searchBox).not.toBeNull();
+  expect(sortBox).not.toBeNull();
+
+  const headerBottom = headerBox!.y + headerBox!.height;
+  const viewportHeight = page.viewportSize()?.height;
+  expect(viewportHeight).toBeDefined();
+
+  expect(filterBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
+  expect(searchBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
+  expect(sortBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
+  expect(filterBox!.y + filterBox!.height).toBeLessThanOrEqual(viewportHeight!);
+  expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(viewportHeight!);
+  expect(sortBox!.y + sortBox!.height).toBeLessThanOrEqual(viewportHeight!);
+});
