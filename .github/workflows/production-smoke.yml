@@ -1,0 +1,57 @@
+name: Production Smoke
+
+on:
+  schedule:
+    # Run every 6 hours. GitHub will notify repository watchers if this fails.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      deployment:
+        description: "Deployment URL to smoke test"
+        required: false
+        default: "https://wikospellbinder.com"
+
+permissions:
+  contents: read
+
+env:
+  DEPLOYMENT_URL: ${{ inputs.deployment || 'https://wikospellbinder.com' }}
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  smoke:
+    name: Read-only production smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run read-only smoke checks
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          args=(--deployment "$DEPLOYMENT_URL" --json)
+          deployment_parts=$(node -e 'const raw = process.env.DEPLOYMENT_URL || ""; const url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`); console.log(`${url.protocol} ${url.hostname}`)')
+          deployment_protocol=${deployment_parts%% *}
+          deployment_host=${deployment_parts#* }
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            if [ "$deployment_protocol" = "https:" ] && [ "$deployment_host" = "wikospellbinder.com" ]; then
+              args+=(--bypass-token "$VERCEL_AUTOMATION_BYPASS_SECRET")
+            else
+              echo "Skipping Vercel bypass secret for non-production or non-HTTPS deployment: $DEPLOYMENT_URL"
+            fi
+            unset VERCEL_AUTOMATION_BYPASS_SECRET
+          fi
+          npm run smoke:production:readonly -- "${args[@]}"

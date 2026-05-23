@@ -25,6 +25,7 @@
  *   3. GET /admin              -> 302/307 redirect to /admin/login when no auth
  *   4. DELETE /api/admin/cards -> MUST be 401 (auth guard). Anything else
  *                                 (especially 200) is treated as a hard FAIL.
+ *                                 Skipped when --read-only is set.
  *   5. GET  /api/admin/health  -> 401 (admin-only)
  *
  * Vercel protection bypass:
@@ -45,22 +46,27 @@ Optional:
   --bypass-token <token>     Vercel protection bypass token. Sent as
                              x-vercel-protection-bypass header. Never logged.
   --timeout-ms <number>      Per-request timeout in ms. Default: 15000.
+  --read-only                Skip mutation-method auth probes. Use this for
+                             scheduled production monitoring where checks must
+                             never send DELETE/POST/PATCH requests.
   --json                     Emit results as a single JSON line at the end.
   -h, --help                 Show this help and exit.
 
 Behavior:
-  - Guard-focused. The script is read-only against production data, but
-    issues a guarded, unauthenticated DELETE /api/admin/cards probe to
-    verify that requireAdmin() rejects with 401 BEFORE any state is
+  - Guard-focused. The default mode is read-only against production data,
+    except that it issues a guarded, unauthenticated DELETE /api/admin/cards
+    probe to verify that requireAdmin() rejects with 401 BEFORE any state is
     touched. The expected (and only valid) response is 401. If the
     DELETE ever returns 200, the smoke fails loudly so a misconfigured
-    deployment's broken auth is surfaced immediately.
+    deployment's broken auth is surfaced immediately. Use --read-only for
+    scheduled production monitoring to skip that mutation-method probe.
   - Exit code is 0 if every check passes, 1 otherwise.
   - No secret values are printed (env vars, tokens, cookies all redacted).
 
 Examples:
   npm run smoke:production -- --help
   npm run smoke:production -- --deployment https://your-app.vercel.app
+  npm run smoke:production:readonly -- --deployment https://your-app.vercel.app
   npm run smoke:production -- --deployment https://preview.vercel.app \\
     --bypass-token "\$VERCEL_BYPASS_TOKEN"
 `;
@@ -69,6 +75,7 @@ interface Args {
   deployment?: string;
   bypassToken?: string;
   timeoutMs: number;
+  readOnly: boolean;
   json: boolean;
   help: boolean;
 }
@@ -80,7 +87,7 @@ interface CheckResult {
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { timeoutMs: 15_000, json: false, help: false };
+  const args: Args = { timeoutMs: 15_000, readOnly: false, json: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
@@ -96,6 +103,9 @@ function parseArgs(argv: readonly string[]): Args {
         break;
       case "--timeout-ms":
         args.timeoutMs = Number.parseInt(argv[++i] ?? "", 10) || 15_000;
+        break;
+      case "--read-only":
+        args.readOnly = true;
         break;
       case "--json":
         args.json = true;
@@ -318,13 +328,15 @@ async function main() {
     process.exit(1);
   }
 
-  const checks = [
-    checkHome,
-    checkLoginPage,
-    checkAdminRedirect,
-    checkAdminMutationGuard,
-    checkHealthGuard,
-  ];
+  const checks = args.readOnly
+    ? [checkHome, checkLoginPage, checkAdminRedirect, checkHealthGuard]
+    : [
+        checkHome,
+        checkLoginPage,
+        checkAdminRedirect,
+        checkAdminMutationGuard,
+        checkHealthGuard,
+      ];
 
   const results: CheckResult[] = [];
   for (const check of checks) {

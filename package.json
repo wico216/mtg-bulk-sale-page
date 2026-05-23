@@ -7,8 +7,12 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run lint && npm test && npm run build && npm run test:e2e",
     "lint": "eslint",
     "smoke:production": "tsx scripts/smoke-production.ts",
+    "smoke:production:readonly": "tsx scripts/smoke-production.ts --read-only",
     "migrate:v1.3": "tsx scripts/migrate-v1.3-binder.ts",
     "migrate:v1.3:dry-run": "tsx scripts/migrate-v1.3-binder.ts --dry-run",
     "migrate:phone": "tsx scripts/migrate-v1.3.x-buyer-phone.ts",
@@ -37,6 +41,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
