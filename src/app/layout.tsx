@@ -23,9 +23,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://wikospellbinder.com"),
   title: "Wiko's Spellbook — a trove of singles",
   description:
     "Wiko's Spellbook — browse and order Magic: The Gathering singles from my collection.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Wiko's Spellbook — a trove of singles",
+    description:
+      "Browse and order Magic: The Gathering singles from Wiko's collection.",
+    url: "/",
+    siteName: "Wiko's Spellbook",
+    type: "website",
+  },
 };
 
 // Runs before React hydrates so the stored mode is applied without a flash.

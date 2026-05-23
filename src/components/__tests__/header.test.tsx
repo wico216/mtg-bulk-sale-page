@@ -30,4 +30,13 @@ describe("Header logo link", () => {
 
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps shopkeeper access subtle instead of exposing an Admin label", () => {
+    render(<Header />);
+
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /shopkeeper sign in/i }),
+    ).toBeInTheDocument();
+  });
 });

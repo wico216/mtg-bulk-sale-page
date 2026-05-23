@@ -20,24 +20,27 @@ function IconSearch({ size = 14 }: { size?: number }) {
   );
 }
 
-export default function SortBar() {
+export default function SortBar({ filteredCount }: { filteredCount: number }) {
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const setSearchQuery = useFilterStore((s) => s.setSearchQuery);
   const sortBy = useFilterStore((s) => s.sortBy);
   const setSortBy = useFilterStore((s) => s.setSortBy);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
-
-  const filteredCount = getFilteredCards().length;
 
   return (
     <div
+      data-testid="storefront-search-bar"
       style={{
+        position: "sticky",
+        top: "68px",
+        zIndex: 40,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "16px 32px 0",
+        padding: "16px 32px 12px",
         gap: 16,
         flexWrap: "wrap",
+        background: "var(--bg)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
       <div style={{ position: "relative", flex: "1 1 560px", minWidth: 220, maxWidth: 760 }}>
@@ -56,7 +59,7 @@ export default function SortBar() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search cards or Scryfall syntax..."
+          placeholder="Search name, set, text, type, or try t:dragon c:rg"
           style={{
             width: "100%",
             padding: "9px 12px 9px 34px",

@@ -136,4 +136,19 @@ describe("filter-store Scryfall-style search", () => {
     expect(useFilterStore.getState().selectedTypes.size).toBe(0);
     expect(useFilterStore.getState().hasActiveFilters()).toBe(false);
   });
+
+  it("clearFilters clears search text and restores the default sort", () => {
+    useFilterStore.getState().setSearchQuery("t:artifact");
+    useFilterStore.getState().setSortBy("name-asc");
+    useFilterStore.getState().toggleType("Artifact");
+
+    expect(useFilterStore.getState().hasActiveFilters()).toBe(true);
+
+    useFilterStore.getState().clearFilters();
+
+    expect(useFilterStore.getState().searchQuery).toBe("");
+    expect(useFilterStore.getState().sortBy).toBe("price-desc");
+    expect(useFilterStore.getState().selectedTypes.size).toBe(0);
+    expect(useFilterStore.getState().hasActiveFilters()).toBe(false);
+  });
 });

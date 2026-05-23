@@ -52,6 +52,14 @@ describe("CardTile display name", () => {
     expect(screen.queryByText("Lightning Bolt - Foil")).not.toBeInTheDocument();
   });
 
+  it("keeps quick add visible for touch buyers", () => {
+    render(<CardTile card={publicCard()} onClick={vi.fn()} />);
+
+    expect(
+      screen.getByRole("button", { name: /add lightning bolt to satchel/i }),
+    ).toBeVisible();
+  });
+
   it("transforms double-faced cards on the storefront tile without opening the modal", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

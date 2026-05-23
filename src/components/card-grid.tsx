@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { PublicCard, CardData } from "@/lib/types";
 import { useFilterStore } from "@/lib/store/filter-store";
@@ -10,44 +10,47 @@ import CardModal from "@/components/card-modal";
 interface CardGridProps {
   cards: PublicCard[];
   meta: CardData["meta"];
+  inventoryTotal: number;
+  filteredTotal: number;
+  hasMoreCards: boolean;
+  loading: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  onRetry: () => void;
+  errorMessage?: string | null;
 }
 
-export default function CardGrid({ cards }: CardGridProps) {
-  const setAllCards = useFilterStore((s) => s.setAllCards);
+export default function CardGrid({
+  cards,
+  inventoryTotal,
+  filteredTotal,
+  hasMoreCards,
+  loading,
+  loadingMore,
+  onLoadMore,
+  onRetry,
+  errorMessage,
+}: CardGridProps) {
   const clearFilters = useFilterStore((s) => s.clearFilters);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
-  const allCards = useFilterStore((s) => s.allCards);
-  const searchQuery = useFilterStore((s) => s.searchQuery);
-  const selectedColors = useFilterStore((s) => s.selectedColors);
-  const selectedSets = useFilterStore((s) => s.selectedSets);
-  const selectedRarities = useFilterStore((s) => s.selectedRarities);
-  const selectedTypes = useFilterStore((s) => s.selectedTypes);
-  const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
-  const priceRange = useFilterStore((s) => s.priceRange);
-  const sortBy = useFilterStore((s) => s.sortBy);
-
-  const filteredCards = useMemo(
-    () => getFilteredCards(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      allCards,
-      searchQuery,
-      selectedColors,
-      selectedSets,
-      selectedRarities,
-      selectedTypes,
-      selectedFinishes,
-      priceRange,
-      sortBy,
-    ],
-  );
-
   const [selectedCard, setSelectedCard] = useState<PublicCard | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setAllCards(cards);
-  }, [cards, setAllCards]);
+    if (!hasMoreCards || loadingMore || errorMessage) return;
+    const node = loadMoreRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
+      },
+      { rootMargin: "800px 0px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMoreCards, loadingMore, errorMessage, onLoadMore]);
 
   useEffect(() => {
     if (selectedCard || lightboxUrl) {
@@ -60,7 +63,33 @@ export default function CardGrid({ cards }: CardGridProps) {
     };
   }, [selectedCard, lightboxUrl]);
 
-  if (cards.length === 0) {
+  const errorPanel = errorMessage ? (
+    <div style={{ padding: "32px", textAlign: "center", color: "var(--muted)" }}>
+      <p style={{ margin: "0 0 12px" }}>{errorMessage}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={loading}
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: 3,
+          background: "var(--surface-2)",
+          color: "var(--ink)",
+          cursor: loading ? "wait" : "pointer",
+          fontFamily: "inherit",
+          fontSize: 12,
+          letterSpacing: "0.08em",
+          opacity: loading ? 0.7 : 1,
+          padding: "10px 16px",
+          textTransform: "uppercase",
+        }}
+      >
+        Try again
+      </button>
+    </div>
+  ) : null;
+
+  if (inventoryTotal === 0) {
     return (
       <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
         <div
@@ -81,7 +110,13 @@ export default function CardGrid({ cards }: CardGridProps) {
 
   return (
     <>
-      {filteredCards.length === 0 ? (
+      {loading && cards.length === 0 ? (
+        <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
+          Consulting the shelves…
+        </div>
+      ) : errorMessage && cards.length === 0 ? (
+        errorPanel
+      ) : filteredTotal === 0 ? (
         <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
           <div
             style={{
@@ -117,23 +152,60 @@ export default function CardGrid({ cards }: CardGridProps) {
           </p>
         </div>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-            columnGap: 18,
-            rowGap: 28,
-            padding: "28px 32px 80px",
-          }}
-        >
-          {filteredCards.map((card) => (
-            <CardTile
-              key={card.id}
-              card={card}
-              onClick={() => setSelectedCard(card)}
-            />
-          ))}
-        </div>
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+              columnGap: 18,
+              rowGap: 28,
+              padding: hasMoreCards ? "28px 32px 28px" : "28px 32px 80px",
+              opacity: loading ? 0.55 : 1,
+              transition: "opacity 0.15s ease",
+            }}
+          >
+            {cards.map((card) => (
+              <CardTile
+                key={card.id}
+                card={card}
+                onClick={() => setSelectedCard(card)}
+              />
+            ))}
+          </div>
+          {errorMessage && cards.length > 0 && errorPanel}
+          {hasMoreCards && !errorMessage && (
+            <div
+              ref={loadMoreRef}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "0 32px 80px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={loadingMore}
+                aria-label={`Show more cards (${cards.length} of ${filteredTotal})`}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: "var(--surface-2)",
+                  color: "var(--ink)",
+                  cursor: loadingMore ? "wait" : "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  letterSpacing: "0.08em",
+                  opacity: loadingMore ? 0.7 : 1,
+                  padding: "10px 16px",
+                  textTransform: "uppercase",
+                }}
+              >
+                {loadingMore ? "Loading…" : `Show more (${cards.length}/${filteredTotal})`}
+              </button>
+            </div>
+          )}
+        </>
       )}
       {selectedCard && (
         <CardModal

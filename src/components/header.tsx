@@ -243,6 +243,8 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setShowLogin(true)}
+            aria-label="Shopkeeper sign in"
+            title="Shopkeeper sign in"
             className="wiko-header-admin-btn"
             style={{
               background: "none",
@@ -256,7 +258,7 @@ export default function Header() {
               fontFamily: "inherit",
             }}
           >
-            Admin
+            Keeper
           </button>
           <Link
             href="/cart"

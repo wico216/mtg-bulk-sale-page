@@ -1,11 +1,28 @@
 import Header from "@/components/header";
 import StorefrontShell from "@/components/storefront-shell";
 import { getCardsAggregated, getCardsMeta } from "@/db/queries";
-import type { PublicCard } from "@/lib/types";
+import type { CardData, PublicCard } from "@/lib/types";
+import {
+  DEFAULT_SORT,
+  STOREFRONT_PAGE_SIZE,
+  paginateStorefrontCards,
+  stripAdminFields,
+  type StorefrontFacets,
+} from "@/lib/storefront";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+type HomeData =
+  | {
+      ok: true;
+      cards: PublicCard[];
+      meta: CardData["meta"];
+      initialTotal: number;
+      facets: StorefrontFacets;
+    }
+  | { ok: false };
+
+async function getHomeData(): Promise<HomeData> {
   try {
     const [aggregatedAdmin, meta] = await Promise.all([
       getCardsAggregated(),
@@ -14,26 +31,31 @@ export default async function Home() {
     // v1.3 Phase 20 D-05/D-06 + AGG-02: strip the admin-only `binders`
     // field BEFORE passing to the storefront. The PublicCard[] type guarantees
     // the storefront cannot accidentally read or render binder names.
-    const cards: PublicCard[] = aggregatedAdmin.map(
-      ({ binders: _binders, ...rest }) => rest,
+    const cards = stripAdminFields(aggregatedAdmin);
+    const initialPage = paginateStorefrontCards(
+      cards,
+      { sortBy: DEFAULT_SORT },
+      0,
+      STOREFRONT_PAGE_SIZE,
     );
 
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg)",
-          color: "var(--ink)",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Header />
-        <StorefrontShell cards={cards} meta={meta} />
-      </div>
-    );
+    return {
+      ok: true,
+      cards: initialPage.cards,
+      meta,
+      initialTotal: initialPage.total,
+      facets: initialPage.facets,
+    };
   } catch (error) {
     console.error("[HOME] Database error:", error);
+    return { ok: false };
+  }
+}
+
+export default async function Home() {
+  const data = await getHomeData();
+
+  if (!data.ok) {
     return (
       <div
         style={{
@@ -60,4 +82,24 @@ export default async function Home() {
       </div>
     );
   }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ink)",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
+      <Header />
+      <StorefrontShell
+        cards={data.cards}
+        meta={data.meta}
+        initialTotal={data.initialTotal}
+        facets={data.facets}
+      />
+    </div>
+  );
 }

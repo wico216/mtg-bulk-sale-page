@@ -2,26 +2,21 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import {
-  PRICE_MAX,
   type PriceRange,
   useFilterStore,
 } from "@/lib/store/filter-store";
+import {
+  COLOR_KEYS,
+  PRICE_MAX,
+  RARITY_ORDER,
+  TYPE_OPTIONS,
+  buildStorefrontFacets,
+  type ColorKey,
+  type StorefrontFacets,
+} from "@/lib/storefront";
 import { ManaSymbol } from "@/components/mana-symbol";
 
-const COLOR_KEYS = ["W", "U", "B", "R", "G"] as const;
-type ColorKey = (typeof COLOR_KEYS)[number];
-
-const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"] as const;
 const fmtRarity = (r: string) => r[0].toUpperCase() + r.slice(1);
-const TYPE_OPTIONS = [
-  "Creature",
-  "Land",
-  "Instant",
-  "Sorcery",
-  "Artifact",
-  "Enchantment",
-  "Planeswalker",
-] as const;
 
 function IconSearch({ size = 14 }: { size?: number }) {
   return (
@@ -423,18 +418,29 @@ function SetFilter({
 export interface FilterRailProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  facets?: StorefrontFacets;
+  totalCount?: number;
+  filteredCount?: number;
   /** When true, skip sticky/height styling so the rail flows inside a drawer. */
   embedded?: boolean;
 }
 
-export default function FilterRail({ collapsed, onToggleCollapse, embedded = false }: FilterRailProps) {
-  const allCards = useFilterStore((s) => s.allCards);
+export default function FilterRail({
+  collapsed,
+  onToggleCollapse,
+  facets,
+  totalCount,
+  filteredCount,
+  embedded = false,
+}: FilterRailProps) {
   const selectedColors = useFilterStore((s) => s.selectedColors);
   const selectedSets = useFilterStore((s) => s.selectedSets);
   const selectedRarities = useFilterStore((s) => s.selectedRarities);
   const selectedTypes = useFilterStore((s) => s.selectedTypes);
   const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
   const priceRange = useFilterStore((s) => s.priceRange);
+  const allCards = useFilterStore((s) => s.allCards);
+  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
   const setPriceRange = useFilterStore((s) => s.setPriceRange);
   const toggleColor = useFilterStore((s) => s.toggleColor);
   const toggleSet = useFilterStore((s) => s.toggleSet);
@@ -443,52 +449,22 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
   const toggleFinish = useFilterStore((s) => s.toggleFinish);
   const clearFilters = useFilterStore((s) => s.clearFilters);
   const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
-
-  const filteredCount = getFilteredCards().length;
-  const totalCount = allCards.length;
-
-  const setCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    allCards.forEach((c) => {
-      m[c.setName] = (m[c.setName] || 0) + 1;
-    });
-    return m;
-  }, [allCards]);
-
-  const rarityCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    allCards.forEach((c) => {
-      m[c.rarity] = (m[c.rarity] || 0) + 1;
-    });
-    return m;
-  }, [allCards]);
-
-  const typeCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    allCards.forEach((card) => {
-      const typeLine = card.typeLine?.toLowerCase() ?? "";
-      TYPE_OPTIONS.forEach((typeName) => {
-        if (typeLine.includes(typeName.toLowerCase())) {
-          m[typeName] = (m[typeName] || 0) + 1;
-        }
-      });
-    });
-    return m;
-  }, [allCards]);
-
-  const colorCounts = useMemo(() => {
-    const m: Record<ColorKey, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-    allCards.forEach((c) =>
-      c.colorIdentity.forEach((col) => {
-        if (col in m) m[col as ColorKey]++;
-      }),
-    );
-    return m;
-  }, [allCards]);
-
-  const sortedSets = useMemo(() => Object.keys(setCounts).sort(), [setCounts]);
-  const rarities = RARITY_ORDER.filter((r) => rarityCounts[r]);
+  const derivedFacets = useMemo(
+    () => facets ?? buildStorefrontFacets(allCards),
+    [facets, allCards],
+  );
+  const effectiveTotalCount = totalCount ?? derivedFacets.totalCards;
+  const effectiveFilteredCount = filteredCount ?? getFilteredCards().length;
+  const setCounts = derivedFacets.setCounts;
+  const rarityCounts = derivedFacets.rarityCounts;
+  const typeCounts = derivedFacets.typeCounts;
+  const colorCounts = derivedFacets.colorCounts;
+  const finishCounts = derivedFacets.finishCounts;
+  const sortedSets = useMemo(() => derivedFacets.sets, [derivedFacets.sets]);
+  const rarities = useMemo(
+    () => derivedFacets.rarities.length ? derivedFacets.rarities : RARITY_ORDER.filter((r) => rarityCounts[r]),
+    [derivedFacets.rarities, rarityCounts],
+  );
 
   if (collapsed) {
     return (
@@ -626,7 +602,7 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
           fontVariantNumeric: "tabular-nums",
         }}
       >
-        {filteredCount.toLocaleString()} of {totalCount.toLocaleString()} cards
+        {effectiveFilteredCount.toLocaleString()} of {effectiveTotalCount.toLocaleString()} cards
       </p>
 
       <FilterSection title="Color">
@@ -675,16 +651,19 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
         <div style={{ display: "flex", flexDirection: "column" }}>
           <Checkbox
             label="Normal"
+            count={finishCounts.normal}
             checked={selectedFinishes.has("normal")}
             onToggle={() => toggleFinish("normal")}
           />
           <Checkbox
             label="Foil"
+            count={finishCounts.foil}
             checked={selectedFinishes.has("foil")}
             onToggle={() => toggleFinish("foil")}
           />
           <Checkbox
             label="Etched"
+            count={finishCounts.etched}
             checked={selectedFinishes.has("etched")}
             onToggle={() => toggleFinish("etched")}
           />

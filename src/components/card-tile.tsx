@@ -287,12 +287,12 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           e.stopPropagation();
           if (!inCart) addItem(card.id, card.quantity);
         }}
-        aria-label="Quick add to cart"
+        aria-label={`Add ${displayName} to satchel`}
         style={{
           position: inCart ? "absolute" : "absolute",
-          top: 8,
+          top: card.price == null ? 34 : 8,
           right: 8,
-          opacity: 0,
+          opacity: 1,
           width: 28,
           height: 28,
           borderRadius: "50%",

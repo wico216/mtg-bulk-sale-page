@@ -171,15 +171,15 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
   if (items.size === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 text-center py-16">
-        <p className="text-lg text-zinc-500 mb-4">Your cart is empty</p>
+        <p className="text-lg text-zinc-500 mb-4">The satchel is empty.</p>
         <p className="text-sm text-zinc-400 mb-6">
-          Add some cards before checking out.
+          Choose a card before opening the handoff scroll.
         </p>
         <Link
           href="/"
           className="inline-block px-5 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
         >
-          Browse cards
+          Browse the shelves
         </Link>
       </div>
     );
