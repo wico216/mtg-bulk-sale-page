@@ -408,6 +408,7 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
 
           {card.oracleText && (
             <p
+              className="wiko-card-modal-oracle"
               style={{
                 marginTop: 18,
                 paddingTop: 16,
@@ -423,6 +424,7 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
           )}
 
           <div
+            className="wiko-card-modal-actions"
             style={{
               marginTop: 24,
               paddingTop: 20,
