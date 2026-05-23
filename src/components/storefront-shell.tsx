@@ -81,49 +81,61 @@ export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
       <div>
         <main>
           <div
+            className="wiko-mobile-storefront-controls"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "12px 16px 0",
+              position: "sticky",
+              top: 68,
+              zIndex: 40,
+              background: "var(--bg)",
+              borderBottom: "1px solid var(--border)",
+              paddingBottom: 12,
             }}
           >
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
+            <div
               style={{
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                border: "1px solid var(--border)",
-                borderRadius: 3,
-                background: "var(--surface-2)",
-                color: "var(--ink)",
-                fontSize: 12,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                fontFamily: "inherit",
-                cursor: "pointer",
+                gap: 10,
+                padding: "12px 16px 0",
               }}
             >
-              <IconSliders />
-              Filter
-              {filtersActive && (
-                <span
-                  aria-hidden
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "var(--accent)",
-                    marginLeft: 2,
-                  }}
-                />
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(true)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  border: "1px solid var(--border)",
+                  borderRadius: 3,
+                  background: "var(--surface-2)",
+                  color: "var(--ink)",
+                  fontSize: 12,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                }}
+              >
+                <IconSliders />
+                Filter
+                {filtersActive && (
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "var(--accent)",
+                      marginLeft: 2,
+                    }}
+                  />
+                )}
+              </button>
+            </div>
+            <SortBar />
           </div>
-          <SortBar />
           <CardGrid cards={cards} meta={meta} />
         </main>
         {mobileOpen && (
