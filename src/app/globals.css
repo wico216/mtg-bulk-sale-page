@@ -207,3 +207,58 @@ a { color: inherit; }
   .wiko-header-actions { gap: 6px !important; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
 }
+
+/* Mobile card details: stack image and details so long card names/set names stay readable. */
+@media (max-width: 640px) {
+  .wiko-card-modal {
+    grid-template-columns: 1fr !important;
+    width: min(100%, calc(100vw - 24px)) !important;
+    max-width: 420px !important;
+    max-height: calc(100dvh - 24px) !important;
+  }
+
+  .wiko-card-modal > :first-child {
+    align-items: center !important;
+    padding: 12px 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+
+  .wiko-card-modal > :first-child > :first-child {
+    width: min(52vw, 190px) !important;
+    align-self: center !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+  }
+
+  .wiko-card-modal > :first-child > :not(:first-child) {
+    width: min(52vw, 190px) !important;
+  }
+
+  .wiko-card-modal > :last-child {
+    padding: 18px 18px 20px !important;
+  }
+
+  .wiko-card-modal h3 {
+    font-size: 24px !important;
+    line-height: 1.08 !important;
+  }
+
+  .wiko-card-modal-actions {
+    order: 2 !important;
+    margin-top: 16px !important;
+    padding-top: 16px !important;
+    border-top: 1px solid var(--border) !important;
+  }
+
+  .wiko-card-modal-oracle {
+    order: 3 !important;
+  }
+
+  .wiko-card-modal a,
+  .wiko-card-modal p,
+  .wiko-card-modal dt,
+  .wiko-card-modal dd {
+    overflow-wrap: anywhere !important;
+  }
+}
