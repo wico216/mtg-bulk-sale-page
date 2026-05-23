@@ -1,50 +1,68 @@
 import Header from "@/components/header";
 import StorefrontShell from "@/components/storefront-shell";
 import { getCardsAggregated, getCardsMeta } from "@/db/queries";
-import type { PublicCard } from "@/lib/types";
+import {
+  e2eFixtureCards,
+  e2eFixtureMeta,
+  e2eFixturesEnabled,
+} from "@/lib/e2e-fixtures";
+import { toPublicCards } from "@/lib/public-card";
+import type { CardData, PublicCard } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  try {
-    const [aggregatedAdmin, meta] = await Promise.all([
-      getCardsAggregated(),
-      getCardsMeta(),
-    ]);
-    // v1.3 Phase 20 D-05/D-06 + AGG-02: strip the admin-only `binders`
-    // field BEFORE passing to the storefront. The PublicCard[] type guarantees
-    // the storefront cannot accidentally read or render binder names.
-    const cards: PublicCard[] = aggregatedAdmin.map(
-      ({ binders: _binders, ...rest }) => rest,
-    );
+type StorefrontData = {
+  cards: PublicCard[];
+  meta: CardData["meta"];
+};
 
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg)",
-          color: "var(--ink)",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Header />
-        <StorefrontShell cards={cards} meta={meta} />
-      </div>
-    );
+async function loadStorefrontData(): Promise<StorefrontData> {
+  if (e2eFixturesEnabled()) {
+    return { cards: e2eFixtureCards, meta: e2eFixtureMeta };
+  }
+
+  const [aggregatedAdmin, meta] = await Promise.all([
+    getCardsAggregated(),
+    getCardsMeta(),
+  ]);
+  // v1.3 Phase 20 D-05/D-06 + AGG-02: strip the admin-only `binders`
+  // field BEFORE passing to the storefront. The PublicCard[] type guarantees
+  // the storefront cannot accidentally read or render binder names.
+  return { cards: toPublicCards(aggregatedAdmin), meta };
+}
+
+async function loadStorefrontDataSafely(): Promise<StorefrontData | null> {
+  try {
+    return await loadStorefrontData();
   } catch (error) {
     console.error("[HOME] Database error:", error);
+    return null;
+  }
+}
+
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ink)",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
+      <Header />
+      {children}
+    </div>
+  );
+}
+
+export default async function Home() {
+  const data = await loadStorefrontDataSafely();
+
+  if (!data) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg)",
-          color: "var(--ink)",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Header />
+      <PageShell>
         <main
           style={{
             maxWidth: 720,
@@ -57,7 +75,13 @@ export default async function Home() {
             The shop is briefly closed — try again soon.
           </p>
         </main>
-      </div>
+      </PageShell>
     );
   }
+
+  return (
+    <PageShell>
+      <StorefrontShell cards={data.cards} meta={data.meta} />
+    </PageShell>
+  );
 }

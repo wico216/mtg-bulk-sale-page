@@ -25,9 +25,7 @@ export default function SortBar() {
   const setSearchQuery = useFilterStore((s) => s.setSearchQuery);
   const sortBy = useFilterStore((s) => s.sortBy);
   const setSortBy = useFilterStore((s) => s.setSortBy);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
-
-  const filteredCount = getFilteredCards().length;
+  const filteredCount = useFilterStore((s) => s.getFilteredCards().length);
 
   return (
     <div
