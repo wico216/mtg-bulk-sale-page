@@ -133,6 +133,39 @@ test("mobile search controls hide on downward scroll and return on upward scroll
     .toBe(true);
 });
 
+test("mobile storefront uses compact two-column cards while desktop keeps the wide grid", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const mobileGrid = page.locator(".wiko-card-grid");
+  const mobileTiles = mobileGrid.locator(".wiko-tile");
+  await expect(mobileTiles).toHaveCount(3);
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+
+  const [firstMobileBox, secondMobileBox] = await Promise.all([
+    mobileTiles.nth(0).boundingBox(),
+    mobileTiles.nth(1).boundingBox(),
+  ]);
+  expect(firstMobileBox).not.toBeNull();
+  expect(secondMobileBox).not.toBeNull();
+  expect(Math.abs(firstMobileBox!.y - secondMobileBox!.y)).toBeLessThanOrEqual(2);
+  expect(firstMobileBox!.width).toBeLessThan(200);
+  const mobileQuickAdd = mobileTiles.nth(0).getByRole("button", { name: "Quick add to cart" });
+  await expect(mobileQuickAdd).toBeVisible();
+  await expect(mobileQuickAdd).toHaveCSS("opacity", "1");
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.reload();
+
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toHaveCount(0);
+  const desktopFirstTile = page.locator(".wiko-card-grid .wiko-tile").first();
+  const desktopBox = await desktopFirstTile.boundingBox();
+  const desktopQuickAdd = desktopFirstTile.getByRole("button", { name: "Quick add to cart" });
+  expect(desktopBox).not.toBeNull();
+  expect(desktopBox!.width).toBeGreaterThanOrEqual(250);
+  await expect(desktopQuickAdd).toHaveCSS("opacity", "0");
+});
+
 test("mobile Safari chrome has a solid theme color and header background", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");

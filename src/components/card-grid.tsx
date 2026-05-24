@@ -118,6 +118,7 @@ export default function CardGrid({ cards }: CardGridProps) {
         </div>
       ) : (
         <div
+          className="wiko-card-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",

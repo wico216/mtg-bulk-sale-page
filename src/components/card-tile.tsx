@@ -221,10 +221,42 @@ export default function CardTile({ card, onClick }: CardTileProps) {
             ×{qty}
           </span>
         )}
+        <button
+          type="button"
+          className="wiko-tile-add"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!inCart) addItem(card.id, card.quantity);
+          }}
+          aria-label="Quick add to cart"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            opacity: 0,
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "var(--bg)",
+            border: "1px solid var(--border-strong)",
+            color: "var(--ink)",
+            cursor: "pointer",
+            display: inCart ? "none" : "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+            lineHeight: 1,
+            transition: "opacity 0.15s",
+            fontFamily: "inherit",
+          }}
+        >
+          +
+        </button>
       </div>
 
       <div style={{ marginTop: 10 }}>
         <div
+          className="wiko-tile-title"
           style={{
             fontFamily: "var(--font-display)",
             fontSize: 16,
@@ -250,6 +282,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           }}
         >
           <span
+            className="wiko-tile-set"
             style={{
               fontSize: 10,
               color: "var(--muted)",
@@ -266,6 +299,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
             {card.setCode.toUpperCase()} · {card.setName}
           </span>
           <span
+            className="wiko-tile-price"
             style={{
               fontFamily: "var(--font-display)",
               fontSize: 16,
@@ -279,38 +313,6 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           </span>
         </div>
       </div>
-
-      <button
-        type="button"
-        className="wiko-tile-add"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!inCart) addItem(card.id, card.quantity);
-        }}
-        aria-label="Quick add to cart"
-        style={{
-          position: inCart ? "absolute" : "absolute",
-          top: 8,
-          right: 8,
-          opacity: 0,
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: "var(--bg)",
-          border: "1px solid var(--border-strong)",
-          color: "var(--ink)",
-          cursor: "pointer",
-          display: inCart ? "none" : "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-          lineHeight: 1,
-          transition: "opacity 0.15s",
-          fontFamily: "inherit",
-        }}
-      >
-        +
-      </button>
     </div>
   );
 }
