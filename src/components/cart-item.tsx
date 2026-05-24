@@ -72,7 +72,7 @@ export default function CartItem({
   // hasn't fired yet.
   if (!card) {
     return (
-      <div style={rowShell}>
+      <div className="wiko-cart-item" style={rowShell}>
         <div
           style={{
             width: 48,
@@ -118,8 +118,9 @@ export default function CartItem({
   }
 
   return (
-    <div style={rowShell}>
+    <div className="wiko-cart-item" style={rowShell}>
       <div
+        className="wiko-cart-item-image"
         style={{
           position: "relative",
           width: 48,
@@ -158,8 +159,9 @@ export default function CartItem({
         )}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="wiko-cart-item-details" style={{ flex: 1, minWidth: 0 }}>
         <p
+          className="wiko-cart-item-title"
           style={{
             margin: 0,
             fontFamily: "var(--font-display)",
@@ -175,6 +177,7 @@ export default function CartItem({
           {card.name}
         </p>
         <p
+          className="wiko-cart-item-meta"
           style={{
             margin: "3px 0 0",
             fontSize: 10,
@@ -195,6 +198,7 @@ export default function CartItem({
               : ""}
         </p>
         <p
+          className="wiko-cart-item-price"
           style={{
             margin: "6px 0 0",
             fontFamily: "var(--font-display)",
@@ -206,8 +210,8 @@ export default function CartItem({
         </p>
       </div>
 
-      <div style={{ flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div className="wiko-cart-item-controls" style={{ flexShrink: 0 }}>
+        <div className="wiko-cart-qty-controls" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
             type="button"
             onClick={() => (quantity <= 1 ? onRemove() : onQuantityChange(quantity - 1))}
@@ -217,6 +221,7 @@ export default function CartItem({
             −
           </button>
           <input
+            className="wiko-cart-quantity-input"
             type="number"
             value={quantity}
             min={1}
@@ -276,6 +281,7 @@ export default function CartItem({
       </div>
 
       <button
+        className="wiko-cart-remove"
         type="button"
         onClick={onRemove}
         aria-label="Remove from cart"

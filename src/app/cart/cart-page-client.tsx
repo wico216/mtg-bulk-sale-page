@@ -26,10 +26,9 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   // Hydration guard: prevent "Your cart is empty" flash before localStorage loads
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    const unsub = useCartStore.persist.onFinishHydration(() =>
-      setHydrated(true),
-    );
-    if (useCartStore.persist.hasHydrated()) setHydrated(true);
+    const finishHydration = () => queueMicrotask(() => setHydrated(true));
+    const unsub = useCartStore.persist.onFinishHydration(finishHydration);
+    if (useCartStore.persist.hasHydrated()) finishHydration();
     return unsub;
   }, []);
 
@@ -99,7 +98,7 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
 
     if (shouldFireToast) {
       // STEP 5: fire one-time toast and advance sentinel.
-      setShowMigrationToast(true);
+      queueMicrotask(() => setShowMigrationToast(true));
       markCartMigrated();
     }
   }, [hydrated, items, cardMap, removeItem, setQuantity]);
@@ -224,8 +223,12 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   // Cart with items
   return (
     <>
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "0 24px" }}>
+      <div
+        className="wiko-cart-page"
+        style={{ maxWidth: 780, margin: "0 auto", padding: "0 24px" }}
+      >
         <div
+          className="wiko-cart-heading"
           style={{
             display: "flex",
             alignItems: "baseline",
@@ -266,7 +269,7 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="wiko-cart-list space-y-3">
           {cartEntries.map(([cardId, qty]) => (
             <CartItem
               key={cardId}

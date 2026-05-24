@@ -31,7 +31,7 @@ export function AdminNav() {
   return (
     <nav
       aria-label="Admin sections"
-      className="flex items-center gap-1 overflow-x-auto"
+      className="flex w-full items-center gap-1 overflow-x-auto sm:w-auto sm:justify-center"
     >
       {NAV_ITEMS.map((item) => {
         const active = isActive(pathname, item);
