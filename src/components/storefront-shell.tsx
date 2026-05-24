@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PublicCard, CardData } from "@/lib/types";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
@@ -40,6 +40,9 @@ function IconSliders({ size = 14 }: { size?: number }) {
 export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileControlsHidden, setMobileControlsHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
   const isMobile = useIsMobile();
   const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters);
   const filtersActive = hasActiveFilters();
@@ -76,6 +79,42 @@ export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
     if (!isMobile && mobileOpen) setMobileOpen(false);
   }, [isMobile, mobileOpen]);
 
+  // Mobile storefront controls behave like Safari chrome: hide while scrolling
+  // down to give cards more room, then reveal as soon as the user nudges upward.
+  useEffect(() => {
+    if (!isMobile) return;
+
+    lastScrollY.current = window.scrollY;
+
+    const updateVisibility = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollY.current;
+
+      if (currentY <= 24) {
+        setMobileControlsHidden(false);
+      } else if (delta > 12) {
+        setMobileControlsHidden(true);
+      } else if (delta < -4) {
+        setMobileControlsHidden(false);
+      }
+
+      lastScrollY.current = currentY;
+      ticking.current = false;
+    };
+
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      window.requestAnimationFrame(updateVisibility);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      ticking.current = false;
+    };
+  }, [isMobile]);
+
   if (isMobile) {
     return (
       <div>
@@ -89,6 +128,10 @@ export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
               background: "var(--bg)",
               borderBottom: "1px solid var(--border)",
               paddingBottom: 12,
+              transform: mobileControlsHidden ? "translateY(calc(-100% - 1px))" : "translateY(0)",
+              transition: "transform 160ms ease",
+              willChange: "transform",
+              pointerEvents: mobileControlsHidden ? "none" : "auto",
             }}
           >
             <div

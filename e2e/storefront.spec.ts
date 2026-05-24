@@ -78,42 +78,75 @@ test("card details modal keeps Add to satchel visible on phone screens", async (
   expect(addButtonBox!.y + addButtonBox!.height).toBeLessThanOrEqual(viewportHeight!);
 });
 
-test("mobile search controls stay pinned below the header while scrolling", async ({ page }) => {
+test("mobile search controls hide on downward scroll and return on upward scroll", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
 
   const header = page.locator(".wiko-header");
+  const controls = page.locator(".wiko-mobile-storefront-controls");
   const filterButton = page.getByRole("button", { name: /filter/i });
   const searchInput = page.getByPlaceholder(/Search cards/i);
   const sortSelect = page.getByRole("combobox");
 
   await expect(header).toBeVisible();
+  await expect(controls).toBeVisible();
   await expect(filterButton).toBeVisible();
   await expect(searchInput).toBeVisible();
   await expect(sortSelect).toBeVisible();
 
   await page.evaluate(() => window.scrollTo(0, 700));
 
-  const [headerBox, filterBox, searchBox, sortBox] = await Promise.all([
-    header.boundingBox(),
-    filterButton.boundingBox(),
-    searchInput.boundingBox(),
-    sortSelect.boundingBox(),
-  ]);
+  await expect
+    .poll(async () => {
+      const [headerBox, controlsBox] = await Promise.all([
+        header.boundingBox(),
+        controls.boundingBox(),
+      ]);
+      if (!headerBox || !controlsBox) return false;
+      const headerBottom = headerBox.y + headerBox.height;
+      return controlsBox.y + controlsBox.height <= headerBottom + 2;
+    })
+    .toBe(true);
 
-  expect(headerBox).not.toBeNull();
-  expect(filterBox).not.toBeNull();
-  expect(searchBox).not.toBeNull();
-  expect(sortBox).not.toBeNull();
+  await page.evaluate(() => window.scrollBy(0, -48));
 
-  const headerBottom = headerBox!.y + headerBox!.height;
-  const viewportHeight = page.viewportSize()?.height;
-  expect(viewportHeight).toBeDefined();
+  await expect
+    .poll(async () => {
+      const [headerBox, filterBox, searchBox, sortBox] = await Promise.all([
+        header.boundingBox(),
+        filterButton.boundingBox(),
+        searchInput.boundingBox(),
+        sortSelect.boundingBox(),
+      ]);
+      const viewportHeight = page.viewportSize()?.height;
+      if (!headerBox || !filterBox || !searchBox || !sortBox || !viewportHeight) return false;
+      const headerBottom = headerBox.y + headerBox.height;
+      return (
+        filterBox.y >= headerBottom - 1 &&
+        searchBox.y >= headerBottom - 1 &&
+        sortBox.y >= headerBottom - 1 &&
+        filterBox.y + filterBox.height <= viewportHeight &&
+        searchBox.y + searchBox.height <= viewportHeight &&
+        sortBox.y + sortBox.height <= viewportHeight
+      );
+    })
+    .toBe(true);
+});
 
-  expect(filterBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
-  expect(searchBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
-  expect(sortBox!.y).toBeGreaterThanOrEqual(headerBottom - 1);
-  expect(filterBox!.y + filterBox!.height).toBeLessThanOrEqual(viewportHeight!);
-  expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(viewportHeight!);
-  expect(sortBox!.y + sortBox!.height).toBeLessThanOrEqual(viewportHeight!);
+test("mobile Safari chrome has a solid theme color and header background", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const themeColors = page.locator('meta[name="theme-color"]');
+  expect(await themeColors.count()).toBeGreaterThan(0);
+
+  const headerBackground = await page
+    .locator(".wiko-header")
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  const rootBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  const bodyBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+  expect(headerBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(rootBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(bodyBackground).not.toBe("rgba(0, 0, 0, 0)");
 });

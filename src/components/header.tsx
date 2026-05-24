@@ -7,6 +7,20 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 type Mode = "light" | "dark";
 const MODE_KEY = "wiko.mode";
+const SAFARI_THEME_COLOR: Record<Mode, string> = {
+  dark: "#171320",
+  light: "#f7f3ea",
+};
+
+function updateSafariThemeColor(mode: Mode) {
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute("content", SAFARI_THEME_COLOR[mode]);
+}
 
 function MageMascot({ size = 40 }: { size?: number }) {
   return (
@@ -117,6 +131,7 @@ function useMode(): [Mode, () => void] {
     setMode((m) => {
       const next: Mode = m === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-mode", next);
+      updateSafariThemeColor(next);
       try {
         localStorage.setItem(MODE_KEY, next);
       } catch {
