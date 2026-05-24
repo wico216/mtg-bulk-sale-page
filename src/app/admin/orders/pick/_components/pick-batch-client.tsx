@@ -163,11 +163,11 @@ export function PickBatchClient({
   }
 
   return (
-    <div className="pb-32">
+    <div className="wiko-picker-screen pb-32">
       {/* Heading */}
       <Link
         href="/admin/orders"
-        className="inline-block mb-3"
+        className="wiko-picker-back inline-block mb-3"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 11,
@@ -179,7 +179,13 @@ export function PickBatchClient({
         ← back to queue
       </Link>
 
-      <header className="grid items-end gap-6 pb-4 mb-4" style={{ borderBottom: "1px solid var(--border)" }}>
+      <header
+        className="wiko-picker-hero grid items-end gap-6 pb-4 mb-4"
+        style={{
+          borderBottom: "1px solid var(--border)",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+        }}
+      >
         <div>
           <p
             className="m-0 mb-2"
@@ -210,7 +216,7 @@ export function PickBatchClient({
             <em style={{ fontStyle: "italic", color: "var(--accent)" }}>.</em>
           </h1>
           <p
-            className="mt-2"
+            className="wiko-picker-batch-meta mt-2"
             style={{
               fontFamily: "var(--font-geist-mono), monospace",
               fontSize: 11,
@@ -234,13 +240,14 @@ export function PickBatchClient({
             · refs {orderRefs.join(", ")}
           </p>
         </div>
+        <BatchStatsCard totals={totals} counts={counts} progressPct={progressPct} />
       </header>
 
       {/* Issues banner: missing refs + skipped (terminal) orders */}
       {(missing.length > 0 || skipped.length > 0) && (
         <div
           role="alert"
-          className="mb-4 rounded p-3"
+          className="wiko-picker-alert mb-4 rounded p-3"
           style={{
             background: "color-mix(in oklab, var(--bad) 6%, transparent)",
             border: "1px solid color-mix(in oklab, var(--bad) 28%, var(--border))",
@@ -267,34 +274,47 @@ export function PickBatchClient({
         </div>
       )}
 
-      {/* Sort tokens — read-only for v1; the chain is BINDER → SET → NAME. */}
       <div
-        className="flex items-center gap-2 py-3 mb-1"
+        className="wiko-picker-toolbar grid gap-3 mb-4"
         style={{
-          fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: 11,
-          letterSpacing: "0.04em",
+          background: "color-mix(in oklab, var(--bg) 92%, transparent)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "12px 14px",
+          backdropFilter: "blur(18px)",
         }}
       >
-        <span
+        {/* Sort tokens — read-only for v1; the chain is BINDER → SET → NAME. */}
+        <div
+          className="wiko-picker-sort-tokens flex items-center gap-2"
           style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            color: "var(--dim)",
-            marginRight: 4,
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 11,
+            letterSpacing: "0.04em",
           }}
         >
-          Sort priority
-        </span>
-        <SortToken order={1} label="BINDER ↑" />
-        <SortToken order={2} label="SET ↑" />
-        <SortToken order={3} label="NAME A→Z" />
-      </div>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "var(--dim)",
+              marginRight: 4,
+            }}
+          >
+            Sort priority
+          </span>
+          <SortToken order={1} label="BINDER ↑" />
+          <SortToken order={2} label="SET ↑" />
+          <SortToken order={3} label="NAME A→Z" />
+        </div>
 
-      {/* Progress */}
-      <div className="grid items-center gap-4 mb-4" style={{ gridTemplateColumns: "1fr auto" }}>
+        {/* Progress */}
+        <div
+          className="wiko-picker-progress grid items-center gap-4"
+          style={{ gridTemplateColumns: "1fr auto" }}
+        >
         <div
           className="relative h-2 rounded overflow-hidden"
           style={{
@@ -325,6 +345,7 @@ export function PickBatchClient({
           <strong style={{ color: "var(--ink)" }}>{counts.remaining}</strong>{" "}
           remaining
         </div>
+        </div>
       </div>
 
       {/* Groups */}
@@ -336,11 +357,11 @@ export function PickBatchClient({
         return (
           <section
             key={g.code}
-            className="mb-2"
+            className="wiko-picker-group mb-2"
             style={{ borderBottom: "1px solid var(--border)" }}
           >
             <div
-              className="flex items-center gap-3 py-3 sticky z-10 backdrop-blur"
+              className="wiko-picker-group-header flex items-center gap-3 py-3 sticky z-10 backdrop-blur"
               style={{
                 top: 56,
                 background:
@@ -403,7 +424,7 @@ export function PickBatchClient({
 
       {/* Sticky footer */}
       <footer
-        className="fixed inset-x-0 bottom-0 z-30"
+        className="wiko-picker-footer fixed inset-x-0 bottom-0 z-30"
         style={{
           background: "color-mix(in oklab, var(--bg) 92%, transparent)",
           borderTop: "1px solid var(--border)",
@@ -411,7 +432,7 @@ export function PickBatchClient({
         }}
       >
         <div
-          className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4"
+          className="wiko-picker-footer-inner max-w-7xl mx-auto px-4 py-3 flex items-center gap-4"
           style={{
             fontFamily: "var(--font-geist-mono), monospace",
             fontSize: 11,
@@ -419,7 +440,7 @@ export function PickBatchClient({
             color: "var(--muted)",
           }}
         >
-          <span>
+          <span className="wiko-picker-footer-counts">
             <strong style={{ color: "var(--ink)" }}>{counts.got}</strong> picked
             ·{" "}
             <strong style={{ color: "var(--ink)" }}>{counts.missing}</strong>{" "}
@@ -442,43 +463,45 @@ export function PickBatchClient({
             </span>
           )}
           <span className="flex-1" />
-          <Link
-            href="/admin/orders"
-            className="text-xs"
-            style={{
-              fontFamily: "var(--font-inter), system-ui, sans-serif",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "var(--muted)",
-              padding: "8px 12px",
-              border: "1px solid var(--border-strong)",
-              borderRadius: 4,
-              textDecoration: "none",
-            }}
-          >
-            Abandon batch
-          </Link>
-          <button
-            type="button"
-            onClick={handleConfirmBatch}
-            disabled={confirming || orderRefs.length === 0}
-            className="transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              fontFamily: "var(--font-inter), system-ui, sans-serif",
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "8px 14px",
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
-              border: "1px solid var(--accent)",
-              borderRadius: 4,
-              cursor: "pointer",
-            }}
-          >
-            {confirming
-              ? "Confirming…"
-              : `Mark batch confirmed · advance ${orderRefs.length} ${orderRefs.length === 1 ? "order" : "orders"} →`}
-          </button>
+          <div className="wiko-picker-footer-actions flex items-center gap-2">
+            <Link
+              href="/admin/orders"
+              className="text-xs"
+              style={{
+                fontFamily: "var(--font-inter), system-ui, sans-serif",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--muted)",
+                padding: "8px 12px",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 4,
+                textDecoration: "none",
+              }}
+            >
+              Abandon batch
+            </Link>
+            <button
+              type="button"
+              onClick={handleConfirmBatch}
+              disabled={confirming || orderRefs.length === 0}
+              className="transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                fontFamily: "var(--font-inter), system-ui, sans-serif",
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "8px 14px",
+                background: "var(--accent)",
+                color: "var(--accent-fg)",
+                border: "1px solid var(--accent)",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              {confirming
+                ? "Confirming…"
+                : `Mark batch confirmed · advance ${orderRefs.length} ${orderRefs.length === 1 ? "order" : "orders"} →`}
+            </button>
+          </div>
         </div>
       </footer>
     </div>
@@ -488,6 +511,117 @@ export function PickBatchClient({
 // ─────────────────────────────────────────────────────────────────────
 // Atoms
 // ─────────────────────────────────────────────────────────────────────
+
+function BatchStatsCard({
+  totals,
+  counts,
+  progressPct,
+}: {
+  totals: { orders: number; cards: number; copies: number };
+  counts: { got: number; missing: number; remaining: number };
+  progressPct: number;
+}) {
+  return (
+    <aside
+      className="wiko-picker-stats-card"
+      aria-label="Batch progress summary"
+      style={{
+        minWidth: 260,
+        padding: "14px 16px",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "linear-gradient(135deg, color-mix(in oklab, var(--surface) 88%, transparent), color-mix(in oklab, var(--accent) 10%, var(--surface)))",
+        boxShadow: "0 18px 60px rgba(0, 0, 0, 0.18)",
+      }}
+    >
+      <div
+        className="flex items-baseline justify-between gap-4"
+        style={{ fontFamily: "var(--font-geist-mono), monospace" }}
+      >
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "var(--dim)",
+          }}
+        >
+          Batch progress
+        </span>
+        <strong
+          className="tabular-nums"
+          style={{
+            fontSize: 24,
+            lineHeight: 1,
+            color: "var(--ink)",
+            letterSpacing: "-0.04em",
+          }}
+        >
+          {progressPct}%
+        </strong>
+      </div>
+      <div
+        className="grid grid-cols-3 gap-2 mt-4"
+        style={{ fontFamily: "var(--font-geist-mono), monospace" }}
+      >
+        <PickerStat label="Orders" value={totals.orders} />
+        <PickerStat label="Cards" value={totals.cards} />
+        <PickerStat label="Copies" value={totals.copies} />
+      </div>
+      <div
+        className="mt-4 pt-3 flex items-center justify-between gap-3 tabular-nums"
+        style={{
+          borderTop: "1px solid color-mix(in oklab, var(--border) 70%, transparent)",
+          fontFamily: "var(--font-geist-mono), monospace",
+          fontSize: 10,
+          color: "var(--muted)",
+        }}
+      >
+        <span>
+          <strong style={{ color: "var(--ink)" }}>{counts.got}</strong> got
+        </span>
+        <span>
+          <strong style={{ color: "var(--bad-soft)" }}>{counts.missing}</strong>{" "}
+          missing
+        </span>
+        <span>
+          <strong style={{ color: "var(--ink)" }}>{counts.remaining}</strong> left
+        </span>
+      </div>
+    </aside>
+  );
+}
+
+function PickerStat({ label, value }: { label: string; value: number }) {
+  return (
+    <span
+      className="rounded-md px-2.5 py-2 tabular-nums"
+      style={{
+        background: "color-mix(in oklab, var(--bg) 38%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--border) 75%, transparent)",
+      }}
+    >
+      <strong
+        className="block"
+        style={{ color: "var(--ink)", fontSize: 15, lineHeight: 1.05 }}
+      >
+        {value}
+      </strong>
+      <span
+        className="block mt-1"
+        style={{
+          color: "var(--muted)",
+          fontSize: 9,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
 
 function SortToken({ order, label }: { order: number; label: string }) {
   return (
@@ -529,7 +663,7 @@ function PickRowView({
   return (
     <div
       data-state={state}
-      className="grid items-center transition-colors"
+      className="wiko-picker-row grid items-center transition-colors"
       style={{
         gridTemplateColumns: "20px 56px minmax(0,1.4fr) auto 90px 200px",
         gap: 14,
@@ -545,7 +679,7 @@ function PickRowView({
     >
       {/* Status glyph */}
       <span
-        className="text-center"
+        className="wiko-picker-row-status text-center"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 14,
@@ -563,7 +697,7 @@ function PickRowView({
 
       {/* Card art */}
       <div
-        className="overflow-hidden rounded"
+        className="wiko-picker-row-art overflow-hidden rounded"
         style={{
           width: 56,
           height: 78,
@@ -591,9 +725,9 @@ function PickRowView({
       </div>
 
       {/* Name + meta */}
-      <div className="min-w-0">
+      <div className="wiko-picker-row-card min-w-0">
         <span
-          className="truncate block"
+          className="wiko-picker-row-title truncate block"
           style={{
             fontFamily:
               "var(--font-instrument-serif), ui-serif, Georgia, serif",
@@ -608,7 +742,7 @@ function PickRowView({
           {row.name}
         </span>
         <span
-          className="block mt-1"
+          className="wiko-picker-row-meta block mt-1"
           style={{
             fontFamily: "var(--font-geist-mono), monospace",
             fontSize: 10,
@@ -641,7 +775,7 @@ function PickRowView({
 
       {/* Source order ref */}
       <span
-        className="text-right"
+        className="wiko-picker-row-order text-right"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 10,
@@ -656,7 +790,7 @@ function PickRowView({
 
       {/* Quantity */}
       <span
-        className="text-right tabular-nums"
+        className="wiko-picker-row-quantity text-right tabular-nums"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 16,
@@ -671,7 +805,7 @@ function PickRowView({
       </span>
 
       {/* Action cluster */}
-      <div className="flex gap-1.5 justify-end">
+      <div className="wiko-picker-row-actions flex gap-1.5 justify-end">
         {state === "pending" && (
           <>
             <PickAction tone="got" onClick={() => onSet(row.id, "got")}>
@@ -735,7 +869,7 @@ function PickAction({
     <button
       type="button"
       onClick={onClick}
-      className="transition-colors"
+      className="wiko-picker-action transition-colors"
       style={{
         fontFamily: "var(--font-geist-mono), monospace",
         fontSize: 10,

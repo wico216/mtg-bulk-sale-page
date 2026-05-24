@@ -1,4 +1,5 @@
 import type {
+  AdminOrderDetail,
   AdminOrdersResult,
   AdminOrderStatusCounts,
 } from "@/db/orders";
@@ -125,3 +126,72 @@ export const e2eFixtureAdminOrderCounts: AdminOrderStatusCounts = {
   completed: 0,
   cancelled: 0,
 };
+
+export const e2eFixtureAdminOrderDetails: AdminOrderDetail[] = [
+  {
+    orderRef: "ORD-E2E-0001",
+    buyerName: "Alex Buyer",
+    buyerEmail: "alex@example.com",
+    buyerPhone: null,
+    message: "Please hold for pickup.",
+    adminNote: null,
+    totalItems: 3,
+    totalPrice: 11.25,
+    status: "pending",
+    createdAt: "2026-05-24T16:00:00.000Z",
+    items: [
+      {
+        cardId: "e2e-150-normal-near_mint::a02",
+        name: "Lightning Bolt",
+        setName: "E2E Masters",
+        setCode: "e2e",
+        collectorNumber: "150",
+        condition: "near_mint",
+        price: 3.5,
+        quantity: 2,
+        lineTotal: 7,
+        imageUrl: null,
+        binder: "a02",
+      },
+      {
+        cardId: "e2e-001-foil-near_mint::b01",
+        name: "Sol Ring",
+        setName: "E2E Masters",
+        setCode: "e2e",
+        collectorNumber: "001",
+        condition: "near_mint",
+        price: 4.25,
+        quantity: 1,
+        lineTotal: 4.25,
+        imageUrl: null,
+        binder: "b01",
+      },
+    ],
+  },
+  {
+    orderRef: "ORD-E2E-0002",
+    buyerName: "Casey Collector",
+    buyerEmail: "casey@example.com",
+    buyerPhone: null,
+    adminNote: null,
+    totalItems: 1,
+    totalPrice: 2,
+    status: "confirmed",
+    createdAt: "2026-05-24T15:00:00.000Z",
+    items: [
+      {
+        cardId: "e2e-045-normal-lightly_played::trade-box",
+        name: "Counterspell",
+        setName: "E2E Masters",
+        setCode: "e2e",
+        collectorNumber: "045",
+        condition: "lightly_played",
+        price: 2,
+        quantity: 1,
+        lineTotal: 2,
+        imageUrl: null,
+        binder: "trade-box",
+      },
+    ],
+  },
+];

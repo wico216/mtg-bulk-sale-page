@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrdersByIds, type AdminOrderDetail } from "@/db/orders";
 import { isAdminEmail } from "@/lib/auth/helpers";
+import {
+  e2eFixtureAdminOrderDetails,
+  e2eFixturesEnabled,
+} from "@/lib/e2e-fixtures";
 import { PickBatchClient, type PickRow } from "./_components/pick-batch-client";
 
 export const metadata: Metadata = {
@@ -66,9 +71,12 @@ export default async function PickBatchPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/admin/login");
-  if (!isAdminEmail(session.user.email)) redirect("/admin/access-denied");
+  const fixtureMode = e2eFixturesEnabled();
+  if (!fixtureMode) {
+    const session = await auth();
+    if (!session?.user) redirect("/admin/login");
+    if (!isAdminEmail(session.user.email)) redirect("/admin/access-denied");
+  }
 
   const resolved = await searchParams;
   const refs = parseRefs(firstParam(resolved.refs));
@@ -91,19 +99,21 @@ export default async function PickBatchPage({
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 13 }}>
           No orders selected. Go back to{" "}
-          <a
+          <Link
             href="/admin/orders"
             style={{ color: "var(--accent)", textDecoration: "underline" }}
           >
             Orders
-          </a>{" "}
+          </Link>{" "}
           and check one or more rows.
         </p>
       </div>
     );
   }
 
-  const orders = await getOrdersByIds(refs);
+  const orders = fixtureMode
+    ? e2eFixtureAdminOrderDetails.filter((order) => refs.includes(order.orderRef))
+    : await getOrdersByIds(refs);
   const missing = refs.filter((r) => !orders.some((o) => o.orderRef === r));
 
   // Only orders that can actually be advanced get included in the picker
