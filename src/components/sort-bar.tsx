@@ -29,6 +29,7 @@ export default function SortBar() {
 
   return (
     <div
+      className="wiko-sort-bar"
       style={{
         display: "flex",
         alignItems: "center",
@@ -38,7 +39,7 @@ export default function SortBar() {
         flexWrap: "wrap",
       }}
     >
-      <div style={{ position: "relative", flex: "1 1 560px", minWidth: 220, maxWidth: 760 }}>
+      <div className="wiko-sort-search" style={{ position: "relative", flex: "1 1 560px", minWidth: 220, maxWidth: 760 }}>
         <span
           style={{
             position: "absolute",
@@ -72,6 +73,7 @@ export default function SortBar() {
         />
       </div>
       <div
+        className="wiko-sort-meta"
         style={{
           display: "flex",
           alignItems: "center",

@@ -214,6 +214,64 @@ a { color: inherit; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
 }
 
+/* Mobile storefront: compact two-column browsing and touch-visible actions.
+ * Scoped to <=640px so desktop/tablet grid density remains driven by the
+ * default minmax(250px, 1fr) layout in CardGrid. */
+@media (max-width: 640px) {
+  .wiko-mobile-storefront-controls .wiko-sort-bar {
+    padding: 10px 14px 12px !important;
+    gap: 10px !important;
+  }
+
+  .wiko-mobile-storefront-controls .wiko-sort-search {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  .wiko-mobile-storefront-controls .wiko-sort-meta {
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .wiko-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    column-gap: 12px !important;
+    row-gap: 22px !important;
+    padding: 20px 14px 72px !important;
+  }
+
+  .wiko-tile-title {
+    font-size: 14px !important;
+    line-height: 1.12 !important;
+    white-space: normal !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    min-height: 32px !important;
+  }
+
+  .wiko-tile-set {
+    font-size: 9px !important;
+  }
+
+  .wiko-tile-price {
+    font-size: 14px !important;
+  }
+
+  .wiko-tile-add {
+    opacity: 1 !important;
+    top: auto !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    width: 32px !important;
+    height: 32px !important;
+    background: color-mix(in oklch, var(--bg) 88%, transparent) !important;
+    backdrop-filter: blur(8px);
+  }
+}
+
 /* Mobile card details: stack image and details so long card names/set names stay readable. */
 @media (max-width: 640px) {
   .wiko-card-modal {
