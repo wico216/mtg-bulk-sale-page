@@ -1,6 +1,7 @@
 import { auth } from "./auth";
 import { NextResponse } from "next/server";
 import { isAdminEmail } from "@/lib/auth/helpers";
+import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -17,6 +18,13 @@ export default auth((req) => {
   // route handlers. The proxy must NOT redirect API requests -- route handlers
   // are the authoritative gate returning JSON 401/403 via requireAdmin().
   if (isAdminApi) return NextResponse.next();
+
+  // E2E fixture mode renders deterministic admin pages without a session.
+  // Production is unaffected because this only trips under the Playwright-only
+  // E2E_FIXTURES=1 environment used by the test web server.
+  if (e2eFixturesEnabled() && isAdminRoute) {
+    return NextResponse.next();
+  }
 
   // Admin page routes need session check
   if (isAdminRoute) {

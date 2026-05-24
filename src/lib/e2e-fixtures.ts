@@ -1,7 +1,11 @@
+import type {
+  AdminOrdersResult,
+  AdminOrderStatusCounts,
+} from "@/db/orders";
 import type { CardData, PublicCard } from "@/lib/types";
 
 export function e2eFixturesEnabled(): boolean {
-  return process.env.E2E_FIXTURES === "1";
+  return process.env.E2E_FIXTURES === "1" && process.env.NODE_ENV !== "production";
 }
 
 export const e2eFixtureCards: PublicCard[] = [
@@ -78,4 +82,46 @@ export const e2eFixtureMeta: CardData["meta"] = {
   totalCards: e2eFixtureCards.reduce((sum, card) => sum + card.quantity, 0),
   totalSkipped: 0,
   totalMissingPrices: 0,
+};
+
+export const e2eFixtureAdminOrders: AdminOrdersResult = {
+  page: 1,
+  limit: 25,
+  total: 2,
+  totalPages: 1,
+  orders: [
+    {
+      id: "ORD-E2E-0001",
+      buyerName: "Alex Buyer",
+      buyerEmail: "alex@example.com",
+      totalItems: 3,
+      totalPrice: 11.25,
+      status: "pending",
+      createdAt: "2026-05-24T16:00:00.000Z",
+      binders: ["a02", "b01"],
+      lineCount: 2,
+      previewItems: ["Lightning Bolt", "Sol Ring"],
+    },
+    {
+      id: "ORD-E2E-0002",
+      buyerName: "Casey Collector",
+      buyerEmail: "casey@example.com",
+      totalItems: 1,
+      totalPrice: 2,
+      status: "confirmed",
+      createdAt: "2026-05-24T15:00:00.000Z",
+      binders: ["trade-box"],
+      lineCount: 1,
+      previewItems: ["Counterspell"],
+    },
+  ],
+};
+
+export const e2eFixtureAdminOrderCounts: AdminOrderStatusCounts = {
+  all: 2,
+  queue: 2,
+  pending: 1,
+  confirmed: 1,
+  completed: 0,
+  cancelled: 0,
 };

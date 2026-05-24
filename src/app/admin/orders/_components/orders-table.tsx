@@ -29,10 +29,11 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
-const absoluteDateFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+function formatAbsoluteDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
 
 function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
@@ -213,7 +214,7 @@ export function OrdersTable({
   // Selection resets when the filter/page changes — same rationale as the
   // inventory table: a cleared list shouldn't carry stale ids.
   useEffect(() => {
-    setSelected(new Set());
+    queueMicrotask(() => setSelected(new Set()));
   }, [q, status, result.page]);
 
   const onActionComplete = (
@@ -262,7 +263,7 @@ export function OrdersTable({
       <OrdersTicker data={ticker} />
 
       {/* Heading band — editorial serif title + section caption */}
-      <header className="grid items-end gap-6 pt-4 pb-3">
+      <header className="wiko-orders-header grid items-end gap-6 pt-4 pb-3">
         <div>
           <p
             className="m-0 mb-2"
@@ -356,7 +357,7 @@ function OrdersTicker({ data }: { data: TickerData }) {
   return (
     <section
       aria-label="Orders ticker"
-      className="sticky z-20 -mx-4 sm:mx-0 px-4 sm:px-0 backdrop-blur"
+      className="wiko-orders-ticker sticky z-20 -mx-4 sm:mx-0 px-4 sm:px-0 backdrop-blur"
       style={{
         top: 56,
         background: "color-mix(in oklab, var(--bg) 92%, transparent)",
@@ -364,7 +365,7 @@ function OrdersTicker({ data }: { data: TickerData }) {
       }}
     >
       <div
-        className="flex items-center gap-x-5 gap-y-1 flex-wrap overflow-x-auto whitespace-nowrap"
+        className="wiko-orders-ticker-inner flex items-center gap-x-5 gap-y-1 flex-wrap overflow-x-auto whitespace-nowrap"
         style={{
           height: 38,
           fontFamily: "var(--font-geist-mono), monospace",
@@ -454,7 +455,7 @@ function StatusTabs({
     <nav
       role="tablist"
       aria-label="Filter by status"
-      className="flex items-center gap-1 -mx-4 sm:mx-0 px-4 sm:px-0"
+      className="wiko-orders-tabs flex items-center gap-1 -mx-4 sm:mx-0 px-4 sm:px-0"
       style={{ borderBottom: "1px solid var(--border)" }}
     >
       {STATUS_TABS.map((tab) => {
@@ -528,7 +529,7 @@ function SearchToolbar({
     <form
       action="/admin/orders"
       method="get"
-      className="grid grid-cols-[1fr_auto] gap-3 items-center py-3"
+      className="wiko-orders-search grid grid-cols-[1fr_auto] gap-3 items-center py-3"
       style={{ borderBottom: "1px solid var(--border)" }}
     >
       <label
@@ -639,6 +640,7 @@ function OrdersList({
 }) {
   return (
     <div
+      className="wiko-orders-list-shell"
       style={{
         background: "var(--surface)",
         borderRadius: 8,
@@ -648,7 +650,7 @@ function OrdersList({
     >
       {/* Header row */}
       <div
-        className="grid items-center"
+        className="wiko-orders-list-header grid items-center"
         style={{
           gridTemplateColumns: COLS,
           gap: 14,
@@ -742,7 +744,7 @@ function OrderRow({
   return (
     <li
       data-selected={selected ? "true" : "false"}
-      className="relative grid items-center group transition-colors"
+      className="wiko-order-row relative grid items-center group transition-colors"
       style={{
         gridTemplateColumns: COLS,
         gap: 14,
@@ -773,7 +775,7 @@ function OrderRow({
       />
 
       {/* Select */}
-      <span>
+      <span className="wiko-order-row-select">
         <input
           type="checkbox"
           aria-label={`Select ${order.id}`}
@@ -787,7 +789,7 @@ function OrderRow({
 
       {/* Status letter chip */}
       <span
-        className="inline-flex items-center justify-center"
+        className="wiko-order-row-status inline-flex items-center justify-center"
         title={order.status}
         aria-label={`Status: ${order.status}`}
         style={{
@@ -806,7 +808,7 @@ function OrderRow({
       {/* Ref + relative date */}
       <Link
         href={`/admin/orders/${order.id}`}
-        className="flex flex-col gap-[3px] hover:underline"
+        className="wiko-order-row-ref flex flex-col gap-[3px] hover:underline"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 13,
@@ -818,7 +820,7 @@ function OrderRow({
       >
         <span>{order.id}</span>
         <span
-          title={absoluteDateFormatter.format(new Date(order.createdAt))}
+          title={formatAbsoluteDate(order.createdAt)}
           style={{
             fontFamily: "var(--font-geist-mono), monospace",
             fontSize: 10,
@@ -832,7 +834,7 @@ function OrderRow({
       </Link>
 
       {/* Buyer */}
-      <div className="min-w-0 flex flex-col gap-[3px]">
+      <div className="wiko-order-row-buyer min-w-0 flex flex-col gap-[3px]">
         <span
           className="truncate"
           style={{
@@ -860,7 +862,7 @@ function OrderRow({
       </div>
 
       {/* Items preview + binders */}
-      <div className="min-w-0 flex flex-col gap-[3px]">
+      <div className="wiko-order-row-preview min-w-0 flex flex-col gap-[3px]">
         <span
           className="truncate"
           style={{
@@ -925,7 +927,7 @@ function OrderRow({
 
       {/* Total */}
       <span
-        className="text-right shrink-0"
+        className="wiko-order-row-total text-right shrink-0"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontVariantNumeric: "tabular-nums",
@@ -944,7 +946,7 @@ function OrderRow({
       {/* Age */}
       <span
         data-age={age.band || undefined}
-        className="text-right shrink-0"
+        className="wiko-order-row-age text-right shrink-0"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontVariantNumeric: "tabular-nums",
@@ -962,7 +964,7 @@ function OrderRow({
       </span>
 
       {/* Hover actions + arrow */}
-      <span className="relative flex items-center justify-end">
+      <span className="wiko-order-row-actions relative flex items-center justify-end">
         <Link
           href={`/admin/orders/${order.id}`}
           aria-label={`Open ${order.id}`}
@@ -974,7 +976,7 @@ function OrderRow({
         </Link>
         {actions.length > 0 && (
           <span
-            className="absolute right-7 top-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity"
+            className="wiko-order-inline-actions absolute right-7 top-1/2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity"
             style={{ transform: "translateY(-50%)" }}
           >
             {actions.map((action) => (

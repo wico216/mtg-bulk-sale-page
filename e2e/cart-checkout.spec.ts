@@ -102,3 +102,51 @@ test("buyer can add a card, edit the satchel, and complete checkout", async ({ p
   await expect(page.getByText("Order ORD-E2E-0001")).toBeVisible();
   await expect(page.getByText(/2 cards\s*—\s*\$7\.00/i)).toBeVisible();
 });
+
+test("mobile satchel uses touch-friendly cart cards and keeps checkout visible", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const boltTile = page.locator(".wiko-tile").filter({ hasText: "Lightning Bolt" });
+  await expect(boltTile).toHaveCount(1);
+  await boltTile.getByRole("button", { name: "Quick add to cart" }).click({ force: true });
+
+  await page.getByRole("link", { name: "Cart" }).click();
+  await expect(page).toHaveURL(/\/cart$/);
+
+  const cartItem = page.locator(".wiko-cart-item").filter({ hasText: "Lightning Bolt" });
+  await expect(cartItem).toBeVisible();
+
+  const titleBox = await cartItem.getByText("Lightning Bolt").boundingBox();
+  const controls = cartItem.locator(".wiko-cart-item-controls");
+  await expect(controls).toBeVisible();
+  const controlsBox = await controls.boundingBox();
+  expect(titleBox).not.toBeNull();
+  expect(controlsBox).not.toBeNull();
+  expect(controlsBox!.y).toBeGreaterThan(titleBox!.y);
+
+  for (const control of [
+    page.getByRole("button", { name: "Decrease quantity" }),
+    page.getByRole("spinbutton", { name: "Quantity" }),
+    page.getByRole("button", { name: "Increase quantity" }),
+  ]) {
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThanOrEqual(40);
+    expect(box!.height).toBeGreaterThanOrEqual(40);
+  }
+
+  const checkout = page.getByRole("link", { name: /Proceed to checkout/i });
+  await expect(checkout).toBeVisible();
+  const checkoutBox = await checkout.boundingBox();
+  expect(checkoutBox).not.toBeNull();
+  expect(checkoutBox!.x).toBeGreaterThanOrEqual(16);
+  expect(checkoutBox!.x + checkoutBox!.width).toBeLessThanOrEqual(390 - 16);
+  expect(checkoutBox!.y + checkoutBox!.height).toBeLessThanOrEqual(844);
+
+  const widths = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.viewport);
+});

@@ -7,6 +7,11 @@ import {
   type OrderQueryStatus,
 } from "@/db/orders";
 import { isAdminEmail } from "@/lib/auth/helpers";
+import {
+  e2eFixtureAdminOrderCounts,
+  e2eFixtureAdminOrders,
+  e2eFixturesEnabled,
+} from "@/lib/e2e-fixtures";
 import { OrdersTable } from "./_components/orders-table";
 
 export const metadata: Metadata = {
@@ -78,6 +83,33 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+  const page = parsePositiveInt(firstParam(resolvedSearchParams.page), 1);
+  const q = parseSearch(firstParam(resolvedSearchParams.q));
+  const status = parseStatus(firstParam(resolvedSearchParams.status));
+
+  if (e2eFixturesEnabled()) {
+    return (
+      <OrdersTable
+        result={e2eFixtureAdminOrders}
+        counts={e2eFixtureAdminOrderCounts}
+        q={q}
+        status={status}
+        ticker={{
+          queue: e2eFixtureAdminOrderCounts.queue,
+          pending: e2eFixtureAdminOrderCounts.pending,
+          confirmed: e2eFixtureAdminOrderCounts.confirmed,
+          todayValue: e2eFixtureAdminOrders.orders.reduce(
+            (sum, order) => sum + order.totalPrice,
+            0,
+          ),
+          oldestAgeText: "2h",
+          oldestAgeBand: "",
+        }}
+      />
+    );
+  }
+
   const session = await auth();
 
   if (!session?.user) {
@@ -87,11 +119,6 @@ export default async function AdminOrdersPage({
   if (!isAdminEmail(session.user.email)) {
     redirect("/admin/access-denied");
   }
-
-  const resolvedSearchParams = await searchParams;
-  const page = parsePositiveInt(firstParam(resolvedSearchParams.page), 1);
-  const q = parseSearch(firstParam(resolvedSearchParams.q));
-  const status = parseStatus(firstParam(resolvedSearchParams.status));
 
   // For the "oldest unfilled" ticker stat we run an extra tiny query: the
   // first row of the queue (pending+confirmed) sorted oldest-first. Doing

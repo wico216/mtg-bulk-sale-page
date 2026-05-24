@@ -13,6 +13,7 @@ export default function CartSummaryBar({
 }: CartSummaryBarProps) {
   return (
     <div
+      className="wiko-cart-summary-bar"
       style={{
         position: "fixed",
         bottom: 0,
@@ -25,6 +26,7 @@ export default function CartSummaryBar({
       }}
     >
       <div
+        className="wiko-cart-summary-inner"
         style={{
           maxWidth: 780,
           margin: "0 auto",
@@ -35,7 +37,7 @@ export default function CartSummaryBar({
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+        <div className="wiko-cart-summary-total" style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
           <span
             style={{
               fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
@@ -58,6 +60,7 @@ export default function CartSummaryBar({
           </span>
         </div>
         <Link
+          className="wiko-cart-checkout-link"
           href="/checkout"
           style={{
             background: "var(--accent)",

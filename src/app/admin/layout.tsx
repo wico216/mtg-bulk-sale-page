@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { AdminNav } from "./_components/admin-nav";
+import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 
 export default async function AdminLayout({
   children,
@@ -9,12 +10,14 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const isAdmin = isAdminEmail(session?.user?.email);
+  const isAdmin = e2eFixturesEnabled() || isAdminEmail(session?.user?.email);
 
   // For non-admin or unauthenticated users, render children only
   // (login and access-denied pages have their own standalone layout).
-  // proxy.ts handles the redirects; layout just wraps content.
-  if (!session || !isAdmin) {
+  // proxy.ts handles the redirects; layout just wraps content. In E2E fixture
+  // mode, `isAdmin` is true without a session so Playwright renders the real
+  // admin shell instead of a misleading bare page.
+  if (!isAdmin) {
     return <>{children}</>;
   }
 
@@ -30,7 +33,7 @@ export default async function AdminLayout({
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Link
             href="/admin"
             className="flex items-center gap-2 shrink-0"
@@ -56,7 +59,9 @@ export default async function AdminLayout({
             </span>
           </Link>
 
-          <AdminNav />
+          <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1 sm:flex sm:justify-center overflow-hidden">
+            <AdminNav />
+          </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
