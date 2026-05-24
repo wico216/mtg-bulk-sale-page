@@ -46,6 +46,8 @@ Optional:
   --bypass-token <token>     Vercel protection bypass token. Sent as
                              x-vercel-protection-bypass header. Never logged.
   --timeout-ms <number>      Per-request timeout in ms. Default: 15000.
+  --retries <number>         Retry count for idempotent GET probes after
+                             transient network errors/5xxs. Default: 2.
   --read-only                Skip mutation-method auth probes. Use this for
                              scheduled production monitoring where checks must
                              never send DELETE/POST/PATCH requests.
@@ -75,6 +77,7 @@ interface Args {
   deployment?: string;
   bypassToken?: string;
   timeoutMs: number;
+  retries: number;
   readOnly: boolean;
   json: boolean;
   help: boolean;
@@ -87,7 +90,7 @@ interface CheckResult {
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { timeoutMs: 15_000, readOnly: false, json: false, help: false };
+  const args: Args = { timeoutMs: 15_000, retries: 2, readOnly: false, json: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
@@ -103,6 +106,9 @@ function parseArgs(argv: readonly string[]): Args {
         break;
       case "--timeout-ms":
         args.timeoutMs = Number.parseInt(argv[++i] ?? "", 10) || 15_000;
+        break;
+      case "--retries":
+        args.retries = Math.max(0, Number.parseInt(argv[++i] ?? "", 10) || 0);
         break;
       case "--read-only":
         args.readOnly = true;
@@ -140,12 +146,52 @@ async function fetchWithTimeout(
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableFetchError(error: unknown): boolean {
+  const name = error instanceof Error ? error.name : "";
+  return name === "AbortError" || name === "TimeoutError" || name === "TypeError";
+}
+
+const RETRYABLE_GET_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+async function fetchReadOnlyWithRetry(
+  url: string,
+  init: RequestInit & { timeoutMs: number },
+  retries: number,
+): Promise<Response> {
+  const attempts = Math.max(0, retries) + 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, init);
+      const shouldRetryStatus = RETRYABLE_GET_STATUSES.has(res.status) && attempt < attempts - 1;
+      if (!shouldRetryStatus) return res;
+      await res.body?.cancel();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFetchError(error) || attempt === attempts - 1) throw error;
+    }
+
+    await sleep(Math.min(1_000 * 2 ** attempt, 5_000));
+  }
+
+  throw lastError;
+}
+
 async function checkHome(base: string, args: Args): Promise<CheckResult> {
-  const res = await fetchWithTimeout(`${base}/`, {
-    method: "GET",
-    headers: bypassHeaders(args.bypassToken),
-    timeoutMs: args.timeoutMs,
-  });
+  const res = await fetchReadOnlyWithRetry(
+    `${base}/`,
+    {
+      method: "GET",
+      headers: bypassHeaders(args.bypassToken),
+      timeoutMs: args.timeoutMs,
+    },
+    args.retries,
+  );
   if (res.status !== 200) {
     return { name: "GET /", ok: false, detail: `status=${res.status}, expected 200` };
   }
@@ -158,11 +204,15 @@ async function checkHome(base: string, args: Args): Promise<CheckResult> {
 }
 
 async function checkLoginPage(base: string, args: Args): Promise<CheckResult> {
-  const res = await fetchWithTimeout(`${base}/admin/login`, {
-    method: "GET",
-    headers: bypassHeaders(args.bypassToken),
-    timeoutMs: args.timeoutMs,
-  });
+  const res = await fetchReadOnlyWithRetry(
+    `${base}/admin/login`,
+    {
+      method: "GET",
+      headers: bypassHeaders(args.bypassToken),
+      timeoutMs: args.timeoutMs,
+    },
+    args.retries,
+  );
   if (res.status !== 200) {
     return {
       name: "GET /admin/login",
@@ -198,11 +248,15 @@ async function checkLoginPage(base: string, args: Args): Promise<CheckResult> {
 }
 
 async function checkAdminRedirect(base: string, args: Args): Promise<CheckResult> {
-  const res = await fetchWithTimeout(`${base}/admin`, {
-    method: "GET",
-    headers: bypassHeaders(args.bypassToken),
-    timeoutMs: args.timeoutMs,
-  });
+  const res = await fetchReadOnlyWithRetry(
+    `${base}/admin`,
+    {
+      method: "GET",
+      headers: bypassHeaders(args.bypassToken),
+      timeoutMs: args.timeoutMs,
+    },
+    args.retries,
+  );
   const isRedirect = res.status === 302 || res.status === 307 || res.status === 308;
   const location = res.headers.get("location") ?? "";
   if (!isRedirect || !location.includes("/admin/login")) {
@@ -259,11 +313,15 @@ async function checkAdminMutationGuard(base: string, args: Args): Promise<CheckR
 }
 
 async function checkHealthGuard(base: string, args: Args): Promise<CheckResult> {
-  const res = await fetchWithTimeout(`${base}/api/admin/health`, {
-    method: "GET",
-    headers: bypassHeaders(args.bypassToken),
-    timeoutMs: args.timeoutMs,
-  });
+  const res = await fetchReadOnlyWithRetry(
+    `${base}/api/admin/health`,
+    {
+      method: "GET",
+      headers: bypassHeaders(args.bypassToken),
+      timeoutMs: args.timeoutMs,
+    },
+    args.retries,
+  );
   if (res.status !== 401) {
     return {
       name: "GET /api/admin/health (unauth)",
