@@ -106,6 +106,12 @@ body::before {
   z-index: 0;
 }
 
+/* Sticky header also paints a solid strip above itself so translucent mobile Safari
+ * chrome/safe-area never shows cards scrolling behind the address bar. */
+.wiko-header {
+  box-shadow: 0 -80px 0 80px var(--bg);
+}
+
 /* Light mode: `screen` blend-mode washes out on parchment — swap to `multiply`. */
 html[data-mode="light"] .wiko-starfield {
   mix-blend-mode: multiply;

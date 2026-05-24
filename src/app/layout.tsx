@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,12 +28,25 @@ export const metadata: Metadata = {
     "Wiko's Spellbook — browse and order Magic: The Gathering singles from my collection.",
 };
 
+export const viewport: Viewport = {
+  themeColor: "#171320",
+  colorScheme: "dark light",
+};
+
 // Runs before React hydrates so the stored mode is applied without a flash.
 const modeInitScript = `(() => {
   try {
     const stored = localStorage.getItem("wiko.mode");
     const mode = stored === "light" || stored === "dark" ? stored : "dark";
     document.documentElement.setAttribute("data-mode", mode);
+    const themeColor = mode === "light" ? "#f7f3ea" : "#171320";
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "theme-color");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", themeColor);
   } catch {}
 })();`;
 
