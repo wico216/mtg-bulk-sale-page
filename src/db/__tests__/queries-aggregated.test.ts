@@ -168,4 +168,13 @@ describe("rowToAggregatedCard (Phase 20 D-01/D-04)", () => {
       /GROUP BY set_code, collector_number, finish, condition\s+HAVING SUM\(quantity\) > 0/s,
     );
   });
+
+  it("getRecentlyAddedCards orders grouped cards by newest created_at before name and applies a limit", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
+
+    expect(source).toMatch(/export async function getRecentlyAddedCards\(limit = 60\)/);
+    expect(source).toMatch(/MAX\(created_at\)\s+AS "createdAt"/);
+    expect(source).toMatch(/ORDER BY MAX\(created_at\) DESC, MAX\(name\) ASC/);
+    expect(source).toMatch(/LIMIT \$\{normalizedLimit\}/);
+  });
 });

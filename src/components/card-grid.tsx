@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import type { PublicCard, CardData } from "@/lib/types";
+import type { SortOption } from "@/lib/store/filter-store";
 import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
 import CardModal from "@/components/card-modal";
@@ -10,9 +11,10 @@ import CardModal from "@/components/card-modal";
 interface CardGridProps {
   cards: PublicCard[];
   meta: CardData["meta"];
+  initialSort?: SortOption;
 }
 
-export default function CardGrid({ cards }: CardGridProps) {
+export default function CardGrid({ cards, initialSort }: CardGridProps) {
   const setAllCards = useFilterStore((s) => s.setAllCards);
   const clearFilters = useFilterStore((s) => s.clearFilters);
   const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
@@ -25,6 +27,7 @@ export default function CardGrid({ cards }: CardGridProps) {
   const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
   const priceRange = useFilterStore((s) => s.priceRange);
   const sortBy = useFilterStore((s) => s.sortBy);
+  const setSortBy = useFilterStore((s) => s.setSortBy);
 
   const filteredCards = useMemo(
     () => getFilteredCards(),
@@ -47,7 +50,8 @@ export default function CardGrid({ cards }: CardGridProps) {
 
   useEffect(() => {
     setAllCards(cards);
-  }, [cards, setAllCards]);
+    if (initialSort) setSortBy(initialSort);
+  }, [cards, initialSort, setAllCards, setSortBy]);
 
   useEffect(() => {
     if (selectedCard || lightboxUrl) {

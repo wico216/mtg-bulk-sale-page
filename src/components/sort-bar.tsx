@@ -3,6 +3,7 @@
 import { type SortOption, useFilterStore } from "@/lib/store/filter-store";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "recent-desc", label: "Newest added" },
   { value: "name-asc", label: "Name (A–Z)" },
   { value: "name-desc", label: "Name (Z–A)" },
   { value: "price-desc", label: "Price (high → low)" },

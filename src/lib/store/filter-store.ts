@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { PublicCard, Finish } from "@/lib/types";
 
 export type SortOption =
+  | "recent-desc"
   | "name-asc"
   | "name-desc"
   | "price-desc"
@@ -356,6 +357,13 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
 
     result = [...result].sort((a, b) => {
       switch (sortBy) {
+        case "recent-desc": {
+          const aTime = Date.parse(a.createdAt ?? "");
+          const bTime = Date.parse(b.createdAt ?? "");
+          const safeATime = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY;
+          const safeBTime = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY;
+          return safeBTime - safeATime || a.name.localeCompare(b.name);
+        }
         case "price-desc": {
           if (a.price === null && b.price === null) return 0;
           if (a.price === null) return 1;

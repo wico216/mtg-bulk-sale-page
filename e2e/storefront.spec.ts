@@ -12,6 +12,7 @@ test("storefront supports search, card details, and unauthenticated admin redire
   await page.goto("/");
 
   await expect(page.getByRole("link", { name: "Wiko's Spellbook home" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "New arrivals" })).toBeVisible();
   await expect(page.getByText(/3 cards in stock/i)).toBeVisible();
 
   await page.getByPlaceholder(/Search cards/i).fill("Lightning Bolt");
@@ -33,6 +34,23 @@ test("storefront supports search, card details, and unauthenticated admin redire
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login$/);
   await expect(page.getByText(/Only authorized admins can access this area/i)).toBeVisible();
+});
+
+test("new arrivals page shows recently added inventory newest first", async ({ page }) => {
+  await page.goto("/new");
+
+  await expect(page.getByRole("heading", { name: "New arrivals" })).toBeVisible();
+  await expect(page.getByText(/Recently added to the spellbook/i)).toBeVisible();
+  await expect(page.getByText(/3 cards in stock/i)).toBeVisible();
+  await expect(page.getByRole("combobox")).toHaveValue("recent-desc");
+
+  const tiles = page.locator(".wiko-card-grid .wiko-tile");
+  await expect(tiles).toHaveCount(3);
+  await expect(tiles.first()).toContainText("Lightning Bolt");
+
+  await page.getByPlaceholder(/Search cards/i).fill("Sol Ring");
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(1);
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Counterspell" })).toHaveCount(0);
 });
 
 test("card details modal keeps readable single-column layout on phone screens", async ({ page }) => {
