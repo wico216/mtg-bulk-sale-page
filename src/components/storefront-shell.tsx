@@ -15,6 +15,11 @@ interface StorefrontShellProps {
 }
 
 const RAIL_COLLAPSED_KEY = "wiko.railCollapsed";
+const MOBILE_CONTROLS_TOP_REVEAL_PX = 32;
+const MOBILE_CONTROLS_HIDE_AFTER_PX = 96;
+const MOBILE_CONTROLS_REVEAL_AFTER_PX = 48;
+const MOBILE_CONTROLS_MIN_SCROLL_DELTA_PX = 2;
+const MOBILE_CONTROLS_TOGGLE_COOLDOWN_MS = 180;
 
 function useIsMobile(maxWidthPx = 767) {
   const [mobile, setMobile] = useState(false);
@@ -47,7 +52,11 @@ export default function StorefrontShell({
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileControlsHidden, setMobileControlsHidden] = useState(false);
+  const mobileControlsHiddenRef = useRef(false);
   const lastScrollY = useRef(0);
+  const scrollIntentDirection = useRef<0 | 1 | -1>(0);
+  const scrollIntentDistance = useRef(0);
+  const lastControlsToggleAt = useRef(0);
   const ticking = useRef(false);
   const isMobile = useIsMobile();
   const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters);
@@ -87,21 +96,71 @@ export default function StorefrontShell({
 
   // Mobile storefront controls behave like Safari chrome: hide while scrolling
   // down to give cards more room, then reveal as soon as the user nudges upward.
+  // The hysteresis keeps quick up/down flicks from making the whole control rail
+  // flap, which feels choppy on mobile even when the scroll thread is healthy.
   useEffect(() => {
-    if (!isMobile) return;
+    if (!isMobile) {
+      mobileControlsHiddenRef.current = mobileControlsHidden;
+      scrollIntentDirection.current = 0;
+      scrollIntentDistance.current = 0;
+      return;
+    }
 
     lastScrollY.current = window.scrollY;
+
+    const resetScrollIntent = () => {
+      scrollIntentDirection.current = 0;
+      scrollIntentDistance.current = 0;
+    };
+
+    const setControlsHidden = (nextHidden: boolean, now: number, force = false) => {
+      if (mobileControlsHiddenRef.current === nextHidden) return;
+      if (!force && now - lastControlsToggleAt.current < MOBILE_CONTROLS_TOGGLE_COOLDOWN_MS) {
+        return;
+      }
+      mobileControlsHiddenRef.current = nextHidden;
+      lastControlsToggleAt.current = now;
+      setMobileControlsHidden(nextHidden);
+    };
 
     const updateVisibility = () => {
       const currentY = window.scrollY;
       const delta = currentY - lastScrollY.current;
+      const absDelta = Math.abs(delta);
+      const now = performance.now();
 
-      if (currentY <= 24) {
-        setMobileControlsHidden(false);
-      } else if (delta > 12) {
-        setMobileControlsHidden(true);
-      } else if (delta < -4) {
-        setMobileControlsHidden(false);
+      if (currentY <= MOBILE_CONTROLS_TOP_REVEAL_PX) {
+        setControlsHidden(false, now, true);
+        resetScrollIntent();
+        lastScrollY.current = currentY;
+        ticking.current = false;
+        return;
+      }
+
+      if (absDelta >= MOBILE_CONTROLS_MIN_SCROLL_DELTA_PX) {
+        const direction: 1 | -1 = delta > 0 ? 1 : -1;
+        if (scrollIntentDirection.current !== direction) {
+          scrollIntentDirection.current = direction;
+          scrollIntentDistance.current = absDelta;
+        } else {
+          scrollIntentDistance.current += absDelta;
+        }
+
+        if (
+          direction === 1 &&
+          !mobileControlsHiddenRef.current &&
+          scrollIntentDistance.current >= MOBILE_CONTROLS_HIDE_AFTER_PX
+        ) {
+          setControlsHidden(true, now);
+          scrollIntentDistance.current = 0;
+        } else if (
+          direction === -1 &&
+          mobileControlsHiddenRef.current &&
+          scrollIntentDistance.current >= MOBILE_CONTROLS_REVEAL_AFTER_PX
+        ) {
+          setControlsHidden(false, now);
+          scrollIntentDistance.current = 0;
+        }
       }
 
       lastScrollY.current = currentY;
@@ -119,7 +178,7 @@ export default function StorefrontShell({
       window.removeEventListener("scroll", onScroll);
       ticking.current = false;
     };
-  }, [isMobile]);
+  }, [isMobile, mobileControlsHidden]);
 
   if (isMobile) {
     return (
@@ -134,9 +193,13 @@ export default function StorefrontShell({
               background: "var(--bg)",
               borderBottom: "1px solid var(--border)",
               paddingBottom: 12,
-              transform: mobileControlsHidden ? "translateY(calc(-100% - 1px))" : "translateY(0)",
-              transition: "transform 160ms ease",
+              transform: mobileControlsHidden
+                ? "translate3d(0, calc(-100% - 1px), 0)"
+                : "translate3d(0, 0, 0)",
+              transition: "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
               willChange: "transform",
+              contain: "paint",
+              backfaceVisibility: "hidden",
               pointerEvents: mobileControlsHidden ? "none" : "auto",
             }}
           >

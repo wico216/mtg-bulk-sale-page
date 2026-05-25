@@ -121,7 +121,7 @@ test("card details modal keeps Add to satchel visible on phone screens", async (
   expect(addButtonBox!.y + addButtonBox!.height).toBeLessThanOrEqual(viewportHeight!);
 });
 
-test("mobile search controls hide on downward scroll and return on upward scroll", async ({ page }) => {
+test("mobile search controls hide/reveal only after intentional scroll distance", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
 
@@ -131,11 +131,35 @@ test("mobile search controls hide on downward scroll and return on upward scroll
   const searchInput = page.getByPlaceholder(/Search cards/i);
   const sortSelect = page.getByRole("combobox");
 
+  const controlsAreVisible = async () => {
+    const [headerBox, filterBox, searchBox, sortBox] = await Promise.all([
+      header.boundingBox(),
+      filterButton.boundingBox(),
+      searchInput.boundingBox(),
+      sortSelect.boundingBox(),
+    ]);
+    const viewportHeight = page.viewportSize()?.height;
+    if (!headerBox || !filterBox || !searchBox || !sortBox || !viewportHeight) return false;
+    const headerBottom = headerBox.y + headerBox.height;
+    return (
+      filterBox.y >= headerBottom - 1 &&
+      searchBox.y >= headerBottom - 1 &&
+      sortBox.y >= headerBottom - 1 &&
+      filterBox.y + filterBox.height <= viewportHeight &&
+      searchBox.y + searchBox.height <= viewportHeight &&
+      sortBox.y + sortBox.height <= viewportHeight
+    );
+  };
+
   await expect(header).toBeVisible();
   await expect(controls).toBeVisible();
   await expect(filterButton).toBeVisible();
   await expect(searchInput).toBeVisible();
   await expect(sortSelect).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 44));
+  await page.waitForTimeout(240);
+  await expect.poll(controlsAreVisible).toBe(true);
 
   await page.evaluate(() => window.scrollTo(0, 700));
 
@@ -151,29 +175,23 @@ test("mobile search controls hide on downward scroll and return on upward scroll
     })
     .toBe(true);
 
-  await page.evaluate(() => window.scrollBy(0, -48));
+  await page.evaluate(() => window.scrollBy(0, -16));
+  await page.waitForTimeout(240);
 
   await expect
     .poll(async () => {
-      const [headerBox, filterBox, searchBox, sortBox] = await Promise.all([
+      const [headerBox, controlsBox] = await Promise.all([
         header.boundingBox(),
-        filterButton.boundingBox(),
-        searchInput.boundingBox(),
-        sortSelect.boundingBox(),
+        controls.boundingBox(),
       ]);
-      const viewportHeight = page.viewportSize()?.height;
-      if (!headerBox || !filterBox || !searchBox || !sortBox || !viewportHeight) return false;
+      if (!headerBox || !controlsBox) return false;
       const headerBottom = headerBox.y + headerBox.height;
-      return (
-        filterBox.y >= headerBottom - 1 &&
-        searchBox.y >= headerBottom - 1 &&
-        sortBox.y >= headerBottom - 1 &&
-        filterBox.y + filterBox.height <= viewportHeight &&
-        searchBox.y + searchBox.height <= viewportHeight &&
-        sortBox.y + sortBox.height <= viewportHeight
-      );
+      return controlsBox.y + controlsBox.height <= headerBottom + 2;
     })
     .toBe(true);
+
+  await page.evaluate(() => window.scrollBy(0, -48));
+  await expect.poll(controlsAreVisible).toBe(true);
 });
 
 test("mobile storefront uses compact two-column cards while desktop keeps the wide grid", async ({ page }) => {
