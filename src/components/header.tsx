@@ -258,6 +258,26 @@ export default function Header() {
           >
             {mode === "dark" ? <IconSun /> : <IconMoon />}
           </button>
+          <Link
+            href="/new"
+            aria-label="New arrivals"
+            className="wiko-header-new-link"
+            style={{
+              color: "var(--ink)",
+              textDecoration: "none",
+              padding: "7px 9px",
+              border: "1px solid var(--border)",
+              borderRadius: 3,
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontFamily: "inherit",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            New
+          </Link>
           <button
             type="button"
             onClick={() => setShowLogin(true)}

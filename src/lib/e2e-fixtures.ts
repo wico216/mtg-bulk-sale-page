@@ -39,8 +39,8 @@ export const e2eFixtureCards: PublicCard[] = [
     rarity: "uncommon",
     finish: "normal",
     scryfallId: "e2e-counterspell",
-    createdAt: "2026-05-23T00:00:00.000Z",
-    updatedAt: "2026-05-23T00:00:00.000Z",
+    createdAt: "2026-05-21T00:00:00.000Z",
+    updatedAt: "2026-05-21T00:00:00.000Z",
   },
   {
     id: "e2e-150-normal-near_mint",
@@ -83,8 +83,8 @@ export const e2eFixtureCards: PublicCard[] = [
     rarity: "uncommon",
     finish: "foil",
     scryfallId: "e2e-sol-ring",
-    createdAt: "2026-05-23T00:00:00.000Z",
-    updatedAt: "2026-05-23T00:00:00.000Z",
+    createdAt: "2026-05-22T00:00:00.000Z",
+    updatedAt: "2026-05-22T00:00:00.000Z",
   },
 ];
 

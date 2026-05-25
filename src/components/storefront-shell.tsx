@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PublicCard, CardData } from "@/lib/types";
+import type { SortOption } from "@/lib/store/filter-store";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
 import CardGrid from "@/components/card-grid";
@@ -10,6 +11,7 @@ import { useFilterStore } from "@/lib/store/filter-store";
 interface StorefrontShellProps {
   cards: PublicCard[];
   meta: CardData["meta"];
+  initialSort?: SortOption;
 }
 
 const RAIL_COLLAPSED_KEY = "wiko.railCollapsed";
@@ -37,7 +39,11 @@ function IconSliders({ size = 14 }: { size?: number }) {
   );
 }
 
-export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
+export default function StorefrontShell({
+  cards,
+  meta,
+  initialSort,
+}: StorefrontShellProps) {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileControlsHidden, setMobileControlsHidden] = useState(false);
@@ -179,7 +185,7 @@ export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
             </div>
             <SortBar />
           </div>
-          <CardGrid cards={cards} meta={meta} />
+          <CardGrid cards={cards} meta={meta} initialSort={initialSort} />
         </main>
         {mobileOpen && (
           <div
@@ -254,7 +260,7 @@ export default function StorefrontShell({ cards, meta }: StorefrontShellProps) {
       />
       <main style={{ flex: 1, minWidth: 0 }}>
         <SortBar />
-        <CardGrid cards={cards} meta={meta} />
+        <CardGrid cards={cards} meta={meta} initialSort={initialSort} />
       </main>
     </div>
   );

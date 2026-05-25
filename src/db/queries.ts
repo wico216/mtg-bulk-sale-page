@@ -182,7 +182,48 @@ export async function getCardById(id: string): Promise<InventoryRow | null> {
  *   - `binders` is sorted distinct ASC — load-bearing input for the
  *     operator-friendly admin display in Phase 21.
  */
+const aggregatedCardsSelect = sql`
+  SELECT
+    set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
+    MAX(name)                                                                  AS "name",
+    set_code                                                                   AS "setCode",
+    MAX(set_name)                                                              AS "setName",
+    collector_number                                                           AS "collectorNumber",
+    AVG(price)::int                                                            AS "price",
+    condition                                                                  AS "condition",
+    SUM(quantity)::int                                                         AS "quantity",
+    MAX(color_identity)                                                        AS "colorIdentity",
+    MAX(image_url)                                                             AS "imageUrl",
+    MAX(back_image_url)                                                        AS "backImageUrl",
+    MAX(oracle_text)                                                           AS "oracleText",
+    MAX(type_line)                                                             AS "typeLine",
+    MAX(mana_value)                                                            AS "manaValue",
+    MAX(rarity)                                                                AS "rarity",
+    finish                                                                     AS "finish",
+    ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)                             AS "binders",
+    MAX(scryfall_id)                                                           AS "scryfallId",
+    MAX(created_at)                                                            AS "createdAt",
+    MAX(updated_at)                                                            AS "updatedAt"
+  FROM cards
+  GROUP BY set_code, collector_number, finish, condition
+  HAVING SUM(quantity) > 0
+`;
+
 export async function getCardsAggregated(): Promise<AdminCard[]> {
+  const result = await db.execute<AggregatedCardRow>(sql`
+    ${aggregatedCardsSelect}
+    ORDER BY MAX(name) ASC
+  `);
+  return result.rows.map(rowToAggregatedCard);
+}
+
+function normalizeRecentLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 60;
+  return Math.min(120, Math.max(1, Math.trunc(limit)));
+}
+
+export async function getRecentlyAddedCards(limit = 60): Promise<AdminCard[]> {
+  const normalizedLimit = normalizeRecentLimit(limit);
   const result = await db.execute<AggregatedCardRow>(sql`
     SELECT
       set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
@@ -203,12 +244,13 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
       finish                                                                     AS "finish",
       ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)                             AS "binders",
       MAX(scryfall_id)                                                           AS "scryfallId",
-      MIN(created_at)                                                            AS "createdAt",
+      MAX(created_at)                                                            AS "createdAt",
       MAX(updated_at)                                                            AS "updatedAt"
     FROM cards
     GROUP BY set_code, collector_number, finish, condition
     HAVING SUM(quantity) > 0
-    ORDER BY MAX(name) ASC
+    ORDER BY MAX(created_at) DESC, MAX(name) ASC
+    LIMIT ${normalizedLimit}
   `);
   return result.rows.map(rowToAggregatedCard);
 }
