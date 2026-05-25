@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import Link from "next/link";
 import { useCartStore } from "@/lib/store/cart-store";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
@@ -144,20 +144,23 @@ function useMode(): [Mode, () => void] {
   return [mode, toggle];
 }
 
+function subscribeCartHydration(onStoreChange: () => void) {
+  return useCartStore.persist.onFinishHydration(onStoreChange);
+}
+
+function getCartHydrationSnapshot() {
+  return useCartStore.persist.hasHydrated();
+}
+
 export default function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
-  const [cartHydrated, setCartHydrated] = useState(
-    () => typeof window !== "undefined" && useCartStore.persist.hasHydrated(),
+  const cartHydrated = useSyncExternalStore(
+    subscribeCartHydration,
+    getCartHydrationSnapshot,
+    () => false,
   );
   const [showLogin, setShowLogin] = useState(false);
   const [mode, toggleMode] = useMode();
-
-  useEffect(() => {
-    const unsub = useCartStore.persist.onFinishHydration(() =>
-      setCartHydrated(true),
-    );
-    return unsub;
-  }, []);
 
   const handleBrandClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (window.location.pathname === "/") {

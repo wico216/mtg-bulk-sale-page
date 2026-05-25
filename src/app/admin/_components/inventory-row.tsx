@@ -122,7 +122,7 @@ export function InventoryRowCard({
   return (
     <li
       data-selected={selected ? "true" : "false"}
-      className="group relative grid items-center transition-colors"
+      className="wiko-inventory-row group relative grid items-center transition-colors"
       style={{
         gridTemplateColumns: config.gridTemplate,
         gap: 14,
@@ -158,7 +158,7 @@ export function InventoryRowCard({
       />
 
       {/* Selection checkbox */}
-      <span className="flex items-center justify-center">
+      <span className="wiko-inventory-row-select flex items-center justify-center">
         <input
           type="checkbox"
           aria-label={`Select ${card.name}`}
@@ -175,7 +175,7 @@ export function InventoryRowCard({
           type="button"
           onClick={() => onInspect(card)}
           aria-label={`Inspect ${card.name}`}
-          className="group/thumb relative overflow-hidden cursor-zoom-in"
+          className="wiko-inventory-row-art group/thumb relative overflow-hidden cursor-zoom-in"
           style={{
             width: config.artW,
             height: config.artH,
@@ -205,9 +205,9 @@ export function InventoryRowCard({
       )}
 
       {/* Name + meta block */}
-      <div className="min-w-0 flex flex-col gap-[3px]">
+      <div className="wiko-inventory-row-details min-w-0 flex flex-col gap-[3px]">
         <span
-          className="truncate"
+          className="wiko-inventory-row-title truncate"
           style={{
             fontFamily: config.titleFamily,
             fontSize: config.titleSize,
@@ -254,7 +254,7 @@ export function InventoryRowCard({
           )}
         </span>
         <span
-          className="flex items-center gap-2 whitespace-nowrap"
+          className="wiko-inventory-row-meta flex items-center gap-2 whitespace-nowrap"
           style={{
             fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
             fontSize: "10px",
@@ -303,7 +303,7 @@ export function InventoryRowCard({
       {/* Mana cost pips + rarity letter chip. ManaCost handles null/empty
           gracefully so lands and unresolved Scryfall rows just collapse the
           pips half; the rarity chip always renders. */}
-      <span className="inline-flex items-center gap-1.5 leading-none">
+      <span className="wiko-inventory-row-mana inline-flex items-center gap-1.5 leading-none">
         <ManaCost cost={card.manaCost} className="text-[14px]" />
         <span
           aria-label={`Rarity ${card.rarity}`}
@@ -327,7 +327,7 @@ export function InventoryRowCard({
           a `$X.YY` static string at rest and swaps to a number input on
           click; the wrapper just owns the typography. */}
       <span
-        className="text-right shrink-0"
+        className="wiko-inventory-row-price text-right shrink-0"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontVariantNumeric: "tabular-nums",
@@ -350,7 +350,7 @@ export function InventoryRowCard({
           EditableCell rather than via ::after so the editing input doesn't
           inherit/clip it. */}
       <span
-        className="flex items-center justify-end gap-1.5 shrink-0"
+        className="wiko-inventory-row-qty flex items-center justify-end gap-1.5 shrink-0"
         data-stock={stock}
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
@@ -408,7 +408,7 @@ export function InventoryRowCard({
       {/* Binder chip — display-formatted (A02 not a02) so the operator's
           physical labels match. */}
       <span
-        className="inline-flex items-center justify-center text-center"
+        className="wiko-inventory-row-binder inline-flex items-center justify-center text-center"
         style={{
           padding: "4px 8px",
           border: "1px solid var(--border)",
@@ -425,7 +425,7 @@ export function InventoryRowCard({
       </span>
 
       {/* Per-row delete (hover-revealed; bulk delete lives in the dock) */}
-      <span className="flex items-center justify-end">
+      <span className="wiko-inventory-row-delete flex items-center justify-end">
         <button
           type="button"
           onClick={() => onRequestDelete(card.id)}

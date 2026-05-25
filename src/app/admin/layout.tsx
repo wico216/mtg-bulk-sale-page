@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { auth, signOut } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { AdminNav } from "./_components/admin-nav";
@@ -10,7 +11,17 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
+  const headerList = await headers();
+  const pathname = headerList.get("x-wiko-pathname") ?? "";
+  const isStandaloneAdminPage =
+    pathname === "/admin/login" || pathname === "/admin/access-denied";
   const isAdmin = e2eFixturesEnabled() || isAdminEmail(session?.user?.email);
+
+  // Login and access-denied pages stay standalone even when E2E fixture mode
+  // treats other admin routes as authorized for deterministic visual guards.
+  if (isStandaloneAdminPage) {
+    return <>{children}</>;
+  }
 
   // For non-admin or unauthenticated users, render children only
   // (login and access-denied pages have their own standalone layout).

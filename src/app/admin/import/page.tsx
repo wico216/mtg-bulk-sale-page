@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getCardsMeta } from "@/db/queries";
+import { e2eFixtureMeta, e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 import { ImportClient } from "./_components/import-client";
 
 export const metadata: Metadata = {
@@ -14,11 +15,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/admin/login");
-  if (!isAdminEmail(session.user.email)) redirect("/admin/access-denied");
+  let meta = e2eFixtureMeta;
 
-  const meta = await getCardsMeta();
+  if (!e2eFixturesEnabled()) {
+    const session = await auth();
+    if (!session?.user) redirect("/admin/login");
+    if (!isAdminEmail(session.user.email)) redirect("/admin/access-denied");
+
+    meta = await getCardsMeta();
+  }
 
   return (
     <div className="max-w-3xl mx-auto">

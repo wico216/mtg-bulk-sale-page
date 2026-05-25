@@ -152,8 +152,8 @@ export function AuditTable({
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
+      <div className="wiko-audit-table-shell overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="wiko-audit-table w-full text-sm">
           <thead>
             <tr className="bg-zinc-50 text-left dark:bg-zinc-900">
               <th className="px-4 py-3 font-semibold text-zinc-600 dark:text-zinc-400">Action</th>
@@ -169,10 +169,10 @@ export function AuditTable({
                 key={entry.id}
                 className="border-t border-zinc-100 align-top dark:border-zinc-800"
               >
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" data-label="Action">
                   <ActionBadge action={entry.action} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" data-label="Target">
                   <div className="font-medium text-zinc-900 dark:text-zinc-100">
                     {entry.targetType}
                     {entry.targetCount !== null ? ` · ${entry.targetCount}` : ""}
@@ -181,16 +181,16 @@ export function AuditTable({
                     {entry.targetId ?? "—"}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300" data-label="Actor">
                   {entry.actorEmail ?? "Unknown"}
                 </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300" data-label="When">
                   {formatDate(entry.createdAt)}
                 </td>
                 {/* Phase 21 D-09/D-11: inventory.import_commit rows route
                     to the ImportCommitDetails client expander; other action
                     types keep the legacy metadataPreview render. */}
-                <td className="max-w-xl px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                <td className="max-w-xl px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-300" data-label="Metadata">
                   {entry.action === "inventory.import_commit" ? (
                     <ImportCommitDetails entry={entry} />
                   ) : (
@@ -230,8 +230,8 @@ export function ImportHistoryTable({
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
+      <div className="wiko-import-history-table-shell overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table className="wiko-import-history-table w-full text-sm">
           <thead>
             <tr className="bg-zinc-50 text-left dark:bg-zinc-900">
               <th className="px-4 py-3 font-semibold text-zinc-600 dark:text-zinc-400">Committed</th>
@@ -262,10 +262,10 @@ export function ImportHistoryTable({
 function ImportHistoryRow({ entry }: { entry: ImportHistoryEntry }) {
   return (
     <tr className="border-t border-zinc-100 align-top dark:border-zinc-800">
-      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300" data-label="Committed">
         {formatDate(entry.committedAt)}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3" data-label="Files">
         <div className="font-medium text-zinc-900 dark:text-zinc-100">
           {entry.fileCount} {entry.fileCount === 1 ? "file" : "files"}
         </div>
@@ -280,12 +280,16 @@ function ImportHistoryRow({ entry }: { entry: ImportHistoryEntry }) {
           ))}
         </div>
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">{entry.parsedRows}</td>
-      <td className="px-4 py-3 text-right tabular-nums">{entry.skippedRows}</td>
-      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+      <td className="px-4 py-3 text-right tabular-nums" data-label="Parsed">
+        {entry.parsedRows}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums" data-label="Skipped">
+        {entry.skippedRows}
+      </td>
+      <td className="px-4 py-3 text-right font-semibold tabular-nums" data-label="Inserted">
         {entry.insertedCards}
       </td>
-      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300" data-label="Actor">
         {entry.actorEmail ?? "Unknown"}
       </td>
     </tr>

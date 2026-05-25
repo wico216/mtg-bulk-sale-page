@@ -2,10 +2,17 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
+  type AdminAuditEntriesResult,
   getAdminAuditEntries,
   getImportHistory,
+  type ImportHistoryResult,
 } from "@/db/queries";
 import { isAdminEmail } from "@/lib/auth/helpers";
+import {
+  e2eFixturesEnabled,
+  getE2eFixtureAdminAuditEntries,
+  getE2eFixtureImportHistory,
+} from "@/lib/e2e-fixtures";
 import { AuditTable, ImportHistoryTable } from "./_components/audit-table";
 
 export const metadata: Metadata = {
@@ -40,14 +47,16 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const session = await auth();
+  if (!e2eFixturesEnabled()) {
+    const session = await auth();
 
-  if (!session?.user) {
-    redirect("/admin/login");
-  }
+    if (!session?.user) {
+      redirect("/admin/login");
+    }
 
-  if (!isAdminEmail(session.user.email)) {
-    redirect("/admin/access-denied");
+    if (!isAdminEmail(session.user.email)) {
+      redirect("/admin/access-denied");
+    }
   }
 
   const resolvedSearchParams = await searchParams;
@@ -55,59 +64,18 @@ export default async function AdminAuditPage({
   const auditPage = parsePositiveInt(firstParam(resolvedSearchParams.auditPage), 1);
   const importPage = parsePositiveInt(firstParam(resolvedSearchParams.importPage), 1);
 
+  let auditEntries: AdminAuditEntriesResult;
+  let importHistory: ImportHistoryResult;
   try {
-    const [auditEntries, importHistory] = await Promise.all([
-      getAdminAuditEntries({ page: auditPage, limit: 25 }),
-      getImportHistory({ page: importPage, limit: 10 }),
-    ]);
-
-    return (
-      <div className="space-y-8">
-        <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-sm dark:border-zinc-800">
-          <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-accent/30 blur-3xl" />
-          <div className="relative max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-light">
-              Operations ledger
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold">Audit & Import History</h1>
-            <p className="mt-2 text-sm leading-6 text-zinc-300">
-              A durable trail of high-impact admin changes: what changed, who did it,
-              when it happened, and the safe metadata needed to understand scope.
-            </p>
-          </div>
-        </div>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Recent audit entries</h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Inventory, import, and order workflow mutations newest first.
-              </p>
-            </div>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {auditEntries.total} total entries
-            </span>
-          </div>
-          <AuditTable result={auditEntries} currentParams={currentParams} />
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Import history</h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                CSV replacement commits with filenames, row counts, inserted cards, actor, and timestamp.
-              </p>
-            </div>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {importHistory.total} total imports
-            </span>
-          </div>
-          <ImportHistoryTable result={importHistory} currentParams={currentParams} />
-        </section>
-      </div>
-    );
+    [auditEntries, importHistory] = e2eFixturesEnabled()
+      ? [
+          getE2eFixtureAdminAuditEntries({ page: auditPage, limit: 25 }),
+          getE2eFixtureImportHistory({ page: importPage, limit: 10 }),
+        ]
+      : await Promise.all([
+          getAdminAuditEntries({ page: auditPage, limit: 25 }),
+          getImportHistory({ page: importPage, limit: 10 }),
+        ]);
   } catch (error) {
     console.error("[ADMIN AUDIT] Failed to load audit history:", error);
     return (
@@ -119,4 +87,52 @@ export default async function AdminAuditPage({
       </div>
     );
   }
+
+  return (
+    <div className="space-y-8">
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-sm dark:border-zinc-800">
+        <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-accent/30 blur-3xl" />
+        <div className="relative max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-light">
+            Operations ledger
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold">Audit & Import History</h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">
+            A durable trail of high-impact admin changes: what changed, who did it,
+            when it happened, and the safe metadata needed to understand scope.
+          </p>
+        </div>
+      </div>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Recent audit entries</h2>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Inventory, import, and order workflow mutations newest first.
+            </p>
+          </div>
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            {auditEntries.total} total entries
+          </span>
+        </div>
+        <AuditTable result={auditEntries} currentParams={currentParams} />
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Import history</h2>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              CSV replacement commits with filenames, row counts, inserted cards, actor, and timestamp.
+            </p>
+          </div>
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            {importHistory.total} total imports
+          </span>
+        </div>
+        <ImportHistoryTable result={importHistory} currentParams={currentParams} />
+      </section>
+    </div>
+  );
 }

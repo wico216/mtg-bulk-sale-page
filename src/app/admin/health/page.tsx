@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import { getAdminHealthSnapshot } from "@/db/admin-health";
+import {
+  e2eFixtureAdminHealthSnapshot,
+  e2eFixturesEnabled,
+} from "@/lib/e2e-fixtures";
 import { RefreshPricesButton } from "./_components/refresh-prices-button";
 
 /**
@@ -83,28 +87,32 @@ function StatusBadge({ status, label }: { status: CheckStatus; label?: string })
 }
 
 export default async function AdminHealthPage() {
-  const session = await auth();
-  if (!session?.user) {
-    redirect("/admin/login");
-  }
-  if (!isAdminEmail(session.user.email)) {
-    redirect("/admin/access-denied");
+  if (!e2eFixturesEnabled()) {
+    const session = await auth();
+    if (!session?.user) {
+      redirect("/admin/login");
+    }
+    if (!isAdminEmail(session.user.email)) {
+      redirect("/admin/access-denied");
+    }
   }
 
   const envState = envChecks();
-  let snapshot;
+  let snapshot = e2eFixtureAdminHealthSnapshot;
   let snapshotError: string | null = null;
-  try {
-    snapshot = await getAdminHealthSnapshot();
-  } catch (error) {
-    snapshot = {
-      database: "error" as const,
-      lastOrderAt: null,
-      lastImportAt: null,
-      lastAuditAt: null,
-      lastPriceRefreshAt: null,
-    };
-    snapshotError = error instanceof Error ? error.message : "Unknown error";
+  if (!e2eFixturesEnabled()) {
+    try {
+      snapshot = await getAdminHealthSnapshot();
+    } catch (error) {
+      snapshot = {
+        database: "error" as const,
+        lastOrderAt: null,
+        lastImportAt: null,
+        lastAuditAt: null,
+        lastPriceRefreshAt: null,
+      };
+      snapshotError = error instanceof Error ? error.message : "Unknown error";
+    }
   }
 
   const checks: Array<{ key: string; label: string; status: CheckStatus; hint: string }> = [
@@ -188,8 +196,8 @@ export default async function AdminHealthPage() {
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Checks</h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-sm">
+        <div className="wiko-health-check-table-shell overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <table className="wiko-health-check-table w-full text-sm">
             <thead className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Check</th>
@@ -200,11 +208,13 @@ export default async function AdminHealthPage() {
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {checks.map((check) => (
                 <tr key={check.key} className="bg-white dark:bg-zinc-950">
-                  <td className="px-4 py-3 font-semibold">{check.label}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 font-semibold" data-label="Check">
+                    {check.label}
+                  </td>
+                  <td className="px-4 py-3" data-label="Status">
                     <StatusBadge status={check.status} />
                   </td>
-                  <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
+                  <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400" data-label="Detail">
                     {check.hint}
                   </td>
                 </tr>

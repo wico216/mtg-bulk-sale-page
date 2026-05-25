@@ -6,13 +6,14 @@ import {
   RATE_LIMIT_BUCKETS,
 } from "@/lib/rate-limit";
 import { logEvent, logError } from "@/lib/logger";
+import {
+  e2eFixturesEnabled,
+  getE2eFixtureAdminCardsResult,
+} from "@/lib/e2e-fixtures";
 
 const ROUTE = "/api/admin/cards";
 
 export async function GET(request: Request) {
-  const result = await requireAdmin();
-  if (result instanceof Response) return result;
-
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") ?? "1");
   const limit = parseInt(url.searchParams.get("limit") ?? "50");
@@ -27,6 +28,24 @@ export async function GET(request: Request) {
   const sortDir = (url.searchParams.get("sortDir") ?? "asc") as
     | "asc"
     | "desc";
+
+  if (e2eFixturesEnabled()) {
+    return Response.json(
+      getE2eFixtureAdminCardsResult({
+        page,
+        limit,
+        search,
+        set,
+        condition,
+        binder,
+        sortBy,
+        sortDir,
+      }),
+    );
+  }
+
+  const result = await requireAdmin();
+  if (result instanceof Response) return result;
 
   // Validate sortBy
   if (!["name", "price", "quantity"].includes(sortBy)) {
