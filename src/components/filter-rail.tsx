@@ -7,6 +7,7 @@ import {
   useFilterStore,
 } from "@/lib/store/filter-store";
 import { ManaSymbol } from "@/components/mana-symbol";
+import { groupCardVariants } from "@/lib/card-variants";
 
 const COLOR_KEYS = ["W", "U", "B", "R", "G"] as const;
 type ColorKey = (typeof COLOR_KEYS)[number];
@@ -442,11 +443,9 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
   const toggleType = useFilterStore((s) => s.toggleType);
   const toggleFinish = useFilterStore((s) => s.toggleFinish);
   const clearFilters = useFilterStore((s) => s.clearFilters);
-  const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
-
-  const filteredCount = getFilteredCards().length;
-  const totalCount = allCards.length;
+  const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters());
+  const filteredCount = useFilterStore((s) => groupCardVariants(s.getFilteredCards()).length);
+  const totalCount = groupCardVariants(allCards).length;
 
   const setCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -579,7 +578,7 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
           Filter
         </h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {hasActiveFilters() && (
+          {hasActiveFilters && (
             <button
               type="button"
               onClick={clearFilters}

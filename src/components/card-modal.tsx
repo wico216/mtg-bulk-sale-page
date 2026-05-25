@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { PublicCard } from "@/lib/types";
+import type { Finish, PublicCard } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 import { ManaSymbol } from "@/components/mana-symbol";
 
@@ -22,6 +22,37 @@ function formatCondition(condition: string): string {
 function formatPrice(price: number | null): string {
   if (price === null) return "—";
   return `$${price.toFixed(2)}`;
+}
+
+function formatFinishName(finish: Finish): string {
+  if (finish === "foil") return "Foil";
+  if (finish === "etched") return "Etched";
+  return "Nonfoil";
+}
+
+function variantOptionLabel(variant: PublicCard, variants: PublicCard[]): string {
+  const finishLabel = formatFinishName(variant.finish);
+  const duplicateFinish = variants.filter((candidate) => candidate.finish === variant.finish).length > 1;
+  const conditionVaries = new Set(variants.map((candidate) => candidate.condition)).size > 1;
+  if (!duplicateFinish && !conditionVaries) return finishLabel;
+  return `${finishLabel} · ${formatCondition(variant.condition)}`;
+}
+
+function formatVariantSummary(variants: PublicCard[]): string {
+  if (variants.length === 1) return formatFinishName(variants[0].finish);
+  return `${variants.length} options`;
+}
+
+function totalQuantity(variants: PublicCard[]): number {
+  return variants.reduce((sum, variant) => sum + variant.quantity, 0);
+}
+
+function formatLowestPrice(variants: PublicCard[]): string {
+  const pricedVariants = variants
+    .map((variant) => variant.price)
+    .filter((price): price is number => price !== null);
+  if (pricedVariants.length === 0) return "—";
+  return formatPrice(Math.min(...pricedVariants));
 }
 
 function formatRarity(rarity: string): string {
@@ -137,16 +168,20 @@ const btnSecondary: React.CSSProperties = {
 
 interface CardModalProps {
   card: PublicCard;
+  variants?: PublicCard[];
   onClose: () => void;
   onImageClick: (imageUrl: string) => void;
 }
 
-export default function CardModal({ card, onClose, onImageClick }: CardModalProps) {
-  const inCart = useCartStore((s) => s.hasItem(card.id));
-  const qty = useCartStore((s) => s.getQuantity(card.id));
+export default function CardModal({ card, variants = [card], onClose, onImageClick }: CardModalProps) {
+  const cartItems = useCartStore((s) => s.items);
   const addItem = useCartStore((s) => s.addItem);
   const setQuantity = useCartStore((s) => s.setQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
+  const inCart = cartItems.has(card.id);
+  const qty = cartItems.get(card.id) ?? 0;
+  const hasMultipleVariants = variants.length > 1;
+  const anyVariantInCart = variants.some((variant) => cartItems.has(variant.id));
   const [imageSide, setImageSide] = useState({
     cardId: card.id,
     showingBack: false,
@@ -381,14 +416,10 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
                 // Phase 17 D-09: echo the storefront pill color for etched
                 // so the modal Finish row visually matches the tile badge.
                 color:
-                  card.finish === "etched" ? "#581c87" : undefined,
+                  !hasMultipleVariants && card.finish === "etched" ? "#581c87" : undefined,
               }}
             >
-              {card.finish === "etched"
-                ? "Etched"
-                : card.finish === "foil"
-                  ? "Foil"
-                  : "Nonfoil"}
+              {formatVariantSummary(variants)}
             </dd>
             <dt style={{ color: "var(--muted)" }}>Color identity</dt>
             <dd style={{ margin: 0, color: "var(--muted)", fontSize: 11 }}>
@@ -403,7 +434,7 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
               )}
             </dd>
             <dt style={{ color: "var(--muted)" }}>In stock</dt>
-            <dd style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{card.quantity}</dd>
+            <dd style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{totalQuantity(variants)}</dd>
           </dl>
 
           {card.oracleText && (
@@ -436,82 +467,210 @@ export default function CardModal({ card, onClose, onImageClick }: CardModalProp
               flexWrap: "wrap",
             }}
           >
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 30,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {formatPrice(card.price)}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "var(--muted)",
-                  marginTop: 4,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                per card
-              </div>
-            </div>
-            {!inCart ? (
-              <button type="button" onClick={() => addItem(card.id, card.quantity)} style={btnPrimary}>
-                Add to satchel
-              </button>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      qty <= 1
-                        ? removeItem(card.id)
-                        : setQuantity(card.id, qty - 1, card.quantity)
-                    }
-                    style={btnStep}
-                  >
-                    −
-                  </button>
-                  <span
+            {hasMultipleVariants ? (
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <div
                     style={{
-                      fontSize: 15,
-                      minWidth: 24,
-                      textAlign: "center",
+                      fontFamily: "var(--font-display)",
+                      fontSize: 30,
+                      lineHeight: 1,
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {qty}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
-                    disabled={qty >= card.quantity}
-                    style={{ ...btnStep, opacity: qty >= card.quantity ? 0.3 : 1 }}
+                    From {formatLowestPrice(variants)}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--muted)",
+                      marginTop: 4,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                    }}
                   >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(card.id)}
-                    style={{ ...btnGhost, marginLeft: 6 }}
-                  >
-                    Remove
-                  </button>
+                    choose finish
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <button type="button" onClick={onClose} style={btnSecondary}>
-                    Close
-                  </button>
-                  <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
-                    Go to cart
-                  </Link>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {variants.map((variant) => {
+                    const optionLabel = variantOptionLabel(variant, variants);
+                    const variantQty = cartItems.get(variant.id) ?? 0;
+                    const variantInCart = variantQty > 0;
+
+                    return (
+                      <div
+                        key={variant.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          padding: "12px 14px",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          background: "var(--surface-2)",
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>
+                            {optionLabel}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 3,
+                              fontSize: 11,
+                              color: "var(--muted)",
+                              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                              letterSpacing: "0.04em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {formatPrice(variant.price)} · {variant.quantity} available
+                          </div>
+                        </div>
+
+                        {!variantInCart ? (
+                          <button
+                            type="button"
+                            aria-label={`Add ${optionLabel} to satchel`}
+                            onClick={() => addItem(variant.id, variant.quantity)}
+                            style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}
+                          >
+                            Add
+                          </button>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button
+                              type="button"
+                              aria-label={`Decrease ${optionLabel} quantity`}
+                              onClick={() =>
+                                variantQty <= 1
+                                  ? removeItem(variant.id)
+                                  : setQuantity(variant.id, variantQty - 1, variant.quantity)
+                              }
+                              style={btnStep}
+                            >
+                              −
+                            </button>
+                            <span
+                              style={{
+                                fontSize: 15,
+                                minWidth: 24,
+                                textAlign: "center",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {variantQty}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Increase ${optionLabel} quantity`}
+                              onClick={() => setQuantity(variant.id, variantQty + 1, variant.quantity)}
+                              disabled={variantQty >= variant.quantity}
+                              style={{ ...btnStep, opacity: variantQty >= variant.quantity ? 0.3 : 1 }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {anyVariantInCart && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <button type="button" onClick={onClose} style={btnSecondary}>
+                      Close
+                    </button>
+                    <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
+                      Go to cart
+                    </Link>
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                <div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 30,
+                      lineHeight: 1,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatPrice(card.price)}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--muted)",
+                      marginTop: 4,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    per card
+                  </div>
+                </div>
+                {!inCart ? (
+                  <button type="button" onClick={() => addItem(card.id, card.quantity)} style={btnPrimary}>
+                    Add to satchel
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          qty <= 1
+                            ? removeItem(card.id)
+                            : setQuantity(card.id, qty - 1, card.quantity)
+                        }
+                        style={btnStep}
+                      >
+                        −
+                      </button>
+                      <span
+                        style={{
+                          fontSize: 15,
+                          minWidth: 24,
+                          textAlign: "center",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(card.id, qty + 1, card.quantity)}
+                        disabled={qty >= card.quantity}
+                        style={{ ...btnStep, opacity: qty >= card.quantity ? 0.3 : 1 }}
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(card.id)}
+                        style={{ ...btnGhost, marginLeft: 6 }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <button type="button" onClick={onClose} style={btnSecondary}>
+                        Close
+                      </button>
+                      <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
+                        Go to cart
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

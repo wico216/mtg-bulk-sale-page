@@ -86,6 +86,50 @@ export const e2eFixtureCards: PublicCard[] = [
     createdAt: "2026-05-22T00:00:00.000Z",
     updatedAt: "2026-05-22T00:00:00.000Z",
   },
+  {
+    id: "e2e-001-normal-near_mint",
+    name: "Sol Ring",
+    setCode: "e2e",
+    setName: "E2E Masters",
+    collectorNumber: "001",
+    price: 3.25,
+    condition: "near_mint",
+    quantity: 1,
+    colorIdentity: [],
+    imageUrl: null,
+    backImageUrl: null,
+    oracleText: "{T}: Add {C}{C}.",
+    typeLine: "Artifact",
+    manaCost: "{1}",
+    manaValue: 1,
+    rarity: "uncommon",
+    finish: "normal",
+    scryfallId: "e2e-sol-ring",
+    createdAt: "2026-05-22T00:00:00.000Z",
+    updatedAt: "2026-05-22T00:00:00.000Z",
+  },
+  {
+    id: "e2e-001e-foil-near_mint",
+    name: "Sol Ring",
+    setCode: "e2e",
+    setName: "E2E Masters Extended Art",
+    collectorNumber: "001e",
+    price: 6.5,
+    condition: "near_mint",
+    quantity: 1,
+    colorIdentity: [],
+    imageUrl: null,
+    backImageUrl: null,
+    oracleText: "{T}: Add {C}{C}.",
+    typeLine: "Artifact",
+    manaCost: "{1}",
+    manaValue: 1,
+    rarity: "uncommon",
+    finish: "foil",
+    scryfallId: "e2e-sol-ring-extended-art",
+    createdAt: "2026-05-20T00:00:00.000Z",
+    updatedAt: "2026-05-20T00:00:00.000Z",
+  },
 ];
 
 export const e2eFixtureMeta: CardData["meta"] = {
@@ -95,7 +139,7 @@ export const e2eFixtureMeta: CardData["meta"] = {
   totalMissingPrices: 0,
 };
 
-const fixtureBinders = ["trade-box", "a02", "b01"] as const;
+const fixtureBinders = ["trade-box", "a02", "b01", "b02", "b03"] as const;
 
 export const e2eFixtureAdminCards: InventoryRow[] = e2eFixtureCards.map(
   (card, index) => ({
@@ -162,27 +206,29 @@ export function getE2eFixtureAdminCardsResult(
 
 export const e2eFixtureAdminDashboardStats: AdminDashboardStats = {
   inventory: {
-    uniqueCards: 3,
-    totalQuantity: 9,
-    totalValue: 27,
+    uniqueCards: 5,
+    totalQuantity: 11,
+    totalValue: 36.75,
     lowStockCount: 0,
     missingPriceCount: 0,
   },
   breakdowns: {
-    bySet: [{ setCode: "e2e", quantity: 9, uniqueCards: 3, value: 27 }],
+    bySet: [{ setCode: "e2e", quantity: 11, uniqueCards: 5, value: 36.75 }],
     byColor: [
       { color: "U", quantity: 4, uniqueCards: 1, value: 8 },
       { color: "R", quantity: 3, uniqueCards: 1, value: 10.5 },
-      { color: "C", quantity: 2, uniqueCards: 1, value: 8.5 },
+      { color: "C", quantity: 4, uniqueCards: 3, value: 18.25 },
     ],
     byRarity: [
-      { rarity: "uncommon", quantity: 6, uniqueCards: 2, value: 16.5 },
+      { rarity: "uncommon", quantity: 8, uniqueCards: 4, value: 26.25 },
       { rarity: "common", quantity: 3, uniqueCards: 1, value: 10.5 },
     ],
     byBinder: [
       { binder: "trade-box", quantity: 4, uniqueCards: 1, value: 8 },
       { binder: "a02", quantity: 3, uniqueCards: 1, value: 10.5 },
       { binder: "b01", quantity: 2, uniqueCards: 1, value: 8.5 },
+      { binder: "b02", quantity: 1, uniqueCards: 1, value: 3.25 },
+      { binder: "b03", quantity: 1, uniqueCards: 1, value: 6.5 },
     ],
   },
 };
@@ -204,17 +250,17 @@ const e2eFixtureAuditEntries: AdminAuditEntriesResult["entries"] = [
     actorEmail: "admin@example.com",
     targetType: "import",
     targetId: "fixture-import-001",
-    targetCount: 3,
+    targetCount: 5,
     metadata: {
-      selectedBinders: ["a02", "b01", "trade-box"],
-      totalBindersInExport: 3,
+      selectedBinders: ["a02", "b01", "b02", "b03", "trade-box"],
+      totalBindersInExport: 5,
       scopedReplaceCounts: {
-        before: { a02: 0, b01: 0, "trade-box": 0 },
-        after: { a02: 1, b01: 1, "trade-box": 1 },
+        before: { a02: 0, b01: 0, b02: 0, b03: 0, "trade-box": 0 },
+        after: { a02: 1, b01: 1, b02: 1, b03: 1, "trade-box": 1 },
         deletedFromUnselected: 0,
       },
-      totalCardsAfterImport: 3,
-      newBindersInExport: ["a02", "b01", "trade-box"],
+      totalCardsAfterImport: 5,
+      newBindersInExport: ["a02", "b01", "b02", "b03", "trade-box"],
       missingBindersFromExport: [],
     },
     createdAt: "2026-05-24T15:45:00.000Z",
@@ -243,10 +289,10 @@ const e2eFixtureImportHistoryEntries: ImportHistoryResult["entries"] = [
     actorEmail: "admin@example.com",
     fileNames: ["wiko-e2e-binders.csv"],
     fileCount: 1,
-    parsedRows: 3,
+    parsedRows: 5,
     skippedRows: 0,
-    insertedCards: 3,
-    metadata: { selectedBinders: ["a02", "b01", "trade-box"] },
+    insertedCards: 5,
+    metadata: { selectedBinders: ["a02", "b01", "b02", "b03", "trade-box"] },
     committedAt: "2026-05-24T15:45:00.000Z",
   },
 ];

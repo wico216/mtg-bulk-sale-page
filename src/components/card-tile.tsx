@@ -10,10 +10,20 @@ function formatPrice(price: number | null): string {
   return `$${price.toFixed(2)}`;
 }
 
-function formatDisplayName(card: PublicCard): string {
+function formatDisplayName(card: PublicCard, variantCount = 1): string {
+  if (variantCount > 1) return card.name;
   if (card.finish === "foil") return `${card.name} - Foil`;
   if (card.finish === "etched") return `${card.name} - Etched`;
   return card.name;
+}
+
+function formatTilePrice(card: PublicCard, variants: PublicCard[]): string {
+  if (variants.length <= 1) return formatPrice(card.price);
+  const pricedVariants = variants
+    .map((variant) => variant.price)
+    .filter((price): price is number => price !== null);
+  if (pricedVariants.length === 0) return "From —";
+  return `From ${formatPrice(Math.min(...pricedVariants))}`;
 }
 
 /**
@@ -77,14 +87,18 @@ function IconTransform({ size = 15 }: { size?: number }) {
 
 interface CardTileProps {
   card: PublicCard;
+  variants?: PublicCard[];
   onClick: () => void;
 }
 
-export default function CardTile({ card, onClick }: CardTileProps) {
-  const inCart = useCartStore((s) => s.hasItem(card.id));
-  const qty = useCartStore((s) => s.getQuantity(card.id));
+export default function CardTile({ card, variants = [card], onClick }: CardTileProps) {
+  const cartItems = useCartStore((s) => s.items);
+  const inCart = variants.some((variant) => cartItems.has(variant.id));
+  const qty = variants.reduce((sum, variant) => sum + (cartItems.get(variant.id) ?? 0), 0);
   const addItem = useCartStore((s) => s.addItem);
-  const displayName = formatDisplayName(card);
+  const isGrouped = variants.length > 1;
+  const displayName = formatDisplayName(card, variants.length);
+  const tilePrice = formatTilePrice(card, variants);
   const [showingBack, setShowingBack] = useState(false);
   const hasBackFace = Boolean(card.backImageUrl);
   const activeImageUrl =
@@ -145,7 +159,25 @@ export default function CardTile({ card, onClick }: CardTileProps) {
             [ card art ]
           </div>
         )}
-        <FinishPill finish={card.finish} />
+        {!isGrouped && <FinishPill finish={card.finish} />}
+        {isGrouped && (
+          <span
+            style={{
+              position: "absolute",
+              top: 6,
+              left: 6,
+              fontSize: 9,
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.1em",
+              background: "var(--ink)",
+              color: "var(--bg)",
+              padding: "2px 5px",
+              borderRadius: 2,
+            }}
+          >
+            {variants.length} OPTIONS
+          </span>
+        )}
         {hasBackFace && (
           <button
             type="button"
@@ -226,31 +258,39 @@ export default function CardTile({ card, onClick }: CardTileProps) {
           className="wiko-tile-add"
           onClick={(e) => {
             e.stopPropagation();
+            if (isGrouped) {
+              onClick();
+              return;
+            }
             if (!inCart) addItem(card.id, card.quantity);
           }}
-          aria-label="Quick add to cart"
+          aria-label={isGrouped ? "Choose finish options" : "Quick add to cart"}
+          title={isGrouped ? "Choose finish" : "Quick add"}
           style={{
             position: "absolute",
             top: 8,
             right: 8,
             opacity: 0,
-            width: 28,
+            width: isGrouped ? 64 : 28,
             height: 28,
-            borderRadius: "50%",
+            borderRadius: isGrouped ? 3 : "50%",
             background: "var(--bg)",
             border: "1px solid var(--border-strong)",
             color: "var(--ink)",
             cursor: "pointer",
-            display: inCart ? "none" : "flex",
+            display: !isGrouped && inCart ? "none" : "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 16,
+            fontSize: isGrouped ? 10 : 16,
+            fontWeight: isGrouped ? 700 : undefined,
+            letterSpacing: isGrouped ? "0.08em" : undefined,
+            textTransform: isGrouped ? "uppercase" : undefined,
             lineHeight: 1,
             transition: "opacity 0.15s",
             fontFamily: "inherit",
           }}
         >
-          +
+          {isGrouped ? "Options" : "+"}
         </button>
       </div>
 
@@ -272,6 +312,20 @@ export default function CardTile({ card, onClick }: CardTileProps) {
         >
           {displayName}
         </div>
+        {isGrouped && (
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 10,
+              color: "var(--muted)",
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            {variants.length} options
+          </div>
+        )}
         <div
           style={{
             display: "flex",
@@ -309,7 +363,7 @@ export default function CardTile({ card, onClick }: CardTileProps) {
               flexShrink: 0,
             }}
           >
-            {formatPrice(card.price)}
+            {tilePrice}
           </span>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { type SortOption, useFilterStore } from "@/lib/store/filter-store";
+import { groupCardVariants } from "@/lib/card-variants";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "recent-desc", label: "Newest added" },
@@ -26,7 +27,7 @@ export default function SortBar() {
   const setSearchQuery = useFilterStore((s) => s.setSearchQuery);
   const sortBy = useFilterStore((s) => s.sortBy);
   const setSortBy = useFilterStore((s) => s.setSortBy);
-  const filteredCount = useFilterStore((s) => s.getFilteredCards().length);
+  const filteredCount = useFilterStore((s) => groupCardVariants(s.getFilteredCards()).length);
 
   return (
     <div
