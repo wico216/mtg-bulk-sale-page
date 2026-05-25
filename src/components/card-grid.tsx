@@ -7,6 +7,7 @@ import type { SortOption } from "@/lib/store/filter-store";
 import { useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
 import CardModal from "@/components/card-modal";
+import { groupCardVariants, type CardVariantGroup } from "@/lib/card-variants";
 
 interface CardGridProps {
   cards: PublicCard[];
@@ -45,8 +46,9 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
     ],
   );
 
-  const [selectedCard, setSelectedCard] = useState<PublicCard | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<CardVariantGroup | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const visibleGroups = useMemo(() => groupCardVariants(filteredCards), [filteredCards]);
 
   useEffect(() => {
     setAllCards(cards);
@@ -54,7 +56,7 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
   }, [cards, initialSort, setAllCards, setSortBy]);
 
   useEffect(() => {
-    if (selectedCard || lightboxUrl) {
+    if (selectedGroup || lightboxUrl) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -62,7 +64,7 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [selectedCard, lightboxUrl]);
+  }, [selectedGroup, lightboxUrl]);
 
   if (cards.length === 0) {
     return (
@@ -85,7 +87,7 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
 
   return (
     <>
-      {filteredCards.length === 0 ? (
+      {visibleGroups.length === 0 ? (
         <div style={{ padding: "80px 32px", textAlign: "center", color: "var(--muted)" }}>
           <div
             style={{
@@ -131,21 +133,23 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
             padding: "28px 32px 80px",
           }}
         >
-          {filteredCards.map((card) => (
+          {visibleGroups.map((group) => (
             <CardTile
-              key={card.id}
-              card={card}
-              onClick={() => setSelectedCard(card)}
+              key={group.id}
+              card={group.card}
+              variants={group.variants}
+              onClick={() => setSelectedGroup(group)}
             />
           ))}
         </div>
       )}
-      {selectedCard && (
+      {selectedGroup && (
         <CardModal
-          card={selectedCard}
-          onClose={() => setSelectedCard(null)}
+          card={selectedGroup.card}
+          variants={selectedGroup.variants}
+          onClose={() => setSelectedGroup(null)}
           onImageClick={(imageUrl) => {
-            setSelectedCard(null);
+            setSelectedGroup(null);
             setLightboxUrl(imageUrl.replace("/normal/", "/large/"));
           }}
         />

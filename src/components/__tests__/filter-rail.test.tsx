@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PublicCard } from "@/lib/types";
 import { PRICE_MAX, useFilterStore } from "@/lib/store/filter-store";
@@ -79,6 +79,33 @@ describe("FilterRail set filter", () => {
     expect(search).toHaveValue("");
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(useFilterStore.getState().selectedSets.has("Alpha")).toBe(true);
+  });
+
+  it("counts grouped foil and nonfoil printings in the rail summary", async () => {
+    resetFilterStore([
+      publicCard(),
+      publicCard({ id: "lea-161-foil-near_mint", finish: "foil", price: 3 }),
+      publicCard({
+        id: "bet-1-normal-near_mint",
+        name: "Counterspell",
+        setCode: "bet",
+        setName: "Beta",
+        collectorNumber: "1",
+        colorIdentity: ["U"],
+      }),
+    ]);
+
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    expect(screen.getByText(/2 of 2 cards/i)).toBeInTheDocument();
+
+    act(() => {
+      useFilterStore.getState().setSearchQuery("Counterspell");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 of 2 cards/i)).toBeInTheDocument();
+    });
   });
 
   it("renders official Scryfall mana symbols in color filters", () => {

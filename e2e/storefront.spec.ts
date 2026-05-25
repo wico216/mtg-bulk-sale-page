@@ -13,7 +13,7 @@ test("storefront supports search, card details, and unauthenticated admin redire
 
   await expect(page.getByRole("link", { name: "Wiko's Spellbook home" })).toBeVisible();
   await expect(page.getByRole("link", { name: "New arrivals" })).toBeVisible();
-  await expect(page.getByText(/3 cards in stock/i)).toBeVisible();
+  await expect(page.getByText(/4 cards in stock/i)).toBeVisible();
 
   await page.getByPlaceholder(/Search cards/i).fill("Lightning Bolt");
 
@@ -41,16 +41,41 @@ test("new arrivals page shows recently added inventory newest first", async ({ p
 
   await expect(page.getByRole("heading", { name: "New arrivals" })).toBeVisible();
   await expect(page.getByText(/Recently added to the spellbook/i)).toBeVisible();
-  await expect(page.getByText(/3 cards in stock/i)).toBeVisible();
+  await expect(page.getByText(/4 cards in stock/i)).toBeVisible();
   await expect(page.getByRole("combobox")).toHaveValue("recent-desc");
 
   const tiles = page.locator(".wiko-card-grid .wiko-tile");
-  await expect(tiles).toHaveCount(3);
+  await expect(tiles).toHaveCount(4);
   await expect(tiles.first()).toContainText("Lightning Bolt");
 
+  await page.getByPlaceholder(/Search cards/i).fill("Counterspell");
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Counterspell" })).toHaveCount(1);
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(0);
+});
+
+test("storefront groups foil and nonfoil finishes while keeping extended art separate", async ({ page }) => {
+  await page.goto("/");
+
   await page.getByPlaceholder(/Search cards/i).fill("Sol Ring");
-  await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(1);
-  await expect(page.locator(".wiko-tile").filter({ hasText: "Counterspell" })).toHaveCount(0);
+
+  const solTiles = page.locator(".wiko-card-grid .wiko-tile").filter({ hasText: "Sol Ring" });
+  await expect(solTiles).toHaveCount(2);
+
+  const regularPrintingTile = solTiles.filter({ hasText: "2 options" });
+  await expect(regularPrintingTile).toHaveCount(1);
+  await expect(regularPrintingTile.getByRole("button", { name: /choose finish options/i })).toBeVisible();
+  await expect(regularPrintingTile.getByRole("button", { name: "Quick add to cart" })).toHaveCount(0);
+
+  await regularPrintingTile.click();
+
+  const modal = page.locator(".wiko-card-modal");
+  await expect(modal).toBeVisible();
+  await expect(modal).toContainText("2 options");
+  await expect(modal.getByRole("button", { name: /add nonfoil to satchel/i })).toBeVisible();
+  await expect(modal.getByRole("button", { name: /add foil to satchel/i })).toBeVisible();
+
+  await modal.getByRole("button", { name: /add foil to satchel/i }).click();
+  await expect(page.getByRole("link", { name: "Cart", exact: true })).toContainText("1");
 });
 
 test("card details modal keeps readable single-column layout on phone screens", async ({ page }) => {
@@ -157,7 +182,7 @@ test("mobile storefront uses compact two-column cards while desktop keeps the wi
 
   const mobileGrid = page.locator(".wiko-card-grid");
   const mobileTiles = mobileGrid.locator(".wiko-tile");
-  await expect(mobileTiles).toHaveCount(3);
+  await expect(mobileTiles).toHaveCount(4);
   await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
 
   const [firstMobileBox, secondMobileBox] = await Promise.all([
