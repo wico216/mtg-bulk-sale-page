@@ -7,6 +7,10 @@ import {
   DashboardSummary,
   DashboardBreakdowns,
 } from "./_components/dashboard-summary";
+import {
+  e2eFixtureAdminDashboardStats,
+  e2eFixturesEnabled,
+} from "@/lib/e2e-fixtures";
 import { InventoryTable } from "./_components/inventory-table";
 
 export const metadata: Metadata = {
@@ -15,18 +19,33 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
-  const session = await auth();
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-  if (!session?.user) {
-    redirect("/admin/login");
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const fixtureInventoryEnabled =
+    e2eFixturesEnabled() && firstParam(resolvedSearchParams.fixtureAdmin) === "1";
+  let stats = e2eFixtureAdminDashboardStats;
+
+  if (!fixtureInventoryEnabled) {
+    const session = await auth();
+
+    if (!session?.user) {
+      redirect("/admin/login");
+    }
+
+    if (!isAdminEmail(session.user.email)) {
+      redirect("/admin/access-denied");
+    }
+
+    stats = await getAdminDashboardStats();
   }
-
-  if (!isAdminEmail(session.user.email)) {
-    redirect("/admin/access-denied");
-  }
-
-  const stats = await getAdminDashboardStats();
 
   return (
     <div className="space-y-6">

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 import { redirect } from "next/navigation";
 
 export default async function AccessDeniedPage() {
-  const session = await auth();
+  const session = e2eFixturesEnabled()
+    ? { user: { email: "not-admin@example.com" } }
+    : await auth();
 
   // Defensive redirect: if no session, send to login
   // (review concern MEDIUM: access-denied null session)

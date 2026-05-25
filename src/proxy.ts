@@ -5,6 +5,11 @@ import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const continueWithPathname = () => {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-wiko-pathname", pathname);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  };
   const isAdminApi = pathname.startsWith("/api/admin");
   const isAdminRoute = pathname.startsWith("/admin");
   const isLoginPage = pathname === "/admin/login";
@@ -12,25 +17,25 @@ export default auth((req) => {
   const isAuthApi = pathname.startsWith("/api/auth");
 
   // Never block auth API routes
-  if (isAuthApi) return NextResponse.next();
+  if (isAuthApi) return continueWithPathname();
 
   // CRITICAL (review concern HIGH): /api/admin/* routes ALWAYS pass through to
   // route handlers. The proxy must NOT redirect API requests -- route handlers
   // are the authoritative gate returning JSON 401/403 via requireAdmin().
-  if (isAdminApi) return NextResponse.next();
+  if (isAdminApi) return continueWithPathname();
 
   // E2E fixture mode renders deterministic admin pages without a session.
   // Production is unaffected because this only trips under the Playwright-only
   // E2E_FIXTURES=1 environment used by the test web server.
   if (e2eFixturesEnabled() && isAdminRoute) {
-    return NextResponse.next();
+    return continueWithPathname();
   }
 
   // Admin page routes need session check
   if (isAdminRoute) {
     if (!req.auth) {
       // Unauthenticated -> login page (D-07), except login/access-denied pass through
-      if (isLoginPage || isAccessDenied) return NextResponse.next();
+      if (isLoginPage || isAccessDenied) return continueWithPathname();
       return NextResponse.redirect(new URL("/admin/login", req.url));
     }
 
@@ -53,7 +58,7 @@ export default auth((req) => {
     }
   }
 
-  return NextResponse.next();
+  return continueWithPathname();
 });
 
 export const config = {

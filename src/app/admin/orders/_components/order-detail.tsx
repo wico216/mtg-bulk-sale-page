@@ -22,11 +22,6 @@ const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-US", {
   numeric: "auto",
 });
 
-const absoluteDateFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
 const stampFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "2-digit",
@@ -66,6 +61,10 @@ function stampString(iso: string): string {
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")} · ${get("hour")}:${get("minute")} utc`;
+}
+
+function absoluteDateTitle(iso: string): string {
+  return stampString(iso).replace(" utc", " UTC");
 }
 
 function statusChipStyle(status: OrderStatus): React.CSSProperties {
@@ -322,7 +321,7 @@ export function OrderDetail({
   })();
 
   return (
-    <div className="space-y-8 pb-32">
+    <div className="wiko-order-detail-screen space-y-8 pb-32">
       {/* Back link */}
       <Link
         href="/admin/orders"
@@ -340,7 +339,7 @@ export function OrderDetail({
 
       {/* Heading + total — editorial band */}
       <header
-        className="grid items-end gap-8 pb-6"
+        className="wiko-order-detail-hero grid items-end gap-8 pb-6"
         style={{
           gridTemplateColumns: "1fr auto",
           borderBottom: "1px solid var(--border)",
@@ -401,8 +400,9 @@ export function OrderDetail({
           >
             Placed{" "}
             <strong
+              suppressHydrationWarning
               style={{ color: "var(--ink-soft)", fontWeight: 600 }}
-              title={absoluteDateFormatter.format(new Date(order.createdAt))}
+              title={absoluteDateTitle(order.createdAt)}
             >
               {relativeTime(order.createdAt)}
             </strong>{" "}
@@ -497,7 +497,7 @@ export function OrderDetail({
 
       {/* Main two-column grid: items + note (left) / actions + buyer (right) */}
       <div
-        className="grid gap-10"
+        className="wiko-order-detail-main grid gap-10"
         style={{ gridTemplateColumns: "minmax(0,1fr) 320px" }}
       >
         <main className="min-w-0 space-y-8">
@@ -540,7 +540,7 @@ export function OrderDetail({
                 {order.items.map((item) => (
                   <li
                     key={`${item.cardId}-${item.binder}-${item.quantity}`}
-                    className="grid items-center"
+                    className="wiko-order-detail-item grid items-center"
                     style={{
                       gridTemplateColumns: "56px minmax(0,1fr) auto auto",
                       gap: 14,
@@ -550,7 +550,7 @@ export function OrderDetail({
                     }}
                   >
                     <div
-                      className="overflow-hidden rounded"
+                      className="wiko-order-detail-item-art overflow-hidden rounded"
                       style={{
                         width: 56,
                         height: 78,
@@ -577,9 +577,9 @@ export function OrderDetail({
                       )}
                     </div>
 
-                    <div className="min-w-0">
+                    <div className="wiko-order-detail-item-details min-w-0">
                       <span
-                        className="block truncate"
+                        className="wiko-order-detail-item-title block truncate"
                         style={{
                           fontFamily:
                             "var(--font-instrument-serif), ui-serif, Georgia, serif",
@@ -591,7 +591,7 @@ export function OrderDetail({
                         {item.name}
                       </span>
                       <span
-                        className="block mt-1"
+                        className="wiko-order-detail-item-meta block mt-1"
                         style={{
                           fontFamily: "var(--font-geist-mono), monospace",
                           fontSize: 10,
@@ -636,7 +636,7 @@ export function OrderDetail({
                     {/* Binder chip */}
                     <span
                       data-binder-pill
-                      className="inline-flex items-center"
+                      className="wiko-order-detail-item-binder inline-flex items-center"
                       style={{
                         fontFamily: "var(--font-geist-mono), monospace",
                         fontSize: 11,
@@ -654,7 +654,7 @@ export function OrderDetail({
                     </span>
 
                     {/* Price */}
-                    <div className="text-right">
+                    <div className="wiko-order-detail-item-price text-right">
                       <div
                         style={{
                           fontFamily: "var(--font-geist-mono), monospace",
@@ -802,7 +802,7 @@ export function OrderDetail({
         </main>
 
         {/* Right rail */}
-        <aside className="space-y-4">
+        <aside className="wiko-order-detail-rail space-y-4">
           {/* Quick actions */}
           {nextStep && (
             <Card title="Quick actions">
@@ -1208,7 +1208,7 @@ function EventTimeline({
   // terminal state (completed/cancelled) the last event IS the terminal
   // event and gets the done styling instead.
   return (
-    <section>
+    <section className="wiko-order-detail-timeline">
       <div className="flex items-baseline justify-between mb-3">
         <h2
           className="m-0"
@@ -1289,11 +1289,12 @@ function TimelineEvent({
 
   return (
     <li
-      className="relative"
+      className="wiko-order-detail-timeline-event relative"
       style={{ padding: "4px 0 18px 28px" }}
     >
       <TimelineDot state={dotState} />
       <div
+        className="wiko-order-detail-timeline-label"
         style={{
           fontSize: 13,
           color: "var(--ink)",
@@ -1319,7 +1320,8 @@ function TimelineEvent({
         )}
       </div>
       <div
-        className="mt-1"
+        suppressHydrationWarning
+        className="wiko-order-detail-timeline-stamp mt-1"
         style={{
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: 10,
@@ -1327,7 +1329,7 @@ function TimelineEvent({
           letterSpacing: "0.04em",
           lineHeight: 1.4,
         }}
-        title={absoluteDateFormatter.format(new Date(event.at))}
+        title={absoluteDateTitle(event.at)}
       >
         {stampString(event.at)} · {relativeTime(event.at)}
       </div>
