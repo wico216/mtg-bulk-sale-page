@@ -214,6 +214,13 @@ a { color: inherit; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
 }
 
+/* Virtualized storefront grids keep the production card DOM bounded while preserving the full scroll range. */
+.wiko-card-grid--virtualized {
+  overflow-anchor: none;
+  padding-top: calc(28px + var(--wiko-grid-top-spacer, 0px)) !important;
+  padding-bottom: calc(80px + var(--wiko-grid-bottom-spacer, 0px)) !important;
+}
+
 /* Mobile storefront: compact two-column browsing and touch-visible actions.
  * Scoped to <=640px so desktop/tablet grid density remains driven by the
  * default minmax(250px, 1fr) layout in CardGrid. */
@@ -240,6 +247,12 @@ a { color: inherit; }
     column-gap: 12px !important;
     row-gap: 22px !important;
     padding: 20px 14px 72px !important;
+  }
+
+  .wiko-card-grid--virtualized {
+    overflow-anchor: none;
+    padding-top: calc(20px + var(--wiko-grid-top-spacer, 0px)) !important;
+    padding-bottom: calc(72px + var(--wiko-grid-bottom-spacer, 0px)) !important;
   }
 
   .wiko-tile-title {
