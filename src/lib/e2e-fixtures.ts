@@ -139,6 +139,52 @@ export const e2eFixtureMeta: CardData["meta"] = {
   totalMissingPrices: 0,
 };
 
+function normalizeFixtureCardCount(value: string | undefined): number | null {
+  if (!value) return null;
+  const count = Number(value);
+  if (!Number.isFinite(count)) return null;
+  return Math.min(2_500, Math.max(e2eFixtureCards.length, Math.trunc(count)));
+}
+
+function makeE2eBulkFixtureCards(count: number): PublicCard[] {
+  return Array.from({ length: count }, (_, index) => {
+    const seed = e2eFixtureCards[index % e2eFixtureCards.length];
+    const displayIndex = index + 1;
+
+    return {
+      ...seed,
+      id: `e2e-bulk-${displayIndex.toString().padStart(4, "0")}`,
+      name: `Fixture Bulk Card ${displayIndex.toString().padStart(4, "0")}`,
+      collectorNumber: `${displayIndex}`,
+      setCode: "blk",
+      setName: "E2E Bulk Masters",
+      price: Number((((index % 97) + 1) / 2).toFixed(2)),
+      quantity: 1,
+      imageUrl: null,
+      backImageUrl: null,
+      oracleText: "Large fixture card for mobile storefront scroll performance.",
+      scryfallId: `e2e-bulk-${displayIndex.toString().padStart(4, "0")}`,
+      createdAt: new Date(Date.UTC(2026, 4, 23, 0, 0, displayIndex)).toISOString(),
+      updatedAt: "2026-05-23T00:00:00.000Z",
+    };
+  });
+}
+
+export function getE2eStorefrontFixtureCards(): PublicCard[] {
+  const bulkCount = normalizeFixtureCardCount(process.env.E2E_BULK_FIXTURE_COUNT);
+  if (!bulkCount) return e2eFixtureCards;
+  return makeE2eBulkFixtureCards(bulkCount);
+}
+
+export function getE2eStorefrontFixtureMeta(
+  cards = getE2eStorefrontFixtureCards(),
+): CardData["meta"] {
+  return {
+    ...e2eFixtureMeta,
+    totalCards: cards.reduce((sum, card) => sum + card.quantity, 0),
+  };
+}
+
 const fixtureBinders = ["trade-box", "a02", "b01", "b02", "b03"] as const;
 
 export const e2eFixtureAdminCards: InventoryRow[] = e2eFixtureCards.map(

@@ -194,6 +194,37 @@ test("mobile search controls hide/reveal only after intentional scroll distance"
   await expect.poll(controlsAreVisible).toBe(true);
 });
 
+test("mobile storefront keeps the rendered card DOM bounded with production-sized inventory", async ({ page }) => {
+  const bulkCount = Number(process.env.E2E_BULK_FIXTURE_COUNT ?? "0");
+  test.skip(
+    bulkCount < 500,
+    "Run with E2E_BULK_FIXTURE_COUNT=1200+ to exercise the large-inventory mobile path.",
+  );
+
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  await expect(page.getByText(`${bulkCount.toLocaleString()} cards in stock`)).toBeVisible();
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+
+  const renderedTileCount = await page.locator(".wiko-card-grid .wiko-tile").count();
+  const domNodeCount = await page.evaluate(() => document.querySelectorAll("*").length);
+
+  expect(renderedTileCount).toBeLessThanOrEqual(72);
+  expect(domNodeCount).toBeLessThan(900);
+
+  await page.evaluate(() => window.scrollTo(0, 120_000));
+  await page.waitForTimeout(120);
+
+  const afterScrollTileCount = await page.locator(".wiko-card-grid .wiko-tile").count();
+  const afterScrollDomNodeCount = await page.evaluate(() => document.querySelectorAll("*").length);
+  const visibleLabels = await page.locator(".wiko-card-grid .wiko-tile-title").allTextContents();
+
+  expect(afterScrollTileCount).toBeLessThanOrEqual(72);
+  expect(afterScrollDomNodeCount).toBeLessThan(900);
+  expect(visibleLabels.some((label) => /Fixture Bulk Card 0[7-9]\d{2}/.test(label))).toBe(true);
+});
+
 test("mobile storefront uses compact two-column cards while desktop keeps the wide grid", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");

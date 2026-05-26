@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import type { CSSProperties } from "react";
 import Image from "next/image";
 import type { PublicCard, CardData } from "@/lib/types";
 import type { SortOption } from "@/lib/store/filter-store";
@@ -13,9 +14,24 @@ interface CardGridProps {
   cards: PublicCard[];
   meta: CardData["meta"];
   initialSort?: SortOption;
+  virtualizeCards?: boolean;
 }
 
-export default function CardGrid({ cards, initialSort }: CardGridProps) {
+const GRID_COLUMN_ESTIMATE = 2;
+const GRID_ESTIMATED_ROW_HEIGHT_PX = 336;
+const GRID_OVERSCAN_ROWS = 5;
+const GRID_INITIAL_ROWS = 12;
+
+interface VirtualRows {
+  start: number;
+  end: number;
+}
+
+function clampVirtualRow(value: number, totalRows: number): number {
+  return Math.max(0, Math.min(totalRows, value));
+}
+
+export default function CardGrid({ cards, initialSort, virtualizeCards = false }: CardGridProps) {
   const setAllCards = useFilterStore((s) => s.setAllCards);
   const clearFilters = useFilterStore((s) => s.clearFilters);
   const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
@@ -49,6 +65,39 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
   const [selectedGroup, setSelectedGroup] = useState<CardVariantGroup | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const visibleGroups = useMemo(() => groupCardVariants(filteredCards), [filteredCards]);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridColumns, setGridColumns] = useState(GRID_COLUMN_ESTIMATE);
+  const [measuredRowHeight, setMeasuredRowHeight] = useState(
+    GRID_ESTIMATED_ROW_HEIGHT_PX,
+  );
+  const [virtualRows, setVirtualRows] = useState<VirtualRows>({
+    start: 0,
+    end: GRID_INITIAL_ROWS,
+  });
+  const totalRows = Math.ceil(visibleGroups.length / gridColumns);
+
+  const windowedGroups = useMemo(() => {
+    if (!virtualizeCards) return visibleGroups;
+    return visibleGroups.slice(
+      virtualRows.start * gridColumns,
+      virtualRows.end * gridColumns,
+    );
+  }, [gridColumns, visibleGroups, virtualRows, virtualizeCards]);
+
+  const topSpacer = virtualizeCards ? virtualRows.start * measuredRowHeight : 0;
+  const bottomSpacer = virtualizeCards
+    ? Math.max(0, totalRows - virtualRows.end) * measuredRowHeight
+    : 0;
+
+  const gridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+    columnGap: 18,
+    rowGap: 28,
+    padding: "28px 32px 80px",
+    "--wiko-grid-top-spacer": `${topSpacer}px`,
+    "--wiko-grid-bottom-spacer": `${bottomSpacer}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     setAllCards(cards);
@@ -65,6 +114,93 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
       document.body.style.overflow = "";
     };
   }, [selectedGroup, lightboxUrl]);
+
+  useEffect(() => {
+    if (!virtualizeCards) {
+      setVirtualRows({ start: 0, end: GRID_INITIAL_ROWS });
+      return;
+    }
+
+    const nextEnd = Math.min(totalRows, GRID_INITIAL_ROWS);
+    setVirtualRows({ start: 0, end: nextEnd });
+    window.scrollTo({ top: 0 });
+  }, [
+    searchQuery,
+    selectedColors,
+    selectedSets,
+    selectedRarities,
+    selectedTypes,
+    selectedFinishes,
+    priceRange,
+    sortBy,
+    totalRows,
+    virtualizeCards,
+  ]);
+
+  useEffect(() => {
+    if (!virtualizeCards) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+
+    let frame = 0;
+
+    const measureGrid = () => {
+      const computedColumns = getComputedStyle(grid)
+        .gridTemplateColumns
+        .split(" ")
+        .filter(Boolean).length;
+      if (computedColumns > 0 && computedColumns !== gridColumns) {
+        setGridColumns(computedColumns);
+      }
+
+      const tiles = grid.querySelectorAll<HTMLElement>(".wiko-tile");
+      if (tiles.length <= gridColumns) return;
+      const firstRow = tiles[0].getBoundingClientRect();
+      const secondRow = tiles[gridColumns].getBoundingClientRect();
+      const nextHeight = secondRow.top - firstRow.top;
+      if (nextHeight > 120 && Math.abs(nextHeight - measuredRowHeight) > 1) {
+        setMeasuredRowHeight(nextHeight);
+      }
+    };
+
+    const updateWindow = () => {
+      frame = 0;
+      const rect = grid.getBoundingClientRect();
+      const gridTop = window.scrollY + rect.top;
+      const viewportTop = Math.max(0, window.scrollY - gridTop);
+      const viewportBottom = viewportTop + window.innerHeight;
+      const start = clampVirtualRow(
+        Math.floor(viewportTop / measuredRowHeight) - GRID_OVERSCAN_ROWS,
+        totalRows,
+      );
+      const end = clampVirtualRow(
+        Math.ceil(viewportBottom / measuredRowHeight) + GRID_OVERSCAN_ROWS,
+        totalRows,
+      );
+
+      setVirtualRows((current) => {
+        if (current.start === start && current.end === end) return current;
+        return { start, end };
+      });
+
+      measureGrid();
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateWindow);
+    };
+
+    scheduleUpdate();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [gridColumns, measuredRowHeight, totalRows, virtualizeCards]);
 
   if (cards.length === 0) {
     return (
@@ -124,16 +260,12 @@ export default function CardGrid({ cards, initialSort }: CardGridProps) {
         </div>
       ) : (
         <div
-          className="wiko-card-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-            columnGap: 18,
-            rowGap: 28,
-            padding: "28px 32px 80px",
-          }}
+          ref={gridRef}
+          className={`wiko-card-grid${virtualizeCards ? " wiko-card-grid--virtualized" : ""}`}
+          data-virtualized={virtualizeCards ? "true" : undefined}
+          style={gridStyle}
         >
-          {visibleGroups.map((group) => (
+          {windowedGroups.map((group) => (
             <CardTile
               key={group.id}
               card={group.card}

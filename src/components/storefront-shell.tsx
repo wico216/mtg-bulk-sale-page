@@ -64,11 +64,17 @@ export default function StorefrontShell({
 
   // Hydrate rail collapse state from localStorage after mount — SSR-safe.
   useEffect(() => {
+    let frame = 0;
     try {
-      if (localStorage.getItem(RAIL_COLLAPSED_KEY) === "1") setRailCollapsed(true);
+      if (localStorage.getItem(RAIL_COLLAPSED_KEY) === "1") {
+        frame = window.requestAnimationFrame(() => setRailCollapsed(true));
+      }
     } catch {
       // ignore
     }
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -91,7 +97,9 @@ export default function StorefrontShell({
 
   // Auto-close drawer if viewport grows past mobile breakpoint.
   useEffect(() => {
-    if (!isMobile && mobileOpen) setMobileOpen(false);
+    if (isMobile || !mobileOpen) return;
+    const frame = window.requestAnimationFrame(() => setMobileOpen(false));
+    return () => window.cancelAnimationFrame(frame);
   }, [isMobile, mobileOpen]);
 
   // Mobile storefront controls behave like Safari chrome: hide while scrolling
@@ -248,7 +256,12 @@ export default function StorefrontShell({
             </div>
             <SortBar />
           </div>
-          <CardGrid cards={cards} meta={meta} initialSort={initialSort} />
+          <CardGrid
+            cards={cards}
+            meta={meta}
+            initialSort={initialSort}
+            virtualizeCards
+          />
         </main>
         {mobileOpen && (
           <div
@@ -323,7 +336,12 @@ export default function StorefrontShell({
       />
       <main style={{ flex: 1, minWidth: 0 }}>
         <SortBar />
-        <CardGrid cards={cards} meta={meta} initialSort={initialSort} />
+        <CardGrid
+          cards={cards}
+          meta={meta}
+          initialSort={initialSort}
+          virtualizeCards
+        />
       </main>
     </div>
   );

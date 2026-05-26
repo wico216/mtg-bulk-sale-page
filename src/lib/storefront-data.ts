@@ -6,9 +6,9 @@ import {
   getRecentlyAddedCards,
 } from "@/db/queries";
 import {
-  e2eFixtureCards,
-  e2eFixtureMeta,
   e2eFixturesEnabled,
+  getE2eStorefrontFixtureCards,
+  getE2eStorefrontFixtureMeta,
 } from "@/lib/e2e-fixtures";
 import { toPublicCards } from "@/lib/public-card";
 import type { CardData, PublicCard } from "@/lib/types";
@@ -30,7 +30,8 @@ function sortByNewest(cards: PublicCard[]): PublicCard[] {
 
 export async function loadStorefrontData(): Promise<StorefrontData> {
   if (e2eFixturesEnabled()) {
-    return { cards: e2eFixtureCards, meta: e2eFixtureMeta };
+    const cards = getE2eStorefrontFixtureCards();
+    return { cards, meta: getE2eStorefrontFixtureMeta(cards) };
   }
 
   const [aggregatedAdmin, meta] = await Promise.all([
@@ -48,7 +49,11 @@ export async function loadRecentlyAddedStorefrontData(
   limit = 60,
 ): Promise<StorefrontData> {
   if (e2eFixturesEnabled()) {
-    return { cards: sortByNewest(e2eFixtureCards).slice(0, limit), meta: e2eFixtureMeta };
+    const cards = getE2eStorefrontFixtureCards();
+    return {
+      cards: sortByNewest(cards).slice(0, limit),
+      meta: getE2eStorefrontFixtureMeta(cards),
+    };
   }
 
   const [aggregatedAdmin, meta] = await Promise.all([
