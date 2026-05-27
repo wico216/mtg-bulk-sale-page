@@ -91,6 +91,21 @@ describe("placeCheckoutOrder", () => {
     expect(mockExecute).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts aggregated card ids whose set code contains hyphens", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ result: { ok: true, order: sqlOrder } }] });
+
+    await expect(
+      placeCheckoutOrder({
+        orderRef: "ORD-HYPHEN-SET",
+        buyerName: "Viki",
+        buyerEmail: "viki@example.com",
+        items: [{ cardId: "pmei-2024-5-foil-near_mint", quantity: 1 }],
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
   it("returns stock conflicts without an order when requested cards are missing or short-stocked", async () => {
     const conflicts = [
       {

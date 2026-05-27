@@ -40,12 +40,13 @@ export interface ManaboxRow {
  * v1.3 Phase 20 D-05/D-06 — PUBLIC card shape returned by the storefront
  * aggregation. No `binder` or `binders` field; binder names are an
  * admin-only physical-world identifier and MUST NOT reach any public
- * surface (AGG-02 / I-DISC-05). The id is the 4-segment aggregated key
+ * surface (AGG-02 / I-DISC-05). The id is the aggregated key
  * `${setCode}-${collectorNumber}-${finish}-${condition}` produced by
- * getCardsAggregated().
+ * getCardsAggregated(); do not infer shape by splitting on every hyphen
+ * because setCode can itself be hyphenated (e.g. `pmei-2024`).
  */
 export interface PublicCard {
-  /** 4-segment aggregated key: `${setCode}-${collectorNumber}-${finish}-${condition}` */
+  /** Aggregated key: `${setCode}-${collectorNumber}-${finish}-${condition}`; setCode may contain hyphens. */
   id: string;
   name: string;
   /** Lowercased set code (e.g., "sld") */
@@ -251,7 +252,7 @@ export type PublicOrderData = Omit<OrderData, "items" | "buyerPhone"> & {
 };
 
 /**
- * v1.3 D-06: `cardId` is the AGGREGATED 4-segment id
+ * v1.3 D-06: `cardId` is the AGGREGATED id
  * `${setCode}-${collectorNumber}-${finish}-${condition}` — NOT a per-binder
  * 5-segment id. `available` is the SUM across all binders for that
  * aggregated key — NEVER per-binder. The shape is preserved verbatim from

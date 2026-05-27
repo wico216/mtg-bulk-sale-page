@@ -128,6 +128,54 @@ describe("Phase 20 D-08 cart reconciliation — v1.2 → v1.3 forward migration 
     });
   });
 
+  it("STEP 3 CLAMP: already-aggregated keys with hyphenated set codes remain in the cart", async () => {
+    seedCart([["pmei-2024-5-foil-near_mint", 1]], "1.3");
+    const cards = [
+      publicCard({
+        id: "pmei-2024-5-foil-near_mint",
+        name: "Diabolic Edict",
+        setCode: "pmei-2024",
+        setName: "Media and Collaboration Promos",
+        collectorNumber: "5",
+        finish: "foil",
+        price: 4.64,
+        quantity: 1,
+      }),
+    ];
+
+    render(<CartPageClient cards={cards} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Diabolic Edict")).toBeInTheDocument();
+    });
+    expect(useCartStore.getState().items.get("pmei-2024-5-foil-near_mint")).toBe(1);
+  });
+
+  it("STEP 1+2: legacy keys with hyphenated set codes reconcile by stripping only the binder suffix", async () => {
+    seedCart([["pmei-2024-5-foil-near_mint-trade_box", 1]], "1.2");
+    const cards = [
+      publicCard({
+        id: "pmei-2024-5-foil-near_mint",
+        name: "Diabolic Edict",
+        setCode: "pmei-2024",
+        setName: "Media and Collaboration Promos",
+        collectorNumber: "5",
+        finish: "foil",
+        price: 4.64,
+        quantity: 1,
+      }),
+    ];
+
+    render(<CartPageClient cards={cards} />);
+
+    await waitFor(() => {
+      expect(useCartStore.getState().items.get("pmei-2024-5-foil-near_mint")).toBe(1);
+    });
+    expect(
+      useCartStore.getState().items.has("pmei-2024-5-foil-near_mint-trade_box"),
+    ).toBe(false);
+  });
+
   it("D-15 empty-cart edge: empty cart with undefined version fires the toast", async () => {
     seedCart([], undefined);
     const cards = [publicCard()];

@@ -47,14 +47,17 @@ interface AggregatedCardKey {
 const FINISH_VALUES = new Set<Finish>(["normal", "foil", "etched"]);
 
 /**
- * Phase 18 D-04: Splits the buyer's 4-segment aggregated cardId
+ * Phase 18 D-04: Splits the buyer's aggregated cardId
  * `${setCode}-${collectorNumber}-${finish}-${condition}` into typed fields
  * for the allocator's VALUES list.
  *
+ * The format is parsed from the RIGHT because modern set codes can contain
+ * hyphens (for example `pmei-2024`). Conditions are normalized with
+ * underscores and finishes are enum values, so the last three segments are
+ * collector number, finish, and condition; everything before that is setCode.
+ *
  * Throws on:
- *   - Segment count != 4 (e.g., 5-segment per-binder ids accidentally
- *     submitted by stale carts; Phase 20's silent reconciliation in
- *     cart-page-client.tsx is the upstream gate, this is defense-in-depth)
+ *   - Fewer than 4 hyphen-delimited segments
  *   - Empty segments
  *   - Unknown `finish` (must be 'normal' | 'foil' | 'etched')
  *
@@ -66,12 +69,15 @@ function parseAggregatedCardId(cardId: string): AggregatedCardKey {
     throw new Error(`Invalid aggregated card id: ${cardId}`);
   }
   const segments = cardId.split("-");
-  if (segments.length !== 4) {
+  if (segments.length < 4) {
     throw new Error(
-      `Invalid aggregated card id (expected 4 segments, got ${segments.length}): ${cardId}`,
+      `Invalid aggregated card id (expected at least 4 segments, got ${segments.length}): ${cardId}`,
     );
   }
-  const [setCode, collectorNumber, finish, condition] = segments;
+  const condition = segments[segments.length - 1];
+  const finish = segments[segments.length - 2];
+  const collectorNumber = segments[segments.length - 3];
+  const setCode = segments.slice(0, -3).join("-");
   if (!setCode || !collectorNumber || !finish || !condition) {
     throw new Error(`Invalid aggregated card id (empty segment): ${cardId}`);
   }
@@ -462,8 +468,9 @@ function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
 /**
  * Phase 18 multi-binder allocator (extends Phase 11's CTE-chain checkout).
  *
- * The buyer's cart submits AGGREGATED 4-segment cardIds
- * (`${setCode}-${collectorNumber}-${finish}-${condition}`). The allocator
+ * The buyer's cart submits AGGREGATED cardIds
+ * (`${setCode}-${collectorNumber}-${finish}-${condition}`; setCode can be
+ * hyphenated). The allocator
  * deterministically distributes each line across binder source rows in
  * ONE SQL CTE chain — never overselling under concurrent checkout, never
  * silently partial-fulfilling, producing one `order_items` row per binder
@@ -487,7 +494,7 @@ function normalizeAdminOrderSummary(row: AdminOrderRow): AdminOrderSummary {
  * Strict all-or-nothing (D-05): if ANY aggregated line cannot be filled
  * across all available binders, the entire order fails with StockConflict
  * — no partial fulfillment. `StockConflict.cardId` is the AGGREGATED
- * 4-segment id (D-06); `available` is SUM across binders. Per-binder
+ * id (D-06); `available` is SUM across binders. Per-binder
  * breakdowns are admin-only.
  */
 export async function placeCheckoutOrder(input: {
@@ -506,8 +513,8 @@ export async function placeCheckoutOrder(input: {
     throw new Error("Checkout requires at least one item");
   }
 
-  // Parse each 4-segment aggregated cardId into typed columns. Throws on
-  // 5-segment or otherwise malformed input — defense-in-depth above
+  // Parse each aggregated cardId into typed columns. Throws on per-binder
+  // or otherwise malformed input — defense-in-depth above
   // Phase 20's silent reconciliation in cart-page-client.tsx.
   const parsed = aggregated.map((item) => ({
     ...parseAggregatedCardId(item.cardId),

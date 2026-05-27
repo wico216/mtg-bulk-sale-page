@@ -35,8 +35,11 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   // v1.3 Phase 20 D-12: one-time migration toast visibility.
   const [showMigrationToast, setShowMigrationToast] = useState(false);
 
-  // O(1) card lookup keyed on the AGGREGATED 4-segment id (the buyer's
-  // cart key shape after Plan 20-01).
+  // O(1) card lookup keyed on the aggregated cart id. Most ids follow the
+  // historical `${setCode}-${collectorNumber}-${finish}-${condition}` shape,
+  // but set codes can themselves contain hyphens (for example `pmei-2024`),
+  // so reconciliation must never infer current-vs-legacy solely from
+  // `id.split("-").length`.
   const cardMap = useMemo(
     () => new Map(cards.map((c) => [c.id, c])),
     [cards],
@@ -46,16 +49,19 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   // hydration.
   //   STEP 0: snapshot cart entries (avoid iterator invalidation while we
   //           mutate the store mid-loop).
-  //   STEP 1: segment-strip 5-segment legacy v1.2 keys to their 4-segment
-  //           aggregated candidate.
-  //   STEP 2: transfer-and-clamp the stale-key quantity into the
+  //   STEP 1: check the exact aggregated cart key first. This is load-bearing
+  //           for modern set codes containing hyphens, e.g.
+  //           `pmei-2024-5-foil-near_mint`.
+  //   STEP 2: if no exact card exists, strip only the final hyphen-delimited
+  //           suffix as a possible legacy per-binder key.
+  //   STEP 3: transfer-and-clamp the stale-key quantity into the
   //           aggregated entry (sums across multiple legacy keys for the
   //           same logical card; clamps to current aggregated stock).
-  //   STEP 3: clamp already-aggregated keys to current stock (Pitfall 11
+  //   STEP 4: clamp already-aggregated keys to current stock (Pitfall 11
   //           mid-session stock-drop case).
-  //   STEP 4: silently remove unmatchable entries (preserves Phase 10-03
+  //   STEP 5: silently remove unmatchable entries (preserves Phase 10-03
   //           D-13 silent-drop behavior verbatim as the final fallback).
-  //   STEP 5: fire one-time migration toast iff needsCartMigration was
+  //   STEP 6: fire one-time migration toast iff needsCartMigration was
   //           true at the start of the effect, then advance sentinel via
   //           markCartMigrated().
   useEffect(() => {
@@ -66,38 +72,36 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
     // STEP 0: snapshot
     const entries = [...startState.items.entries()];
     for (const [cartKey, qty] of entries) {
-      const segs = cartKey.split("-");
-      if (segs.length === 5) {
-        // STEP 1: segment-strip
-        const candidate = segs.slice(0, 4).join("-");
-        const candidateCard = cardMap.get(candidate);
-        if (candidateCard) {
-          // STEP 2: transfer-and-clamp. Sum existing aggregated qty (if any)
-          // with the stale-key qty, then setQuantity clamps to maxStock.
-          const existing = useCartStore.getState().items.get(candidate) ?? 0;
-          setQuantity(candidate, existing + qty, candidateCard.quantity);
-          removeItem(cartKey);
-        } else {
-          // STEP 4: silently drop unmatchable legacy entry
-          removeItem(cartKey);
+      // STEP 1 + STEP 4: exact current aggregated key path.
+      const exactCard = cardMap.get(cartKey);
+      if (exactCard) {
+        if (qty > exactCard.quantity) {
+          setQuantity(cartKey, exactCard.quantity);
         }
         continue;
       }
-      // 4-segment key path: check existence + clamp current.
-      const card = cardMap.get(cartKey);
-      if (!card) {
-        // STEP 4: silent drop preserved from Phase 10-03 D-13
+
+      // STEP 2: legacy per-binder keys were formed by appending
+      // `-${binder}` to the aggregated id. Binder names are normalized with
+      // hyphens converted to underscores, so stripping only the final hyphen
+      // suffix preserves hyphenated set codes such as `pmei-2024`.
+      const lastHyphen = cartKey.lastIndexOf("-");
+      const candidate = lastHyphen > 0 ? cartKey.slice(0, lastHyphen) : "";
+      const candidateCard = candidate ? cardMap.get(candidate) : undefined;
+      if (candidateCard) {
+        // STEP 3: transfer-and-clamp. Sum existing aggregated qty (if any)
+        // with the stale-key qty, then setQuantity clamps to maxStock.
+        const existing = useCartStore.getState().items.get(candidate) ?? 0;
+        setQuantity(candidate, existing + qty, candidateCard.quantity);
         removeItem(cartKey);
-        continue;
-      }
-      // STEP 3: clamp on already-aggregated key (Pitfall 11)
-      if (qty > card.quantity) {
-        setQuantity(cartKey, card.quantity);
+      } else {
+        // STEP 5: silently drop unmatchable stale entry
+        removeItem(cartKey);
       }
     }
 
     if (shouldFireToast) {
-      // STEP 5: fire one-time toast and advance sentinel.
+      // STEP 6: fire one-time toast and advance sentinel.
       queueMicrotask(() => setShowMigrationToast(true));
       markCartMigrated();
     }
