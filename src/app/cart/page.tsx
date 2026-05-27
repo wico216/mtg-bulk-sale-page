@@ -18,8 +18,10 @@ async function loadCartCards(): Promise<PublicCard[]> {
   if (e2eFixturesEnabled()) return e2eFixtureCards;
 
   // v1.3 Phase 20 D-03/D-06 + AGG-02: cart-page-client builds its
-  // cardMap from the aggregated 4-segment ids (matches the buyer's
-  // cart key shape). The disaggregated getCards() is no longer needed
+  // cardMap from the aggregated buyer cart ids. The ids use the
+  // `${setCode}-${collectorNumber}-${finish}-${condition}` shape but can
+  // contain extra hyphens when setCode itself is hyphenated. The
+  // disaggregated getCards() is no longer needed
   // here — cart-page-client only reads PublicCard fields. The legacy
   // CONTEXT D-03 directive to "KEEP getCards()" was conditional on
   // future internal/admin paths consuming disaggregated rows; in v1.3
