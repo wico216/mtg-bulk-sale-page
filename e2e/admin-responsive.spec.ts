@@ -98,6 +98,21 @@ test.describe("mobile admin responsive audit surfaces", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("ManaBox removals render as a visual checklist with card art and source boxes", async ({ page }) => {
+    await page.goto("/admin/manabox");
+    await expect(page.getByRole("heading", { name: "ManaBox visual removals" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /print visual report/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /download csv/i })).toHaveCount(0);
+
+    const report = page.getByRole("region", { name: /Visual ManaBox removal report/i });
+    await expect(report).toBeVisible();
+    await expect(report.getByRole("img", { name: /Lightning Bolt card art/i })).toBeVisible();
+    await expect(report.getByText("Box A02")).toBeVisible();
+    await expect(report.getByText("Box Trade Box")).toBeVisible();
+
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("picker confirmation footer no longer covers row action buttons mid-list", async ({ page }) => {
     await page.goto("/admin/orders/pick?refs=ORD-E2E-0001,ORD-E2E-0002");
     await expect(page.getByRole("heading", { name: "Pull list." })).toBeVisible();

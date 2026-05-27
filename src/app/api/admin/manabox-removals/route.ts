@@ -1,6 +1,5 @@
 import {
   getManaBoxRemovalReport,
-  manaBoxRemovalReportToCsv,
   markManaBoxItemsRemoved,
 } from "@/db/manabox-removals";
 import { requireAdmin } from "@/lib/auth/admin-check";
@@ -39,24 +38,12 @@ function parseOrderItemIds(value: unknown): number[] | Response {
   return ids;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   const result = await requireAdmin();
   if (result instanceof Response) return result;
 
   try {
     const report = await getManaBoxRemovalReport();
-    const url = new URL(request.url);
-    if (url.searchParams.get("format") === "csv") {
-      const csv = manaBoxRemovalReportToCsv(report);
-      const date = new Date().toISOString().split("T")[0];
-      return new Response(csv, {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="manabox-removals-${date}.csv"`,
-        },
-      });
-    }
-
     return Response.json({ report });
   } catch (err) {
     logError({

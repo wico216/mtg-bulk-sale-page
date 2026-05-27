@@ -15,7 +15,6 @@ vi.mock("@/db/client", () => ({
 
 import {
   getManaBoxRemovalReport,
-  manaBoxRemovalReportToCsv,
   markManaBoxItemsRemoved,
 } from "../manabox-removals";
 
@@ -42,7 +41,7 @@ const unremovedRows = [
     orderRef: "ORD-20260526-0002",
     status: "completed",
     soldAt: "2026-05-26T13:00:00.000Z",
-    cardId: "pmei-2024-5-foil-near_mint-trade_box",
+    cardId: "pmei-2024-5-foil-near_mint-b01",
     name: "Diabolic Edict",
     setName: "Pioneer Masters 2024",
     setCode: "pmei-2024",
@@ -52,7 +51,7 @@ const unremovedRows = [
     quantity: 2,
     lineTotal: 200,
     imageUrl: null,
-    binder: "trade_box",
+    binder: "b01",
   },
   {
     orderItemId: 12,
@@ -110,23 +109,44 @@ describe("getManaBoxRemovalReport", () => {
       orderRefs: ["ORD-20260526-0001", "ORD-20260526-0002"],
       orderItemIds: [10, 11],
       statuses: ["completed", "confirmed"],
-      binders: ["trade_box"],
+      binders: ["b01", "trade_box"],
+      boxBreakdown: [
+        {
+          box: "b01",
+          quantity: 2,
+          orderRefs: ["ORD-20260526-0002"],
+          orderItemIds: [11],
+        },
+        {
+          box: "trade_box",
+          quantity: 1,
+          orderRefs: ["ORD-20260526-0001"],
+          orderItemIds: [10],
+        },
+      ],
     });
   });
 
-  it("exports the report as a CSV for ManaBox cleanup", async () => {
+  it("keeps card art URLs and box locations in the report data", async () => {
     mockExecute
-      .mockResolvedValueOnce({ rows: unremovedRows.slice(0, 1) })
+      .mockResolvedValueOnce({ rows: unremovedRows.slice(2) })
       .mockResolvedValueOnce({ rows: [] });
 
     const report = await getManaBoxRemovalReport();
-    const csv = manaBoxRemovalReportToCsv(report);
 
-    expect(csv).toContain(
-      "Name,Set Code,Set Name,Collector Number,Finish,Condition,Quantity,Total Value,Order Refs,Order Item IDs,Binders,Statuses,First Sold At,Last Sold At",
-    );
-    expect(csv).toContain("Diabolic Edict,pmei-2024,Pioneer Masters 2024,5,foil,near_mint,1,1.25");
-    expect(csv).toContain("ORD-20260526-0001");
+    expect(report.rows[0]).toMatchObject({
+      name: "Lightning Bolt",
+      imageUrl: "https://example.com/bolt.jpg",
+      binders: ["a02"],
+      boxBreakdown: [
+        {
+          box: "a02",
+          quantity: 1,
+          orderRefs: ["ORD-20260526-0003"],
+          orderItemIds: [12],
+        },
+      ],
+    });
   });
 
   it("uses audit-log marker rows instead of schema columns for idempotency", () => {

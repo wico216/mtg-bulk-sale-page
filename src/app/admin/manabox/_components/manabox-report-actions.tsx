@@ -19,13 +19,18 @@ export function ManaBoxReportActions({
   const uniqueOrderItemIds = useMemo(() => [...new Set(orderItemIds)], [orderItemIds]);
   const isDisabled = disabled || uniqueOrderItemIds.length === 0 || isPending;
 
+  function printReport() {
+    if (disabled || uniqueOrderItemIds.length === 0) return;
+    window.print();
+  }
+
   async function markRemoved() {
     if (isDisabled) return;
     setMessage(null);
     setError(null);
 
     const confirmed = window.confirm(
-      `Mark ${uniqueOrderItemIds.length} sold line item${uniqueOrderItemIds.length === 1 ? "" : "s"} as removed from ManaBox?\n\nOnly do this after you've removed them from your ManaBox collection.`,
+      `Mark ${uniqueOrderItemIds.length} sold line item${uniqueOrderItemIds.length === 1 ? "" : "s"} as removed from ManaBox?\n\nOnly do this after you've removed the pictured cards from your ManaBox collection.`,
     );
     if (!confirmed) return;
 
@@ -56,13 +61,15 @@ export function ManaBoxReportActions({
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <a
-        href="/api/admin/manabox-removals?format=csv"
-        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors"
+      <button
+        type="button"
+        onClick={printReport}
+        disabled={disabled || uniqueOrderItemIds.length === 0}
+        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         style={{ background: "var(--ink)", color: "var(--bg)" }}
       >
-        Download CSV
-      </a>
+        Print visual report
+      </button>
       <button
         type="button"
         onClick={markRemoved}

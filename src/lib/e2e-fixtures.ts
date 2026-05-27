@@ -360,6 +360,9 @@ export function getE2eFixtureImportHistory(
   };
 }
 
+const e2eFixtureCardImage =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='336' viewBox='0 0 240 336'%3E%3Crect width='240' height='336' rx='18' fill='%23211635'/%3E%3Crect x='18' y='18' width='204' height='300' rx='12' fill='%23f2d071'/%3E%3Ctext x='120' y='168' dominant-baseline='middle' text-anchor='middle' font-family='serif' font-size='24' fill='%23211635'%3EWiko%3C/text%3E%3C/svg%3E";
+
 export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
   generatedAt: "2026-05-24T17:00:00.000Z",
   rows: [
@@ -376,10 +379,18 @@ export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
       orderRefs: ["ORD-E2E-0001"],
       orderItemIds: [101],
       binders: ["a02"],
+      boxBreakdown: [
+        {
+          box: "a02",
+          quantity: 2,
+          orderRefs: ["ORD-E2E-0001"],
+          orderItemIds: [101],
+        },
+      ],
       statuses: ["pending"],
       firstSoldAt: "2026-05-24T16:00:00.000Z",
       lastSoldAt: "2026-05-24T16:00:00.000Z",
-      imageUrl: null,
+      imageUrl: e2eFixtureCardImage,
     },
     {
       key: "e2e|001|foil|near_mint",
@@ -394,10 +405,18 @@ export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
       orderRefs: ["ORD-E2E-0001"],
       orderItemIds: [102],
       binders: ["b01"],
+      boxBreakdown: [
+        {
+          box: "b01",
+          quantity: 1,
+          orderRefs: ["ORD-E2E-0001"],
+          orderItemIds: [102],
+        },
+      ],
       statuses: ["pending"],
       firstSoldAt: "2026-05-24T16:00:00.000Z",
       lastSoldAt: "2026-05-24T16:00:00.000Z",
-      imageUrl: null,
+      imageUrl: e2eFixtureCardImage,
     },
     {
       key: "e2e|045|normal|lightly_played",
@@ -412,10 +431,18 @@ export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
       orderRefs: ["ORD-E2E-0002"],
       orderItemIds: [103],
       binders: ["trade-box"],
+      boxBreakdown: [
+        {
+          box: "trade-box",
+          quantity: 1,
+          orderRefs: ["ORD-E2E-0002"],
+          orderItemIds: [103],
+        },
+      ],
       statuses: ["confirmed"],
       firstSoldAt: "2026-05-24T15:00:00.000Z",
       lastSoldAt: "2026-05-24T15:00:00.000Z",
-      imageUrl: null,
+      imageUrl: e2eFixtureCardImage,
     },
   ],
   totalRows: 3,

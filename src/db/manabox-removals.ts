@@ -27,6 +27,13 @@ interface ManaBoxLineItemRow {
   binder: string;
 }
 
+export interface ManaBoxRemovalBoxBreakdown {
+  box: string;
+  quantity: number;
+  orderRefs: string[];
+  orderItemIds: number[];
+}
+
 export interface ManaBoxRemovalReportRow {
   key: string;
   name: string;
@@ -40,6 +47,7 @@ export interface ManaBoxRemovalReportRow {
   orderRefs: string[];
   orderItemIds: number[];
   binders: string[];
+  boxBreakdown: ManaBoxRemovalBoxBreakdown[];
   statuses: ManaBoxRemovalStatus[];
   firstSoldAt: string;
   lastSoldAt: string;
@@ -144,17 +152,45 @@ function sortedList(values: Set<string>): string[] {
   return [...values].sort((left, right) => left.localeCompare(right));
 }
 
-function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalReportRow[] {
-  const groups = new Map<
+type ManaBoxRemovalRowGroup = {
+  row: ManaBoxRemovalReportRow;
+  orderRefs: Set<string>;
+  binders: Set<string>;
+  statuses: Set<ManaBoxRemovalStatus>;
+  totalValueCents: number;
+  boxes: Map<
     string,
     {
-      row: ManaBoxRemovalReportRow;
+      quantity: number;
       orderRefs: Set<string>;
-      binders: Set<string>;
-      statuses: Set<ManaBoxRemovalStatus>;
-      totalValueCents: number;
+      orderItemIds: number[];
     }
-  >();
+  >;
+};
+
+function addBoxBreakdown(
+  group: ManaBoxRemovalRowGroup,
+  rawRow: ManaBoxLineItemRow,
+  orderItemId: number,
+  quantity: number,
+) {
+  const current = group.boxes.get(rawRow.binder);
+  if (current) {
+    current.quantity += quantity;
+    current.orderRefs.add(rawRow.orderRef);
+    current.orderItemIds.push(orderItemId);
+    return;
+  }
+
+  group.boxes.set(rawRow.binder, {
+    quantity,
+    orderRefs: new Set([rawRow.orderRef]),
+    orderItemIds: [orderItemId],
+  });
+}
+
+function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalReportRow[] {
+  const groups = new Map<string, ManaBoxRemovalRowGroup>();
 
   for (const rawRow of lineItems) {
     const orderItemId = numberFromDb(rawRow.orderItemId);
@@ -167,7 +203,7 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
 
     const current = groups.get(key);
     if (!current) {
-      groups.set(key, {
+      const group: ManaBoxRemovalRowGroup = {
         row: {
           key,
           name: rawRow.name,
@@ -181,6 +217,7 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
           orderRefs: [rawRow.orderRef],
           orderItemIds: [orderItemId],
           binders: [rawRow.binder],
+          boxBreakdown: [],
           statuses: [status],
           firstSoldAt: soldAt,
           lastSoldAt: soldAt,
@@ -190,7 +227,10 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
         binders: new Set([rawRow.binder]),
         statuses: new Set([status]),
         totalValueCents: valueCents,
-      });
+        boxes: new Map(),
+      };
+      addBoxBreakdown(group, rawRow, orderItemId, quantity);
+      groups.set(key, group);
       continue;
     }
 
@@ -201,12 +241,16 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
     current.statuses.add(status);
     current.totalValueCents += valueCents;
     current.row.totalValue = centsToDollars(current.totalValueCents);
+    if (!current.row.imageUrl && rawRow.imageUrl) {
+      current.row.imageUrl = rawRow.imageUrl;
+    }
     if (new Date(soldAt).getTime() < new Date(current.row.firstSoldAt).getTime()) {
       current.row.firstSoldAt = soldAt;
     }
     if (new Date(soldAt).getTime() > new Date(current.row.lastSoldAt).getTime()) {
       current.row.lastSoldAt = soldAt;
     }
+    addBoxBreakdown(current, rawRow, orderItemId, quantity);
   }
 
   return [...groups.values()]
@@ -215,6 +259,14 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
       orderRefs: sortedList(group.orderRefs),
       orderItemIds: [...group.row.orderItemIds].sort((left, right) => left - right),
       binders: sortedList(group.binders),
+      boxBreakdown: [...group.boxes.entries()]
+        .map(([box, value]) => ({
+          box,
+          quantity: value.quantity,
+          orderRefs: sortedList(value.orderRefs),
+          orderItemIds: [...value.orderItemIds].sort((left, right) => left - right),
+        }))
+        .sort((left, right) => left.box.localeCompare(right.box)),
       statuses: sortedStatusList(group.statuses),
     }))
     .sort(
@@ -237,20 +289,6 @@ function parseMarkPayload(raw: unknown): MarkPayload {
   if (typeof raw === "string") return JSON.parse(raw) as MarkPayload;
   if (raw && typeof raw === "object") return raw as MarkPayload;
   throw new Error("ManaBox mark query returned no result");
-}
-
-function csvEscape(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "";
-  const str = String(value);
-  if (
-    str.includes(",") ||
-    str.includes("\n") ||
-    str.includes('"') ||
-    /^[=+\-@]/.test(str)
-  ) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
 }
 
 export async function getManaBoxRemovalReport(): Promise<ManaBoxRemovalReport> {
@@ -316,46 +354,6 @@ export async function getManaBoxRemovalReport(): Promise<ManaBoxRemovalReport> {
     lastMarkedAt: lastMarked?.lastMarkedAt ? toIsoString(lastMarked.lastMarkedAt) : null,
     lastMarkedBy: lastMarked?.lastMarkedBy ?? null,
   };
-}
-
-export function manaBoxRemovalReportToCsv(report: ManaBoxRemovalReport): string {
-  const header = [
-    "Name",
-    "Set Code",
-    "Set Name",
-    "Collector Number",
-    "Finish",
-    "Condition",
-    "Quantity",
-    "Total Value",
-    "Order Refs",
-    "Order Item IDs",
-    "Binders",
-    "Statuses",
-    "First Sold At",
-    "Last Sold At",
-  ];
-
-  const lines = report.rows.map((row) =>
-    [
-      row.name,
-      row.setCode,
-      row.setName,
-      row.collectorNumber,
-      row.finish,
-      row.condition,
-      row.quantity,
-      row.totalValue.toFixed(2),
-      row.orderRefs.join("; "),
-      row.orderItemIds.join("; "),
-      row.binders.join("; "),
-      row.statuses.join("; "),
-      row.firstSoldAt,
-      row.lastSoldAt,
-    ].map(csvEscape).join(","),
-  );
-
-  return [header.join(","), ...lines].join("\n");
 }
 
 export async function markManaBoxItemsRemoved(

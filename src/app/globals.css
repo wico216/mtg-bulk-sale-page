@@ -1241,3 +1241,39 @@ a { color: inherit; }
     text-transform: uppercase;
   }
 }
+
+@media print {
+  body::before,
+  .wiko-header,
+  .wiko-manabox-toolbar {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: #111 !important;
+  }
+
+  .wiko-manabox-page {
+    color: #111 !important;
+  }
+
+  .wiko-manabox-report-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  .wiko-manabox-report-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    background: white !important;
+    border-color: #bbb !important;
+  }
+
+  .wiko-manabox-card-art {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

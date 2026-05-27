@@ -26,8 +26,6 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
 vi.mock("@/db/manabox-removals", () => ({
   getManaBoxRemovalReport: mockGetManaBoxRemovalReport,
   markManaBoxItemsRemoved: mockMarkManaBoxItemsRemoved,
-  manaBoxRemovalReportToCsv: (report: { rows: Array<{ name: string; setCode: string }> }) =>
-    ["Name,Set Code", ...report.rows.map((row) => `${row.name},${row.setCode}`)].join("\n"),
 }));
 
 import { GET, POST } from "../route";
@@ -52,9 +50,18 @@ const report = {
       orderRefs: ["ORD-1"],
       orderItemIds: [10, 11],
       binders: ["trade_box"],
+      boxBreakdown: [
+        {
+          box: "trade_box",
+          quantity: 3,
+          orderRefs: ["ORD-1"],
+          orderItemIds: [10, 11],
+        },
+      ],
       statuses: ["confirmed"],
       firstSoldAt: "2026-05-26T12:00:00.000Z",
       lastSoldAt: "2026-05-26T13:00:00.000Z",
+      imageUrl: "https://example.com/edict.jpg",
     },
   ],
   totalRows: 1,
@@ -64,10 +71,6 @@ const report = {
   lastMarkedAt: null,
   lastMarkedBy: null,
 };
-
-function makeRequest(url = "http://localhost:3000/api/admin/manabox-removals") {
-  return new Request(url);
-}
 
 function makePostRequest(body?: unknown) {
   return new Request("http://localhost:3000/api/admin/manabox-removals", {
@@ -87,30 +90,28 @@ describe("GET /api/admin/manabox-removals", () => {
   it("returns the current unmarked ManaBox removal report as JSON", async () => {
     mockGetManaBoxRemovalReport.mockResolvedValue(report);
 
-    const response = await GET(makeRequest());
+    const response = await GET();
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ report });
     expect(mockGetManaBoxRemovalReport).toHaveBeenCalledTimes(1);
   });
 
-  it("returns the current report as a CSV attachment", async () => {
+  it("does not expose a CSV attachment from the visual-report API", async () => {
     mockGetManaBoxRemovalReport.mockResolvedValue(report);
 
-    const response = await GET(
-      makeRequest("http://localhost:3000/api/admin/manabox-removals?format=csv"),
-    );
+    const response = await GET();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(response.headers.get("content-disposition")).toContain("manabox-removals");
-    expect(await response.text()).toContain("Diabolic Edict,pmei-2024");
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("content-disposition")).toBeNull();
+    expect(await response.json()).toEqual({ report });
   });
 
   it("returns 401 when requireAdmin rejects the request", async () => {
     mockRequireAdmin.mockResolvedValue(Response.json({ error: "Unauthorized" }, { status: 401 }));
 
-    const response = await GET(makeRequest());
+    const response = await GET();
 
     expect(response.status).toBe(401);
     expect(mockGetManaBoxRemovalReport).not.toHaveBeenCalled();
