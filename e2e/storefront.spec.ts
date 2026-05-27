@@ -213,15 +213,19 @@ test("mobile storefront keeps the rendered card DOM bounded with production-size
   expect(renderedTileCount).toBeLessThanOrEqual(72);
   expect(domNodeCount).toBeLessThan(900);
 
+  const initialScrollHeight = await page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);
+
   await page.evaluate(() => window.scrollTo(0, 120_000));
   await page.waitForTimeout(120);
 
   const afterScrollTileCount = await page.locator(".wiko-card-grid .wiko-tile").count();
   const afterScrollDomNodeCount = await page.evaluate(() => document.querySelectorAll("*").length);
+  const afterScrollHeight = await page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);
   const visibleLabels = await page.locator(".wiko-card-grid .wiko-tile-title").allTextContents();
 
   expect(afterScrollTileCount).toBeLessThanOrEqual(72);
   expect(afterScrollDomNodeCount).toBeLessThan(900);
+  expect(Math.abs(afterScrollHeight - initialScrollHeight)).toBeLessThanOrEqual(2);
   expect(visibleLabels.some((label) => /Fixture Bulk Card 0[7-9]\d{2}/.test(label))).toBe(true);
 });
 
