@@ -214,11 +214,25 @@ a { color: inherit; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
 }
 
-/* Virtualized storefront grids keep the production card DOM bounded while preserving the full scroll range. */
+/* Virtualized storefront grids keep the production card DOM bounded while preserving the full scroll range.
+ * The outer virtualizer owns the full scroll height; the rendered card window moves via transform.
+ * Avoid changing grid padding on every scroll — that forces layout and shows up as flicker on mobile Safari. */
+.wiko-card-grid-virtualizer {
+  --wiko-grid-base-top: 28px;
+  --wiko-grid-base-bottom: 80px;
+  position: relative;
+  height: calc(
+    var(--wiko-grid-virtual-content-height, 0px) +
+    var(--wiko-grid-base-top) +
+    var(--wiko-grid-base-bottom)
+  );
+  overflow-anchor: none;
+  contain: layout paint style;
+}
+
 .wiko-card-grid--virtualized {
   overflow-anchor: none;
-  padding-top: calc(28px + var(--wiko-grid-top-spacer, 0px)) !important;
-  padding-bottom: calc(80px + var(--wiko-grid-bottom-spacer, 0px)) !important;
+  padding-bottom: 0 !important;
 }
 
 /* Mobile storefront: compact two-column browsing and touch-visible actions.
@@ -249,10 +263,14 @@ a { color: inherit; }
     padding: 20px 14px 72px !important;
   }
 
+  .wiko-card-grid-virtualizer {
+    --wiko-grid-base-top: 20px;
+    --wiko-grid-base-bottom: 72px;
+  }
+
   .wiko-card-grid--virtualized {
     overflow-anchor: none;
-    padding-top: calc(20px + var(--wiko-grid-top-spacer, 0px)) !important;
-    padding-bottom: calc(72px + var(--wiko-grid-bottom-spacer, 0px)) !important;
+    padding-bottom: 0 !important;
   }
 
   .wiko-tile-title {
