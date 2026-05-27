@@ -194,6 +194,18 @@ test("mobile search controls hide/reveal only after intentional scroll distance"
   await expect.poll(controlsAreVisible).toBe(true);
 });
 
+test("mobile card tiles reserve consistent height for smooth slow scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const tileHeights = await page.locator(".wiko-card-grid .wiko-tile").evaluateAll((tiles) =>
+    tiles.map((tile) => Math.round(tile.getBoundingClientRect().height)),
+  );
+
+  expect(tileHeights.length).toBeGreaterThan(1);
+  expect(Math.max(...tileHeights) - Math.min(...tileHeights)).toBeLessThanOrEqual(1);
+});
+
 test("mobile storefront keeps the rendered card DOM bounded with production-sized inventory", async ({ page }) => {
   const bulkCount = Number(process.env.E2E_BULK_FIXTURE_COUNT ?? "0");
   test.skip(

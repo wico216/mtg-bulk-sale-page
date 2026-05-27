@@ -294,7 +294,7 @@ export default function CardTile({ card, variants = [card], onClick }: CardTileP
         </button>
       </div>
 
-      <div style={{ marginTop: 10 }}>
+      <div className="wiko-tile-body" style={{ marginTop: 10 }}>
         <div
           className="wiko-tile-title"
           style={{
