@@ -198,8 +198,12 @@ test("mobile card tiles reserve consistent height for smooth slow scrolling", as
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
 
-  const tileHeights = await page.locator(".wiko-card-grid .wiko-tile").evaluateAll((tiles) =>
-    tiles.map((tile) => Math.round(tile.getBoundingClientRect().height)),
+  const tiles = page.locator(".wiko-card-grid .wiko-tile");
+  await expect(page.getByText(/cards in stock/i)).toBeVisible();
+  await expect(tiles).toHaveCount(4);
+
+  const tileHeights = await tiles.evaluateAll((tileElements) =>
+    tileElements.map((tile) => Math.round(tile.getBoundingClientRect().height)),
   );
 
   expect(tileHeights.length).toBeGreaterThan(1);
