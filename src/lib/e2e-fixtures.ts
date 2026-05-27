@@ -4,6 +4,7 @@ import type {
   AdminOrderStatusCounts,
   OrderTimelineEvent,
 } from "@/db/orders";
+import type { ManaBoxRemovalReport } from "@/db/manabox-removals";
 import type {
   AdminAuditEntriesParams,
   AdminAuditEntriesResult,
@@ -358,6 +359,72 @@ export function getE2eFixtureImportHistory(
     totalPages: Math.max(1, Math.ceil(e2eFixtureImportHistoryEntries.length / limit)),
   };
 }
+
+export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
+  generatedAt: "2026-05-24T17:00:00.000Z",
+  rows: [
+    {
+      key: "e2e|150|normal|near_mint",
+      name: "Lightning Bolt",
+      setCode: "e2e",
+      setName: "E2E Masters",
+      collectorNumber: "150",
+      finish: "normal",
+      condition: "near_mint",
+      quantity: 2,
+      totalValue: 7,
+      orderRefs: ["ORD-E2E-0001"],
+      orderItemIds: [101],
+      binders: ["a02"],
+      statuses: ["pending"],
+      firstSoldAt: "2026-05-24T16:00:00.000Z",
+      lastSoldAt: "2026-05-24T16:00:00.000Z",
+      imageUrl: null,
+    },
+    {
+      key: "e2e|001|foil|near_mint",
+      name: "Sol Ring",
+      setCode: "e2e",
+      setName: "E2E Masters",
+      collectorNumber: "001",
+      finish: "foil",
+      condition: "near_mint",
+      quantity: 1,
+      totalValue: 4.25,
+      orderRefs: ["ORD-E2E-0001"],
+      orderItemIds: [102],
+      binders: ["b01"],
+      statuses: ["pending"],
+      firstSoldAt: "2026-05-24T16:00:00.000Z",
+      lastSoldAt: "2026-05-24T16:00:00.000Z",
+      imageUrl: null,
+    },
+    {
+      key: "e2e|045|normal|lightly_played",
+      name: "Counterspell",
+      setCode: "e2e",
+      setName: "E2E Masters",
+      collectorNumber: "045",
+      finish: "normal",
+      condition: "lightly_played",
+      quantity: 1,
+      totalValue: 2,
+      orderRefs: ["ORD-E2E-0002"],
+      orderItemIds: [103],
+      binders: ["trade-box"],
+      statuses: ["confirmed"],
+      firstSoldAt: "2026-05-24T15:00:00.000Z",
+      lastSoldAt: "2026-05-24T15:00:00.000Z",
+      imageUrl: null,
+    },
+  ],
+  totalRows: 3,
+  totalQuantity: 4,
+  totalValue: 13.25,
+  orderCount: 2,
+  lastMarkedAt: "2026-05-23T10:00:00.000Z",
+  lastMarkedBy: "admin@example.com",
+};
 
 export const e2eFixtureAdminHealthSnapshot: AdminHealthSnapshot = {
   database: "ok",

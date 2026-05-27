@@ -306,9 +306,10 @@ export type AdminAuditAction =
   | "order.status_update"
   | "order.cancel"
   | "order.restore_inventory"
+  | "manabox.removal_marked"
   | "price_refresh";
 
-export type AdminAuditTargetType = "card" | "inventory" | "order" | "import";
+export type AdminAuditTargetType = "card" | "inventory" | "order" | "order_item" | "import";
 
 export interface AdminAuditEntry {
   id: number;
@@ -491,6 +492,7 @@ function normalizeAdminAuditAction(value: string): AdminAuditAction {
     "order.status_update",
     "order.cancel",
     "order.restore_inventory",
+    "manabox.removal_marked",
     "price_refresh",
   ];
   return allowed.includes(value as AdminAuditAction)
@@ -503,6 +505,7 @@ function normalizeAdminAuditTargetType(value: string): AdminAuditTargetType {
     "card",
     "inventory",
     "order",
+    "order_item",
     "import",
   ];
   return allowed.includes(value as AdminAuditTargetType)

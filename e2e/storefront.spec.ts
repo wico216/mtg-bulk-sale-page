@@ -36,6 +36,19 @@ test("storefront supports search, card details, and unauthenticated admin redire
   await expect(page.getByText(/Only authorized admins can access this area/i)).toBeVisible();
 });
 
+test("admin ManaBox report shows sold cards pending collection removal", async ({ page }) => {
+  await page.goto("/admin/manabox");
+
+  await expect(page.getByRole("heading", { name: "ManaBox removals" })).toBeVisible();
+  await expect(page.getByText(/These are sold Spellbook order items/i)).toBeVisible();
+  await expect(page.getByText("4", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download CSV" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mark current report removed" })).toBeVisible();
+  await expect(page.getByText("Lightning Bolt")).toBeVisible();
+  await expect(page.getByText("Counterspell")).toBeVisible();
+  await expect(page.getByText("Sol Ring")).toBeVisible();
+});
+
 test("new arrivals page shows recently added inventory newest first", async ({ page }) => {
   await page.goto("/new");
 
