@@ -32,6 +32,7 @@ export interface ManaBoxRemovalBoxBreakdown {
   quantity: number;
   orderRefs: string[];
   orderItemIds: number[];
+  totalValue?: number;
 }
 
 export interface ManaBoxRemovalReportRow {
@@ -162,6 +163,7 @@ type ManaBoxRemovalRowGroup = {
     string,
     {
       quantity: number;
+      totalValueCents: number;
       orderRefs: Set<string>;
       orderItemIds: number[];
     }
@@ -173,10 +175,12 @@ function addBoxBreakdown(
   rawRow: ManaBoxLineItemRow,
   orderItemId: number,
   quantity: number,
+  valueCents: number,
 ) {
   const current = group.boxes.get(rawRow.binder);
   if (current) {
     current.quantity += quantity;
+    current.totalValueCents += valueCents;
     current.orderRefs.add(rawRow.orderRef);
     current.orderItemIds.push(orderItemId);
     return;
@@ -184,6 +188,7 @@ function addBoxBreakdown(
 
   group.boxes.set(rawRow.binder, {
     quantity,
+    totalValueCents: valueCents,
     orderRefs: new Set([rawRow.orderRef]),
     orderItemIds: [orderItemId],
   });
@@ -229,7 +234,7 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
         totalValueCents: valueCents,
         boxes: new Map(),
       };
-      addBoxBreakdown(group, rawRow, orderItemId, quantity);
+      addBoxBreakdown(group, rawRow, orderItemId, quantity, valueCents);
       groups.set(key, group);
       continue;
     }
@@ -250,7 +255,7 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
     if (new Date(soldAt).getTime() > new Date(current.row.lastSoldAt).getTime()) {
       current.row.lastSoldAt = soldAt;
     }
-    addBoxBreakdown(current, rawRow, orderItemId, quantity);
+    addBoxBreakdown(current, rawRow, orderItemId, quantity, valueCents);
   }
 
   return [...groups.values()]
@@ -263,6 +268,7 @@ function normalizeReportRows(lineItems: ManaBoxLineItemRow[]): ManaBoxRemovalRep
         .map(([box, value]) => ({
           box,
           quantity: value.quantity,
+          totalValue: centsToDollars(value.totalValueCents),
           orderRefs: sortedList(value.orderRefs),
           orderItemIds: [...value.orderItemIds].sort((left, right) => left - right),
         }))
