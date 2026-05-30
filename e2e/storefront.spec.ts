@@ -40,17 +40,21 @@ test("admin ManaBox report shows sold cards pending visual collection removal", 
   await page.goto("/admin/manabox");
 
   await expect(page.getByRole("heading", { name: "ManaBox visual removals" })).toBeVisible();
-  await expect(page.getByText(/Use the visual report below/i)).toBeVisible();
+  await expect(page.getByText(/grouped by Spellbook source box/i)).toBeVisible();
   await expect(page.getByText("4", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /download csv/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Print visual report" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Mark current report removed" })).toBeVisible();
 
   const report = page.getByRole("region", { name: /Visual ManaBox removal report/i });
-  await expect(report.getByRole("img", { name: /Lightning Bolt card art/i })).toBeVisible();
-  await expect(report.getByText("Box A02")).toBeVisible();
-  await expect(report.getByText("Counterspell")).toBeVisible();
-  await expect(report.getByText("Sol Ring")).toBeVisible();
+  const boxA02 = report.getByRole("region", { name: /Box A02 ManaBox removals/i });
+  const boxB01 = report.getByRole("region", { name: /Box B01 ManaBox removals/i });
+  const tradeBox = report.getByRole("region", { name: /Box Trade Box ManaBox removals/i });
+
+  await expect(boxA02.getByRole("img", { name: /Lightning Bolt card art/i })).toBeVisible();
+  await expect(boxB01.getByText("Sol Ring")).toBeVisible();
+  await expect(tradeBox.getByText("Counterspell")).toBeVisible();
+  await expect(boxA02.getByText(/1 card row/i)).toBeVisible();
 });
 
 test("new arrivals page shows recently added inventory newest first", async ({ page }) => {
