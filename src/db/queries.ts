@@ -217,14 +217,19 @@ export async function getCardsAggregated(): Promise<AdminCard[]> {
   return result.rows.map(rowToAggregatedCard);
 }
 
-function normalizeRecentLimit(limit: number): number {
-  if (!Number.isFinite(limit)) return 60;
-  return Math.min(120, Math.max(1, Math.trunc(limit)));
-}
-
-export async function getRecentlyAddedCards(limit = 60): Promise<AdminCard[]> {
-  const normalizedLimit = normalizeRecentLimit(limit);
+export async function getRecentlyAddedCards(): Promise<AdminCard[]> {
   const result = await db.execute<AggregatedCardRow>(sql`
+    WITH latest_upload AS (
+      SELECT COALESCE(
+        (
+          SELECT committed_at
+          FROM import_history
+          ORDER BY committed_at DESC, id DESC
+          LIMIT 1
+        ),
+        (SELECT MAX(created_at) FROM cards)
+      ) AS uploaded_at
+    )
     SELECT
       set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
       MAX(name)                                                                  AS "name",
@@ -247,10 +252,18 @@ export async function getRecentlyAddedCards(limit = 60): Promise<AdminCard[]> {
       MAX(created_at)                                                            AS "createdAt",
       MAX(updated_at)                                                            AS "updatedAt"
     FROM cards
+    CROSS JOIN latest_upload
     GROUP BY set_code, collector_number, finish, condition
     HAVING SUM(quantity) > 0
+      AND (
+        MAX(created_at) >= NOW() - INTERVAL '30 days'
+        OR (
+          MAX(latest_upload.uploaded_at) IS NOT NULL
+          AND MAX(created_at) >= MAX(latest_upload.uploaded_at) - INTERVAL '10 minutes'
+          AND MAX(created_at) <= MAX(latest_upload.uploaded_at) + INTERVAL '10 minutes'
+        )
+      )
     ORDER BY MAX(created_at) DESC, MAX(name) ASC
-    LIMIT ${normalizedLimit}
   `);
   return result.rows.map(rowToAggregatedCard);
 }

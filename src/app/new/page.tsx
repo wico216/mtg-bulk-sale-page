@@ -95,7 +95,7 @@ function ClosedMessage() {
 
 export default async function NewArrivalsPage() {
   const data = await loadStorefrontDataSafely(
-    () => loadRecentlyAddedStorefrontData(60),
+    () => loadRecentlyAddedStorefrontData(),
     "NEW_ARRIVALS",
   );
 

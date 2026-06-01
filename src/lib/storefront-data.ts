@@ -45,19 +45,17 @@ export async function loadStorefrontData(): Promise<StorefrontData> {
   return { cards: toPublicCards(aggregatedAdmin), meta };
 }
 
-export async function loadRecentlyAddedStorefrontData(
-  limit = 60,
-): Promise<StorefrontData> {
+export async function loadRecentlyAddedStorefrontData(): Promise<StorefrontData> {
   if (e2eFixturesEnabled()) {
     const cards = getE2eStorefrontFixtureCards();
     return {
-      cards: sortByNewest(cards).slice(0, limit),
+      cards: sortByNewest(cards),
       meta: getE2eStorefrontFixtureMeta(cards),
     };
   }
 
   const [aggregatedAdmin, meta] = await Promise.all([
-    getRecentlyAddedCards(limit),
+    getRecentlyAddedCards(),
     getCardsMeta(),
   ]);
 
