@@ -61,7 +61,7 @@ test("new arrivals page shows recently added inventory newest first", async ({ p
   await page.goto("/new");
 
   await expect(page.getByRole("heading", { name: "New arrivals" })).toBeVisible();
-  await expect(page.getByText(/Recently added to the spellbook/i)).toBeVisible();
+  await expect(page.getByText(/Cards from the latest inventory import/i)).toBeVisible();
   await expect(page.getByText(/4 cards in stock/i)).toBeVisible();
   await expect(page.getByRole("combobox")).toHaveValue("recent-desc");
 

@@ -255,14 +255,9 @@ export async function getRecentlyAddedCards(): Promise<AdminCard[]> {
     CROSS JOIN latest_upload
     GROUP BY set_code, collector_number, finish, condition
     HAVING SUM(quantity) > 0
-      AND (
-        MAX(created_at) >= NOW() - INTERVAL '30 days'
-        OR (
-          MAX(latest_upload.uploaded_at) IS NOT NULL
-          AND MAX(created_at) >= MAX(latest_upload.uploaded_at) - INTERVAL '10 minutes'
-          AND MAX(created_at) <= MAX(latest_upload.uploaded_at) + INTERVAL '10 minutes'
-        )
-      )
+      AND MAX(latest_upload.uploaded_at) IS NOT NULL
+      AND MAX(created_at) >= MAX(latest_upload.uploaded_at) - INTERVAL '10 minutes'
+      AND MAX(created_at) <= MAX(latest_upload.uploaded_at) + INTERVAL '10 minutes'
     ORDER BY MAX(created_at) DESC, MAX(name) ASC
   `);
   return result.rows.map(rowToAggregatedCard);

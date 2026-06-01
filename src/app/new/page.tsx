@@ -69,7 +69,7 @@ function NewArrivalsIntro() {
             lineHeight: 1.6,
           }}
         >
-          Recently added to the spellbook, ordered by the latest inventory import first.
+          Cards from the latest inventory import, ordered newest first.
         </p>
       </div>
     </section>
