@@ -169,14 +169,25 @@ describe("rowToAggregatedCard (Phase 20 D-01/D-04)", () => {
     );
   });
 
-  it("getRecentlyAddedCards returns every last-upload or recent grouped card without a hard cap", () => {
+  it("getRecentlyAddedCards returns only latest-upload grouped cards without a hard cap", () => {
     const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
+    const recentQuery = source.match(
+      /export async function getRecentlyAddedCards\(\): Promise<AdminCard\[\]> \{[\s\S]*?return result\.rows\.map\(rowToAggregatedCard\);\n\}/,
+    )?.[0];
 
-    expect(source).toMatch(/export async function getRecentlyAddedCards\(\)/);
-    expect(source).toMatch(/import_history/);
-    expect(source).toMatch(/INTERVAL '30 days'/);
-    expect(source).toMatch(/MAX\(created_at\)\s+AS "createdAt"/);
-    expect(source).toMatch(/ORDER BY MAX\(created_at\) DESC, MAX\(name\) ASC/);
-    expect(source).not.toMatch(/LIMIT \$\{normalizedLimit\}/);
+    expect(recentQuery).toBeDefined();
+    expect(recentQuery).toMatch(/import_history/);
+    expect(recentQuery).toMatch(/MAX\(created_at\)\s+AS "createdAt"/);
+    expect(recentQuery).toMatch(/MAX\(latest_upload\.uploaded_at\) IS NOT NULL/);
+    expect(recentQuery).toMatch(
+      /MAX\(created_at\) >= MAX\(latest_upload\.uploaded_at\) - INTERVAL '10 minutes'/,
+    );
+    expect(recentQuery).toMatch(
+      /MAX\(created_at\) <= MAX\(latest_upload\.uploaded_at\) \+ INTERVAL '10 minutes'/,
+    );
+    expect(recentQuery).toMatch(/ORDER BY MAX\(created_at\) DESC, MAX\(name\) ASC/);
+    expect(recentQuery).not.toMatch(/INTERVAL '30 days'/);
+    expect(recentQuery).not.toMatch(/NOW\(\)/);
+    expect(recentQuery).not.toMatch(/LIMIT \$\{normalizedLimit\}/);
   });
 });
