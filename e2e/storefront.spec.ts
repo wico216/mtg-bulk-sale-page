@@ -215,6 +215,41 @@ test("mobile search controls hide/reveal only after intentional scroll distance"
   await expect.poll(controlsAreVisible).toBe(true);
 });
 
+test("mobile form controls use 16px text to avoid iOS focus zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const expectFocusControlNotToZoom = async (label: string, locator: ReturnType<typeof page.locator>) => {
+    await expect(locator, `${label} should be visible before checking its font size`).toBeVisible();
+    const fontSize = await locator.evaluate((element) =>
+      Number.parseFloat(window.getComputedStyle(element).fontSize),
+    );
+    expect(fontSize, `${label} should use at least 16px text on mobile`).toBeGreaterThanOrEqual(16);
+  };
+
+  await expectFocusControlNotToZoom(
+    "storefront search",
+    page.getByPlaceholder(/Search cards/i),
+  );
+  await expectFocusControlNotToZoom("sort select", page.getByRole("combobox"));
+
+  await page.getByRole("button", { name: /filter/i }).click();
+  await expectFocusControlNotToZoom(
+    "filter drawer set search",
+    page.getByPlaceholder("Search sets"),
+  );
+  await page.getByRole("button", { name: "Close filters" }).click();
+
+  await page.locator(".wiko-tile").first().getByRole("button", { name: "Quick add to cart" }).click();
+  await page.getByRole("link", { name: "Cart", exact: true }).click();
+  await page.getByRole("link", { name: "Proceed to checkout" }).click();
+
+  await expectFocusControlNotToZoom("checkout name", page.getByLabel("Name"));
+  await expectFocusControlNotToZoom("checkout email", page.getByLabel("Email"));
+  await expectFocusControlNotToZoom("checkout phone", page.getByLabel(/Phone/i));
+  await expectFocusControlNotToZoom("checkout message", page.getByLabel(/Message/i));
+});
+
 test("mobile card tiles reserve consistent height for smooth slow scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
