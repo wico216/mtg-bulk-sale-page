@@ -169,12 +169,14 @@ describe("rowToAggregatedCard (Phase 20 D-01/D-04)", () => {
     );
   });
 
-  it("getRecentlyAddedCards orders grouped cards by newest created_at before name and applies a limit", () => {
+  it("getRecentlyAddedCards returns every last-upload or recent grouped card without a hard cap", () => {
     const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
 
-    expect(source).toMatch(/export async function getRecentlyAddedCards\(limit = 60\)/);
+    expect(source).toMatch(/export async function getRecentlyAddedCards\(\)/);
+    expect(source).toMatch(/import_history/);
+    expect(source).toMatch(/INTERVAL '30 days'/);
     expect(source).toMatch(/MAX\(created_at\)\s+AS "createdAt"/);
     expect(source).toMatch(/ORDER BY MAX\(created_at\) DESC, MAX\(name\) ASC/);
-    expect(source).toMatch(/LIMIT \$\{normalizedLimit\}/);
+    expect(source).not.toMatch(/LIMIT \$\{normalizedLimit\}/);
   });
 });
