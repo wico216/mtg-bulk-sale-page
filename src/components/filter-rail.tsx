@@ -317,15 +317,30 @@ function SetFilter({
   onToggle: (s: string) => void;
 }) {
   const [q, setQ] = useState("");
-  const filtered = useMemo(() => {
+  const selectedSets = useMemo(
+    () => sets.filter((setName) => selected.has(setName)),
+    [sets, selected],
+  );
+  const filteredAvailableSets = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return sets;
-    return sets.filter((s) => s.toLowerCase().includes(needle));
-  }, [sets, q]);
+    const availableSets = sets.filter((setName) => !selected.has(setName));
+    if (!needle) return availableSets;
+    return availableSets.filter((setName) => setName.toLowerCase().includes(needle));
+  }, [sets, selected, q]);
   const handleSetToggle = (setName: string) => {
     onToggle(setName);
     setQ("");
   };
+
+  const renderSetCheckbox = (setName: string) => (
+    <Checkbox
+      key={setName}
+      label={setName}
+      count={counts[setName]}
+      checked={selected.has(setName)}
+      onToggle={() => handleSetToggle(setName)}
+    />
+  );
 
   return (
     <div>
@@ -403,18 +418,36 @@ function SetFilter({
             )}
           </div>
         </div>
-        {filtered.length === 0 ? (
+        {selectedSets.length > 0 && (
+          <div
+            style={{
+              margin: "2px 0 8px",
+              padding: "6px 8px 8px",
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              borderRadius: 3,
+            }}
+          >
+            <div
+              style={{
+                marginBottom: 4,
+                fontSize: 10,
+                color: "var(--muted)",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+              }}
+            >
+              Selected
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {selectedSets.map(renderSetCheckbox)}
+            </div>
+          </div>
+        )}
+        {filteredAvailableSets.length === 0 ? (
           <p style={{ margin: "8px 0", fontSize: 11, color: "var(--muted)" }}>No sets match.</p>
         ) : (
-          filtered.map((s) => (
-            <Checkbox
-              key={s}
-              label={s}
-              count={counts[s]}
-              checked={selected.has(s)}
-              onToggle={() => handleSetToggle(s)}
-            />
-          ))
+          filteredAvailableSets.map(renderSetCheckbox)
         )}
       </div>
     </div>
@@ -450,7 +483,7 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
   const setCounts = useMemo(() => {
     const m: Record<string, number> = {};
     allCards.forEach((c) => {
-      m[c.setName] = (m[c.setName] || 0) + 1;
+      m[c.setName] = (m[c.setName] || 0) + c.quantity;
     });
     return m;
   }, [allCards]);
@@ -486,7 +519,13 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
     return m;
   }, [allCards]);
 
-  const sortedSets = useMemo(() => Object.keys(setCounts).sort(), [setCounts]);
+  const sortedSets = useMemo(
+    () =>
+      Object.keys(setCounts).sort(
+        (a, b) => setCounts[b] - setCounts[a] || a.localeCompare(b),
+      ),
+    [setCounts],
+  );
   const rarities = RARITY_ORDER.filter((r) => rarityCounts[r]);
 
   if (collapsed) {

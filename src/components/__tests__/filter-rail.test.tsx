@@ -81,6 +81,48 @@ describe("FilterRail set filter", () => {
     expect(useFilterStore.getState().selectedSets.has("Alpha")).toBe(true);
   });
 
+  it("sorts sets by total quantity so the deepest inventory appears first", () => {
+    resetFilterStore([
+      publicCard({ setName: "Alpha", quantity: 1 }),
+      publicCard({ id: "bet-1", setName: "Beta", quantity: 7 }),
+      publicCard({ id: "gam-1", setName: "Gamma", quantity: 3 }),
+      publicCard({ id: "bet-2", setName: "Beta", quantity: 2 }),
+    ]);
+
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    const beta = screen.getByText("Beta");
+    const gamma = screen.getByText("Gamma");
+    const alpha = screen.getByText("Alpha");
+
+    expect(screen.getByText("9")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(Boolean(beta.compareDocumentPosition(gamma) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(gamma.compareDocumentPosition(alpha) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
+  it("pins selected sets above the rest of the set list", async () => {
+    const user = userEvent.setup();
+    resetFilterStore([
+      publicCard({ setName: "Alpha", quantity: 1 }),
+      publicCard({ id: "bet-1", setName: "Beta", quantity: 7 }),
+      publicCard({ id: "gam-1", setName: "Gamma", quantity: 3 }),
+    ]);
+
+    render(<FilterRail collapsed={false} onToggleCollapse={() => {}} />);
+
+    await user.click(screen.getByText("Alpha"));
+
+    const selectedLabel = screen.getByText("Selected");
+    const alpha = screen.getByText("Alpha");
+    const beta = screen.getByText("Beta");
+
+    expect(useFilterStore.getState().selectedSets.has("Alpha")).toBe(true);
+    expect(Boolean(selectedLabel.compareDocumentPosition(alpha) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(alpha.compareDocumentPosition(beta) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
   it("counts grouped foil and nonfoil printings in the rail summary", async () => {
     resetFilterStore([
       publicCard(),
