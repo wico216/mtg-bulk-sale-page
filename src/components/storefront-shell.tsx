@@ -60,7 +60,15 @@ export default function StorefrontShell({
   const ticking = useRef(false);
   const isMobile = useIsMobile();
   const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters);
+  const selectedSets = useFilterStore((s) => s.selectedSets);
   const filtersActive = hasActiveFilters();
+  const selectedSetNames = Array.from(selectedSets);
+  const selectedSetSummary =
+    selectedSetNames.length === 0
+      ? null
+      : selectedSetNames.length === 1
+        ? `Set: ${selectedSetNames[0]}`
+        : `${selectedSetNames.length} sets`;
 
   // Hydrate rail collapse state from localStorage after mount — SSR-safe.
   useEffect(() => {
@@ -236,6 +244,7 @@ export default function StorefrontShell({
                   textTransform: "uppercase",
                   fontFamily: "inherit",
                   cursor: "pointer",
+                  flexShrink: 0,
                 }}
               >
                 <IconSliders />
@@ -253,6 +262,28 @@ export default function StorefrontShell({
                   />
                 )}
               </button>
+              {selectedSetSummary && (
+                <span
+                  aria-live="polite"
+                  title={selectedSetSummary}
+                  style={{
+                    minWidth: 0,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    border: "1px solid var(--border)",
+                    borderRadius: 999,
+                    padding: "6px 10px",
+                    color: "var(--ink-soft)",
+                    background: "var(--surface)",
+                    fontSize: 11,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {selectedSetSummary}
+                </span>
+              )}
             </div>
             <SortBar />
           </div>

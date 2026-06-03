@@ -142,6 +142,25 @@ test("card details modal keeps Add to satchel visible on phone screens", async (
   expect(addButtonBox!.y + addButtonBox!.height).toBeLessThanOrEqual(viewportHeight!);
 });
 
+test("mobile filter drawer keeps selected set visible and summarized", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  const controls = page.locator(".wiko-mobile-storefront-controls");
+  await expect(controls).toBeVisible();
+
+  await page.getByRole("button", { name: /filter/i }).click();
+  const drawer = page.getByRole("dialog", { name: "Filters" });
+  await expect(drawer).toBeVisible();
+
+  await drawer.getByText("E2E Masters Extended Art").click();
+  await expect(drawer.getByText("Selected")).toBeVisible();
+  await expect(drawer.getByText("E2E Masters Extended Art")).toBeVisible();
+  await drawer.getByRole("button", { name: "Close filters" }).click();
+
+  await expect(controls.getByText("Set: E2E Masters Extended Art")).toBeVisible();
+});
+
 test("mobile search controls hide/reveal only after intentional scroll distance", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
