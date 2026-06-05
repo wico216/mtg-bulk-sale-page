@@ -35,8 +35,8 @@ function publicCard(overrides: Partial<PublicCard> = {}): PublicCard {
 function seedCart(items: Array<[string, number]>, version: string | undefined) {
   useCartStore.setState({
     items: new Map(items),
-    version: version as any,
-  });
+    version,
+  } as Partial<ReturnType<typeof useCartStore.getState>>);
 }
 
 beforeEach(async () => {
