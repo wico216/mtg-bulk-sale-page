@@ -22,22 +22,22 @@ describe("cart-store version sentinel (Phase 20 D-12/D-13)", () => {
 
   it("needsCartMigration returns true for undefined version", () => {
     expect(
-      needsCartMigration({ items: new Map(), version: undefined as any }),
+      needsCartMigration({ version: undefined as unknown as string }),
     ).toBe(true);
   });
 
   it("needsCartMigration returns true for version '1.2'", () => {
-    expect(needsCartMigration({ items: new Map(), version: "1.2" })).toBe(true);
+    expect(needsCartMigration({ version: "1.2" })).toBe(true);
   });
 
   it("needsCartMigration returns false for version '1.3'", () => {
-    expect(needsCartMigration({ items: new Map(), version: "1.3" })).toBe(
+    expect(needsCartMigration({ version: "1.3" })).toBe(
       false,
     );
   });
 
   it("needsCartMigration returns false for version '1.4' (future)", () => {
-    expect(needsCartMigration({ items: new Map(), version: "1.4" })).toBe(
+    expect(needsCartMigration({ version: "1.4" })).toBe(
       false,
     );
   });

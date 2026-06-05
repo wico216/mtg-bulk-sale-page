@@ -355,9 +355,10 @@ describe("runPriceRefresh", () => {
       .filter((c) => c.sqlText.toUpperCase().includes("UPDATE CARDS"))
       .map((c) => c.sqlText)
       .join("\n");
-    expect(updateText).toMatch(/cards\.id\s*=\s*v\.id/);
-    // D-09: NEVER address rows by scryfall_id in the UPDATE path.
-    expect(updateText).not.toMatch(/scryfall_id/);
+    expect(updateText).toMatch(/WHERE\s+cards\.id\s*=\s*changed\.id/);
+    // D-09: UPDATE joins by the 5-segment card id. scryfall_id may be carried
+    // into the Price Movers snapshot payload, but it must never be the UPDATE key.
+    expect(updateText).not.toMatch(/WHERE\s+cards\.scryfall_id/i);
   });
 
   it("Case 7: audit metadata is exactly { trigger, updated, unchanged, failed, skipped, durationMs }", async () => {
@@ -513,5 +514,38 @@ describe("runPriceRefresh", () => {
     const auditInput = mockCreateAudit.mock.calls[0][0];
     expect(auditInput.metadata.updated).toBe(1);
     expect(auditInput.targetCount).toBe(1);
+  });
+
+  it("Case 12: changed rows are snapshotted for the Admin Price Movers report", async () => {
+    mockSelectRows.mockReturnValue([
+      makeRow({ id: "row-up", scryfallId: "sf-A", currentPriceCents: 100 }),
+      makeRow({ id: "row-same", scryfallId: "sf-B", currentPriceCents: 250 }),
+    ]);
+    mockFetchCards.mockResolvedValue(
+      new Map([
+        ["sf-A", makeScryfallCard({ usd: "2.50" })],
+        ["sf-B", makeScryfallCard({ usd: "2.50" })],
+      ]),
+    );
+
+    const summary = await runPriceRefresh({
+      trigger: "manual",
+      actorEmail: "admin@example.com",
+    });
+
+    expect(summary.updated).toBe(1);
+    const snapshotSql = mockExecuteCalls
+      .filter((c) => c.sqlText.includes("card_price_snapshots"))
+      .map((c) => c.sqlText)
+      .join("\n");
+    expect(snapshotSql).toContain("CREATE TABLE IF NOT EXISTS card_price_snapshots");
+    expect(snapshotSql).toContain("INSERT INTO card_price_snapshots");
+    expect(snapshotSql).toContain("row-up");
+    expect(snapshotSql).toContain("sf-A");
+    expect(snapshotSql).toContain("100");
+    expect(snapshotSql).toContain("250");
+    expect(snapshotSql).toContain("manual");
+    expect(snapshotSql).toContain("admin@example.com");
+    expect(snapshotSql).not.toContain("row-same");
   });
 });

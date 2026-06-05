@@ -9,6 +9,7 @@ import {
   finishEnum,
   adminAuditLog,
   importHistory,
+  cardPriceSnapshots,
 } from "../schema";
 
 describe("cards table schema", () => {
@@ -193,6 +194,32 @@ describe("importHistory table schema", () => {
     expect(columns.fileNames.dataType).toBe("array");
     expect(columns.metadata.dataType).toBe("json");
     expect(columns.metadata.notNull).toBe(true);
+  });
+});
+
+describe("cardPriceSnapshots table schema", () => {
+  const columns = getTableColumns(cardPriceSnapshots);
+
+  it("tracks durable before/after price snapshots for admin Price Movers", () => {
+    const requiredColumns = [
+      "id",
+      "cardId",
+      "scryfallId",
+      "previousPrice",
+      "newPrice",
+      "source",
+      "actorEmail",
+      "capturedAt",
+    ];
+    const colRecord = columns as Record<string, unknown>;
+    for (const col of requiredColumns) {
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
+    }
+    expect(columns.cardId.notNull).toBe(true);
+    expect(columns.previousPrice.dataType).toBe("number");
+    expect(columns.newPrice.dataType).toBe("number");
+    expect(columns.source.notNull).toBe(true);
+    expect(columns.capturedAt.notNull).toBe(true);
   });
 });
 

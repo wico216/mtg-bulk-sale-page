@@ -113,6 +113,23 @@ test.describe("mobile admin responsive audit surfaces", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("Price Movers report renders rising cards with source boxes and no horizontal overflow", async ({ page }) => {
+    await page.goto("/admin/prices");
+    await expect(page.getByRole("heading", { name: "Price movers" })).toBeVisible();
+    await expect(page.getByText(/cards that jumped in value/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Price Movers" })).toHaveAttribute("aria-current", "page");
+
+    const report = page.getByRole("region", { name: /Admin Price Movers report/i });
+    await expect(report).toBeVisible();
+    await expect(report.getByRole("article", { name: /Rhystic Study price mover/i })).toBeVisible();
+    await expect(report.getByText("Box A03")).toBeVisible();
+    await expect(report.getByText("$38.20 → $51.75")).toBeVisible();
+    await expect(report.getByText("+$13.55")).toBeVisible();
+    await expect(report.getByText("+$9.00 inventory upside")).toBeVisible();
+
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("picker confirmation footer no longer covers row action buttons mid-list", async ({ page }) => {
     await page.goto("/admin/orders/pick?refs=ORD-E2E-0001,ORD-E2E-0002");
     await expect(page.getByRole("heading", { name: "Pull list." })).toBeVisible();

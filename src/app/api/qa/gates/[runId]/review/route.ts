@@ -111,6 +111,28 @@ export async function POST(
     return Response.json({ error: "Invalid checklist payload" }, { status: 400 });
   }
 
+  const requiredChecklistFailures = run.checklist.filter(
+    (item) => item.required && checklist[item.id] !== "pass",
+  );
+
+  if (payload.decision === "approved" && requiredChecklistFailures.length > 0) {
+    return Response.json(
+      {
+        error: `Cannot approve until required checklist rows pass: ${requiredChecklistFailures
+          .map((item) => item.label)
+          .join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+
+  if (payload.decision === "failed" && notes.length === 0) {
+    return Response.json(
+      { error: "Failed QA gates need notes describing what Atlas should fix" },
+      { status: 400 },
+    );
+  }
+
   try {
     const { saveQaGateReview } = await import("@/db/qa-gate-reviews");
     const review = await saveQaGateReview({

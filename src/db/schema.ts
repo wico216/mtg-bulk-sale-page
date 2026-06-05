@@ -89,6 +89,29 @@ export const cards = pgTable(
   ],
 );
 
+export const cardPriceSnapshots = pgTable(
+  "card_price_snapshots",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    cardId: text("card_id").notNull(),
+    scryfallId: text("scryfall_id"),
+    previousPrice: integer("previous_price"),
+    newPrice: integer("new_price"),
+    source: text("source").notNull(),
+    actorEmail: text("actor_email"),
+    capturedAt: timestamp("captured_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("card_price_snapshots_card_id_captured_at_idx").on(
+      table.cardId,
+      table.capturedAt.desc(),
+    ),
+    index("card_price_snapshots_captured_at_idx").on(table.capturedAt.desc()),
+  ],
+);
+
 export const adminAuditLog = pgTable(
   "admin_audit_log",
   {

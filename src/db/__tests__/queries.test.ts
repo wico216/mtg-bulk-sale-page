@@ -10,81 +10,90 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
+import { cards } from "../schema";
 import { rowToCard } from "../queries";
+
+type CardRow = typeof cards.$inferSelect;
+
+type MockDbClient = {
+  select: ReturnType<typeof vi.fn>;
+};
 
 /**
  * Factory for creating mock DB rows matching cards.$inferSelect shape.
- * Typed as `any` to avoid full Drizzle inference in tests --
- * type safety is ensured by the production code.
  */
-const makeRow = (overrides: Record<string, unknown> = {}) => ({
-  id: "sld-123-normal-NearMint-unsorted",
-  name: "Test Card",
-  setCode: "sld",
-  setName: "Secret Lair Drop",
-  collectorNumber: "123",
-  price: 1299,
-  condition: "NearMint",
-  quantity: 3,
-  colorIdentity: ["W", "U"],
-  imageUrl: "https://example.com/card.jpg",
-  backImageUrl: "https://example.com/card-back.jpg",
-  oracleText: "Flying, vigilance",
-  typeLine: "Creature — Angel",
-  manaValue: 4,
-  rarity: "rare",
-  // Phase 17: row carries finish enum + binder; foil boolean is gone.
-  finish: "normal",
-  binder: "unsorted",
-  scryfallId: null,
-  createdAt: new Date("2026-04-11T12:00:00Z"),
-  updatedAt: new Date("2026-04-11T14:00:00Z"),
-  ...overrides,
-});
+const makeRow = (overrides: Partial<CardRow> = {}): CardRow => {
+  const baseRow: CardRow = {
+    id: "sld-123-normal-NearMint-unsorted",
+    name: "Test Card",
+    setCode: "sld",
+    setName: "Secret Lair Drop",
+    collectorNumber: "123",
+    price: 1299,
+    condition: "NearMint",
+    quantity: 3,
+    colorIdentity: ["W", "U"],
+    imageUrl: "https://example.com/card.jpg",
+    backImageUrl: "https://example.com/card-back.jpg",
+    oracleText: "Flying, vigilance",
+    typeLine: "Creature — Angel",
+    manaCost: null,
+    manaValue: 4,
+    rarity: "rare",
+    // Phase 17: row carries finish enum + binder; foil boolean is gone.
+    finish: "normal",
+    binder: "unsorted",
+    scryfallId: null,
+    createdAt: new Date("2026-04-11T12:00:00Z"),
+    updatedAt: new Date("2026-04-11T14:00:00Z"),
+  };
+
+  return { ...baseRow, ...overrides } as CardRow;
+};
 
 describe("rowToCard", () => {
   it("converts integer cents to dollars (1299 -> 12.99)", () => {
-    expect(rowToCard(makeRow({ price: 1299 }) as any).price).toBe(12.99);
+    expect(rowToCard(makeRow({ price: 1299 })).price).toBe(12.99);
   });
 
   it("handles null price", () => {
-    expect(rowToCard(makeRow({ price: null }) as any).price).toBeNull();
+    expect(rowToCard(makeRow({ price: null })).price).toBeNull();
   });
 
   it("handles zero cents (0 -> 0)", () => {
-    expect(rowToCard(makeRow({ price: 0 }) as any).price).toBe(0);
+    expect(rowToCard(makeRow({ price: 0 })).price).toBe(0);
   });
 
   it("handles large value (99999 -> 999.99)", () => {
-    expect(rowToCard(makeRow({ price: 99999 }) as any).price).toBe(999.99);
+    expect(rowToCard(makeRow({ price: 99999 })).price).toBe(999.99);
   });
 
   it("converts createdAt Date to ISO string", () => {
-    expect(rowToCard(makeRow() as any).createdAt).toBe(
+    expect(rowToCard(makeRow()).createdAt).toBe(
       "2026-04-11T12:00:00.000Z",
     );
   });
 
   it("converts updatedAt Date to ISO string", () => {
-    expect(rowToCard(makeRow() as any).updatedAt).toBe(
+    expect(rowToCard(makeRow()).updatedAt).toBe(
       "2026-04-11T14:00:00.000Z",
     );
   });
 
   it("passes through scryfallId (null)", () => {
     expect(
-      rowToCard(makeRow({ scryfallId: null }) as any).scryfallId,
+      rowToCard(makeRow({ scryfallId: null })).scryfallId,
     ).toBeNull();
   });
 
   it("passes through scryfallId (non-null)", () => {
     expect(
-      rowToCard(makeRow({ scryfallId: "abc-123" }) as any).scryfallId,
+      rowToCard(makeRow({ scryfallId: "abc-123" })).scryfallId,
     ).toBe("abc-123");
   });
 
   it("maps all Card fields correctly", () => {
-    const result = rowToCard(makeRow() as any);
+    const result = rowToCard(makeRow());
 
     expect(result).toEqual({
       id: "sld-123-normal-NearMint-unsorted",
@@ -111,11 +120,11 @@ describe("rowToCard", () => {
   });
 
   it("passes through binder column to Card.binder (Phase 17 — no longer hard-coded)", () => {
-    expect(rowToCard(makeRow({ binder: "a07" }) as any).binder).toBe("a07");
+    expect(rowToCard(makeRow({ binder: "a07" })).binder).toBe("a07");
   });
 
   it("passes through finish='etched' to Card.finish (Phase 17 etched first-class)", () => {
-    const card = rowToCard(makeRow({ finish: "etched" }) as any);
+    const card = rowToCard(makeRow({ finish: "etched" }));
     expect(card.finish).toBe("etched");
   });
 });
@@ -135,7 +144,7 @@ describe("getCardsMeta", () => {
       },
     ]);
     const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as any).select = mockSelect;
+    (db as unknown as MockDbClient).select = mockSelect;
 
     // Re-import to pick up the mock
     vi.doMock("server-only", () => ({}));
@@ -159,7 +168,7 @@ describe("getCardsMeta", () => {
       },
     ]);
     const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as any).select = mockSelect;
+    (db as unknown as MockDbClient).select = mockSelect;
 
     vi.doMock("server-only", () => ({}));
     const { getCardsMeta } = await import("../queries");
@@ -176,7 +185,7 @@ describe("getCardsMeta", () => {
       },
     ]);
     const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as any).select = mockSelect;
+    (db as unknown as MockDbClient).select = mockSelect;
 
     vi.doMock("server-only", () => ({}));
     const { getCardsMeta } = await import("../queries");

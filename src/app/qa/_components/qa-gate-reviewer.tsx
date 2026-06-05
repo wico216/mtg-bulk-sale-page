@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type {
   QaChecklistState,
   QaGateDecision,
+  QaGateEvidenceStatus,
   QaGateReview,
   QaGateRun,
 } from "@/lib/qa-gates";
@@ -24,6 +25,36 @@ function decisionLabel(decision: QaGateDecision | undefined): string {
   if (decision === "approved") return "Approved";
   if (decision === "failed") return "Failed";
   return "Pending";
+}
+
+function evidenceStatusLabel(status: QaGateEvidenceStatus): string {
+  switch (status) {
+    case "passed":
+      return "Passed";
+    case "failed":
+      return "Failed";
+    case "warning":
+      return "Needs attention";
+    case "not-run":
+      return "Not run";
+  }
+}
+
+function evidenceStatusColor(status: QaGateEvidenceStatus): string {
+  switch (status) {
+    case "passed":
+      return "#22c55e";
+    case "failed":
+      return "var(--bad)";
+    case "warning":
+      return "#f59e0b";
+    case "not-run":
+      return "var(--muted)";
+  }
+}
+
+function formatReviewDate(value: string): string {
+  return new Date(value).toLocaleString();
 }
 
 export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
@@ -48,6 +79,7 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
       ),
     [checklist, run.checklist],
   );
+  const approveDisabled = Boolean(submittingDecision) || requiredFailures.length > 0;
 
   function updateChecklist(itemId: string, state: QaChecklistState) {
     setChecklist((prev) => ({ ...prev, [itemId]: state }));
@@ -55,6 +87,17 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
 
   async function submitDecision(decision: QaGateDecision) {
     setError(null);
+
+    if (decision === "approved" && requiredFailures.length > 0) {
+      setError("Mark every required checklist row Pass before approving this gate.");
+      return;
+    }
+
+    if (decision === "failed" && notes.trim().length === 0) {
+      setError("Failed QA gates need notes describing what Atlas should fix.");
+      return;
+    }
+
     setSubmittingDecision(decision);
     try {
       const response = await fetch(`/api/qa/gates/${encodeURIComponent(run.id)}/review`, {
@@ -107,9 +150,38 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
             background: "color-mix(in oklab, var(--surface) 86%, transparent)",
           }}
         >
-          <h2 className="text-xl font-semibold">Expected behavior</h2>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--muted)" }}>
+            <span>Ticket</span>
+            <span className="rounded-full border px-2 py-1 font-mono" style={{ borderColor: "var(--border)", color: "var(--ink)" }}>
+              {run.ticketId}
+            </span>
+          </div>
+          <h2 className="mt-4 text-xl font-semibold">What changed</h2>
+          <ul className="mt-4 space-y-3 text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
+            {run.changeSummary.map((item) => (
+              <li key={item} className="flex gap-3">
+                <span aria-hidden="true" className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div
+          className="rounded-3xl p-5"
+          style={{
+            border: "1px solid var(--border)",
+            background: "color-mix(in oklab, var(--surface) 86%, transparent)",
+          }}
+        >
+          <h2 className="text-xl font-semibold">What to look for</h2>
+          <p className="mt-2 text-sm leading-6" style={{ color: "var(--muted)" }}>
+            Use this packet to compare the agent&apos;s recorded browser proof against
+            the ticket&apos;s expected behavior. You should only have to watch proof and
+            mark the checklist, not manually replay every screen yourself.
+          </p>
           <ol className="mt-4 space-y-3 text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
-            {run.expectedBehavior.map((item, index) => (
+            {[...run.reviewerInstructions, ...run.expectedBehavior].map((item, index) => (
               <li key={`${index}-${item}`} className="flex gap-3">
                 <span
                   className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold"
@@ -121,6 +193,80 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
               </li>
             ))}
           </ol>
+        </div>
+
+        <div
+          className="rounded-3xl p-5"
+          style={{
+            border: "1px solid var(--border)",
+            background: "color-mix(in oklab, var(--surface) 82%, transparent)",
+          }}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Agent-recorded evidence</h2>
+              <p className="mt-2 text-sm leading-6" style={{ color: "var(--muted)" }}>
+                {run.proofRun.tool} proof against {run.proofRun.targetUrl} · {run.proofRun.browser}
+              </p>
+            </div>
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "var(--border)", color: "var(--ink-soft)" }}>
+              {run.proofRun.resultSummary}
+            </span>
+          </div>
+          <dl className="mt-4 grid gap-3 rounded-2xl p-4 text-xs" style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--muted)" }}>
+            <div>
+              <dt className="font-semibold uppercase tracking-[0.16em]">Recorded command</dt>
+              <dd className="mt-1 break-words font-mono">{run.proofRun.command}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold uppercase tracking-[0.16em]">Recorded at</dt>
+              <dd className="mt-1">{formatReviewDate(run.proofRun.recordedAt)}</dd>
+            </div>
+          </dl>
+          <div className="mt-4 grid gap-3">
+            {run.evidence.map((item) => (
+              <article
+                key={item.id}
+                className="rounded-2xl p-4"
+                style={{ border: "1px solid var(--border)", background: "var(--bg)" }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold">{item.title}</h3>
+                  <span
+                    className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]"
+                    style={{
+                      background: `color-mix(in oklab, ${evidenceStatusColor(item.status)} 22%, transparent)`,
+                      color: "var(--ink)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    {evidenceStatusLabel(item.status)}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
+                  <strong>Expected:</strong> {item.expected}
+                </p>
+                <p className="mt-2 text-sm leading-6" style={{ color: "var(--ink-soft)" }}>
+                  <strong>Observed:</strong> {item.observed}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs" style={{ color: "var(--muted)" }}>
+                  <span className="rounded-full border px-2 py-1" style={{ borderColor: "var(--border)" }}>
+                    {item.artifactKind}
+                  </span>
+                  {item.timestamp && (
+                    <span className="rounded-full border px-2 py-1" style={{ borderColor: "var(--border)" }}>
+                      Video timestamp {item.timestamp}
+                    </span>
+                  )}
+                  {item.artifactUrl && (
+                    <a href={item.artifactUrl} target="_blank" rel="noreferrer" className="rounded-full border px-2 py-1 hover:underline" style={{ borderColor: "var(--border)", color: "var(--ink-soft)" }}>
+                      Open artifact
+                    </a>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
 
         {run.artifacts.length > 0 && (
@@ -189,7 +335,7 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
           {currentReview && (
             <p className="mt-3 text-xs leading-5" style={{ color: "var(--muted)" }}>
               Last reviewed by {currentReview.reviewerName || "Reviewer"} on{" "}
-              {new Date(currentReview.reviewedAt).toLocaleString()}.
+              {formatReviewDate(currentReview.reviewedAt)}.
             </p>
           )}
         </div>
@@ -246,7 +392,7 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
           </div>
 
           {requiredFailures.length > 0 && (
-            <p className="mt-4 text-xs leading-5" style={{ color: "var(--muted)" }}>
+            <p id="required-checklist-warning" className="mt-4 text-xs leading-5" style={{ color: "var(--muted)" }}>
               Required items not marked pass yet: {requiredFailures.map((item) => item.label).join(", ")}
             </p>
           )}
@@ -280,7 +426,7 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
             maxLength={2000}
             onChange={(event) => setNotes(event.target.value)}
             rows={6}
-            placeholder="What feels right, what feels off, or what must change before this ships?"
+            placeholder="Required if failing. Tell Atlas what feels right, what feels off, or what must change before this ships."
             className="mt-2 w-full resize-y rounded-2xl px-4 py-3 text-base outline-none"
             style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--ink)" }}
           />
@@ -303,12 +449,13 @@ export function QaGateReviewer({ run, initialReview }: QaGateReviewerProps) {
                 color: "var(--ink)",
               }}
             >
-              {submittingDecision === "failed" ? "Saving…" : "Fail"}
+              {submittingDecision === "failed" ? "Saving…" : "Fail / request fixes"}
             </button>
             <button
               type="button"
               onClick={() => submitDecision("approved")}
-              disabled={Boolean(submittingDecision)}
+              disabled={approveDisabled}
+              aria-describedby={requiredFailures.length > 0 ? "required-checklist-warning" : undefined}
               className="rounded-2xl px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
               style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
             >

@@ -77,6 +77,15 @@ describe("proxy.ts route protection", () => {
     expect(redirectUrl.pathname).toBe("/admin/login");
   });
 
+  it("redirects unauthenticated request to /admin/prices to /admin/login", () => {
+    const req = makeRequest("/admin/prices");
+    callProxy(req);
+
+    expect(mockRedirect).toHaveBeenCalledTimes(1);
+    const redirectUrl = mockRedirect.mock.calls[0][0] as URL;
+    expect(redirectUrl.pathname).toBe("/admin/login");
+  });
+
   it("passes through unauthenticated request to /admin/login", () => {
     const req = makeRequest("/admin/login");
     callProxy(req);

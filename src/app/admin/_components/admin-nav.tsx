@@ -12,6 +12,7 @@ interface NavItem {
 const NAV_ITEMS: readonly NavItem[] = [
   { href: "/admin", label: "Inventory", matchPrefix: "/admin" },
   { href: "/admin/orders", label: "Orders", matchPrefix: "/admin/orders" },
+  { href: "/admin/prices", label: "Price Movers", matchPrefix: "/admin/prices" },
   { href: "/admin/manabox", label: "ManaBox", matchPrefix: "/admin/manabox" },
   { href: "/admin/audit", label: "Audit", matchPrefix: "/admin/audit" },
   { href: "/admin/health", label: "Health", matchPrefix: "/admin/health" },

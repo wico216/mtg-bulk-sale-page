@@ -5,6 +5,7 @@ import type {
   OrderTimelineEvent,
 } from "@/db/orders";
 import type { ManaBoxRemovalReport } from "@/db/manabox-removals";
+import type { PriceMoversReport } from "@/db/price-movers";
 import type {
   AdminAuditEntriesParams,
   AdminAuditEntriesResult,
@@ -362,6 +363,54 @@ export function getE2eFixtureImportHistory(
 
 const e2eFixtureCardImage =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='336' viewBox='0 0 240 336'%3E%3Crect width='240' height='336' rx='18' fill='%23211635'/%3E%3Crect x='18' y='18' width='204' height='300' rx='12' fill='%23f2d071'/%3E%3Ctext x='120' y='168' dominant-baseline='middle' text-anchor='middle' font-family='serif' font-size='24' fill='%23211635'%3EWiko%3C/text%3E%3C/svg%3E";
+
+export const e2eFixturePriceMoversReport: PriceMoversReport = {
+  generatedAt: "2026-06-04T12:30:00.000Z",
+  rows: [
+    {
+      cardId: "rhystic-study-wot-25-foil-near_mint-a03",
+      name: "Rhystic Study",
+      setCode: "wot",
+      setName: "Wilds of Eldraine Enchanting Tales",
+      collectorNumber: "25",
+      finish: "foil",
+      condition: "near_mint",
+      binder: "a03",
+      quantity: 2,
+      imageUrl: e2eFixtureCardImage,
+      previousPrice: 38.2,
+      currentPrice: 51.75,
+      dollarGain: 13.55,
+      percentGain: 35.47,
+      inventoryGain: 27.1,
+      lastMovedAt: "2026-06-04T12:00:00.000Z",
+    },
+    {
+      cardId: "bulk-uncommon-e2e-7-normal-near_mint-trade-box",
+      name: "Bulk Uncommon Spike",
+      setCode: "e2e",
+      setName: "E2E Masters",
+      collectorNumber: "7",
+      finish: "normal",
+      condition: "near_mint",
+      binder: "trade-box",
+      quantity: 4,
+      imageUrl: e2eFixtureCardImage,
+      previousPrice: 0.25,
+      currentPrice: 2.5,
+      dollarGain: 2.25,
+      percentGain: 900,
+      inventoryGain: 9,
+      lastMovedAt: "2026-06-04T11:00:00.000Z",
+    },
+  ],
+  totalRows: 2,
+  totalQuantity: 6,
+  totalInventoryGain: 36.1,
+  biggestDollarGain: 13.55,
+  highestPercentGain: 900,
+  lastSnapshotAt: "2026-06-04T12:00:00.000Z",
+};
 
 export const e2eFixtureManaBoxRemovalReport: ManaBoxRemovalReport = {
   generatedAt: "2026-05-24T17:00:00.000Z",

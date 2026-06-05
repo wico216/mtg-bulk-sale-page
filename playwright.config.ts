@@ -16,6 +16,8 @@ const webServerEnv = {
   SELLER_EMAIL: "seller@example.com",
   ORDER_EMAIL_FROM: "Wiko Spellbook CI <orders@example.com>",
   DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci",
+  QA_GATE_PASSWORD: "qa-ci-password",
+  QA_GATE_COOKIE_SECRET: "ci-qa-cookie-secret-placeholder-32-characters",
 };
 
 export default defineConfig({

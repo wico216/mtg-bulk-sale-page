@@ -13,6 +13,36 @@ describe("QA gate registry", () => {
     expect(runs.map((run) => run.id)).toContain("demo-mobile-storefront-gate");
   });
 
+  it("describes the full human acceptance packet", () => {
+    const run = getQaGateRun("demo-mobile-storefront-gate");
+    expect(run).toBeDefined();
+    expect(run!.ticketId).toBe("QA-GATE-DEMO");
+    expect(run!.changeSummary).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("human-in-the-loop"),
+      ]),
+    );
+    expect(run!.reviewerInstructions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("watch the recorded browser proof"),
+      ]),
+    );
+    expect(run!.proofRun).toMatchObject({
+      tool: "Playwright",
+      targetUrl: expect.stringContaining("wikospellbinder"),
+    });
+    expect(run!.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "video-visible",
+          checklistItemId: "video-visible",
+          status: "passed",
+          artifactKind: "video",
+        }),
+      ]),
+    );
+  });
+
   it("normalizes checklist payloads to the registered run items only", () => {
     const run = getQaGateRun("demo-mobile-storefront-gate");
     expect(run).toBeDefined();

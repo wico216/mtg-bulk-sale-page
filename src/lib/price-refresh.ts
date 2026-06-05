@@ -7,6 +7,7 @@ import { fetchCardsByScryfallIds } from "@/lib/scryfall";
 import type { ScryfallCard } from "@/lib/types";
 import { getPrice } from "@/lib/enrichment";
 import { createAdminAuditEntry } from "@/db/queries";
+import { ensureCardPriceSnapshotsTable } from "@/db/price-movers";
 import { logEvent } from "@/lib/logger";
 
 /**
@@ -247,7 +248,12 @@ export async function runPriceRefresh(opts: {
         : new Map<string, ScryfallCard>();
 
     // ---- D-09 + D-10: per-row classification -----------------------------
-    const updates: Array<{ id: string; priceCents: number | null }> = [];
+    const updates: Array<{
+      id: string;
+      scryfallId: string;
+      previousPriceCents: number | null;
+      priceCents: number | null;
+    }> = [];
 
     for (const row of rows) {
       if (!row.scryfallId) {
@@ -286,44 +292,85 @@ export async function runPriceRefresh(opts: {
         continue;
       }
 
-      updates.push({ id: row.id, priceCents });
+      updates.push({
+        id: row.id,
+        scryfallId: row.scryfallId,
+        previousPriceCents: row.currentPriceCents,
+        priceCents,
+      });
     }
 
-    // ---- D-09: chunked UPDATE by 5-segment cards.id ----------------------
-    // Build a parametrized `UPDATE ... FROM (VALUES (id, price), ...) AS
-    // v(id, price) WHERE cards.id = v.id` per chunk. Drizzle `sql.join`
-    // keeps every id and price value parametrized — never
-    // string-concatenated into SQL.
-    //
-    // Join key is `cards.id` (5-segment composite PK). Updating by
-    // `scryfall_id` here would re-introduce the v1.2 etched-mispricing
-    // bug because the same scryfallId maps to N rows (one per finish x
-    // condition x binder).
-    //
-    // REVIEW WR-03: `updated` is incremented by the ACTUAL rows-affected
-    // count returned by each chunk's UPDATE, not by classification-time
-    // intent. The neon-http driver populates `rowCount` on every result
-    // (NeonHttpQueryResult inherits FullQueryResults.rowCount from
-    // @neondatabase/serverless). If `rowCount` is absent (e.g. unit-test
-    // mock without rowCount in its return) we fall back to `chunk.length`
-    // so the count is never silently zero in tests; the production
-    // driver always populates it, so the fallback is a guardrail not a
-    // load-bearing path.
+    // ---- D-09 + Price Movers: chunked UPDATE by cards.id + snapshot insert --
+    // Build one CTE per chunk so the price update and its durable
+    // `card_price_snapshots` insert are tied to the rows actually returned by
+    // UPDATE. This keeps the Admin Price Movers report honest while preserving
+    // the v1.3 invariant that refreshes address inventory rows by the full
+    // 5-segment `cards.id` key, never by shared `scryfall_id`.
+    if (updates.length > 0) {
+      await ensureCardPriceSnapshotsTable();
+    }
+
+    const source = opts.trigger;
+    const actorEmail = opts.actorEmail ?? null;
     for (let i = 0; i < updates.length; i += UPDATE_CHUNK_SIZE) {
       const chunk = updates.slice(i, i + UPDATE_CHUNK_SIZE);
       const valuesSql = sql.join(
-        chunk.map((u) => sql`(${u.id}::text, ${u.priceCents}::integer)`),
+        chunk.map(
+          (u) => sql`(
+            ${u.id}::text,
+            ${u.scryfallId}::text,
+            ${u.previousPriceCents}::integer,
+            ${u.priceCents}::integer
+          )`,
+        ),
         sql`, `,
       );
-      const result = await db.execute(sql`
-        UPDATE cards
-        SET price = v.price,
-            updated_at = NOW()
-        FROM (VALUES ${valuesSql}) AS v(id, price)
-        WHERE cards.id = v.id
+      const result = await db.execute<{ updatedCount: number | string }>(sql`
+        WITH changed(id, scryfall_id, previous_price, new_price) AS (
+          VALUES ${valuesSql}
+        ),
+        updated_rows AS (
+          UPDATE cards
+          SET price = changed.new_price,
+              updated_at = NOW()
+          FROM changed
+          WHERE cards.id = changed.id
+          RETURNING
+            cards.id,
+            changed.scryfall_id,
+            changed.previous_price,
+            changed.new_price
+        ),
+        inserted_snapshots AS (
+          INSERT INTO card_price_snapshots (
+            card_id,
+            scryfall_id,
+            previous_price,
+            new_price,
+            source,
+            actor_email,
+            captured_at
+          )
+          SELECT
+            updated_rows.id,
+            updated_rows.scryfall_id,
+            updated_rows.previous_price,
+            updated_rows.new_price,
+            ${source},
+            ${actorEmail},
+            NOW()
+          FROM updated_rows
+          RETURNING id
+        )
+        SELECT COUNT(*)::integer AS "updatedCount"
+        FROM inserted_snapshots
       `);
-      const affected =
-        typeof result?.rowCount === "number" ? result.rowCount : chunk.length;
+      const counted = Number(result.rows[0]?.updatedCount);
+      const affected = Number.isFinite(counted) && result.rows.length > 0
+        ? counted
+        : typeof result?.rowCount === "number"
+          ? result.rowCount
+          : chunk.length;
       updated += affected;
     }
 
