@@ -4,11 +4,13 @@ import { eq, count, max, asc, desc, ilike, and, inArray, sql, type SQL } from "d
 import { db } from "@/db/client";
 import { adminAuditLog, cards, importHistory } from "@/db/schema";
 import { cardToRow } from "@/db/seed";
+import { buildCardVersionUpdate } from "@/lib/card-version";
 import type {
   AdminCard,
   CardData,
   Finish,
   InventoryRow,
+  ScryfallCard,
 } from "@/lib/types";
 import type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 
@@ -307,6 +309,7 @@ export interface AdminCardsResult {
 
 export type AdminAuditAction =
   | "inventory.update"
+  | "inventory.version_update"
   | "inventory.delete_one"
   | "inventory.delete_many"
   | "inventory.delete_all"
@@ -493,6 +496,7 @@ function sanitizeAdminAuditMetadata(
 function normalizeAdminAuditAction(value: string): AdminAuditAction {
   const allowed: readonly AdminAuditAction[] = [
     "inventory.update",
+    "inventory.version_update",
     "inventory.delete_one",
     "inventory.delete_many",
     "inventory.delete_all",
@@ -934,6 +938,106 @@ export async function updateCard(
       ),
       newValues: updates,
       cardName: result[0].name,
+    },
+  });
+
+  return rowToCard(result[0]);
+}
+
+export class CardVersionConflictError extends Error {
+  constructor(public readonly targetId: string) {
+    super("Target card version already exists");
+    this.name = "CardVersionConflictError";
+  }
+}
+
+export interface UpdateCardVersionInput {
+  setCode: string;
+  collectorNumber: string;
+  scryfallCard: ScryfallCard;
+}
+
+/**
+ * Update a per-binder inventory row to a different Scryfall printing/version.
+ *
+ * Preserves the physical inventory dimensions (binder, finish, condition,
+ * quantity) and rewrites only the printing-derived fields: composite id,
+ * Scryfall UUID, set/collector/name, image/rules/mana/rarity, and finish-aware
+ * price. Existing order rows are denormalized snapshots with no FK to cards, so
+ * historical orders remain untouched.
+ */
+export async function updateCardVersion(
+  id: string,
+  input: UpdateCardVersionInput,
+  audit?: AdminMutationAuditContext,
+): Promise<InventoryRow | null> {
+  const currentRows = await db
+    .select()
+    .from(cards)
+    .where(eq(cards.id, id))
+    .limit(1);
+  if (currentRows.length === 0) return null;
+
+  const current = rowToCard(currentRows[0]);
+  const update = buildCardVersionUpdate(current, input.scryfallCard, {
+    setCode: input.setCode,
+    collectorNumber: input.collectorNumber,
+  });
+
+  if (update.targetId !== id) {
+    const existingTarget = await db
+      .select({ id: cards.id })
+      .from(cards)
+      .where(eq(cards.id, update.targetId))
+      .limit(1);
+    if (existingTarget.length > 0) {
+      throw new CardVersionConflictError(update.targetId);
+    }
+  }
+
+  const result = await db
+    .update(cards)
+    .set({
+      id: update.values.id,
+      name: update.values.name,
+      setCode: update.values.setCode,
+      setName: update.values.setName,
+      collectorNumber: update.values.collectorNumber,
+      price: update.values.price,
+      colorIdentity: update.values.colorIdentity,
+      imageUrl: update.values.imageUrl,
+      backImageUrl: update.values.backImageUrl,
+      oracleText: update.values.oracleText,
+      typeLine: update.values.typeLine,
+      manaCost: update.values.manaCost,
+      manaValue: update.values.manaValue,
+      rarity: update.values.rarity,
+      scryfallId: update.values.scryfallId,
+    })
+    .where(eq(cards.id, id))
+    .returning();
+  if (result.length === 0) return null;
+
+  await createMutationAuditEntry(audit, {
+    action: "inventory.version_update",
+    targetType: "card",
+    targetId: update.targetId,
+    targetCount: 1,
+    metadata: {
+      previousId: id,
+      newId: update.targetId,
+      cardName: result[0].name,
+      preservedFields: ["binder", "finish", "condition", "quantity"],
+      previousVersion: {
+        setCode: current.setCode,
+        collectorNumber: current.collectorNumber,
+        scryfallId: current.scryfallId,
+      },
+      newVersion: {
+        setCode: update.values.setCode,
+        collectorNumber: update.values.collectorNumber,
+        scryfallId: update.values.scryfallId,
+      },
     },
   });
 

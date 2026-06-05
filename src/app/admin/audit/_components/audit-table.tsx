@@ -14,6 +14,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 
 const ACTION_LABELS: Record<AdminAuditAction, string> = {
   "inventory.update": "Inventory edit",
+  "inventory.version_update": "Version edit",
   "inventory.delete_one": "Single delete",
   "inventory.delete_many": "Bulk delete",
   "inventory.delete_all": "Delete inventory",
@@ -28,6 +29,7 @@ const ACTION_LABELS: Record<AdminAuditAction, string> = {
 
 const ACTION_CLASSES: Record<AdminAuditAction, string> = {
   "inventory.update": "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300",
+  "inventory.version_update": "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300",
   "inventory.delete_one": "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300",
   "inventory.delete_many": "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300",
   "inventory.delete_all": "bg-red-200 text-red-800 dark:bg-red-950/50 dark:text-red-200",

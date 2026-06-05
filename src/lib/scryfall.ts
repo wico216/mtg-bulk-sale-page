@@ -38,7 +38,7 @@ export async function fetchCard(
   const cached = getCached<ScryfallCard>(cacheKey);
   if (cached) return cached;
 
-  const url = `https://api.scryfall.com/cards/${setCode.toLowerCase()}/${collectorNumber}`;
+  const url = `https://api.scryfall.com/cards/${encodeURIComponent(setCode.toLowerCase())}/${encodeURIComponent(collectorNumber)}`;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {

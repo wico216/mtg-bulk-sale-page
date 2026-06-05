@@ -1,5 +1,12 @@
 import { requireAdmin } from "@/lib/auth/admin-check";
-import { updateCard, deleteCard } from "@/db/queries";
+import {
+  CardVersionConflictError,
+  updateCard,
+  updateCardVersion,
+  deleteCard,
+} from "@/db/queries";
+import { normalizeCardVersionInput } from "@/lib/card-version";
+import { fetchCard } from "@/lib/scryfall";
 import { abbrToCondition, CONDITION_OPTIONS } from "@/lib/condition-map";
 import {
   enforceRateLimit,
@@ -29,7 +36,12 @@ export async function PATCH(
   // WR-B: every admin route's 5xx must be structured JSON so the admin UI's
   // `fetch(...).then(r => r.json())` consumer never trips on an HTML error
   // page. A malformed JSON body falls into 400 JSON, not Next's HTML 500.
-  let body: { price?: unknown; quantity?: unknown; condition?: unknown };
+  let body: {
+    price?: unknown;
+    quantity?: unknown;
+    condition?: unknown;
+    version?: { setCode?: unknown; collectorNumber?: unknown };
+  };
   try {
     body = await request.json();
   } catch {
@@ -38,6 +50,69 @@ export async function PATCH(
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (body.version !== undefined) {
+    if (
+      !body.version ||
+      typeof body.version !== "object" ||
+      Array.isArray(body.version)
+    ) {
+      return Response.json({ error: "Invalid version payload" }, { status: 400 });
+    }
+
+    let version;
+    try {
+      version = normalizeCardVersionInput(body.version);
+    } catch (err) {
+      return Response.json(
+        { error: err instanceof Error ? err.message : "Invalid version payload" },
+        { status: 400 },
+      );
+    }
+
+    const scryfallCard = await fetchCard(version.setCode, version.collectorNumber);
+    if (!scryfallCard) {
+      return Response.json(
+        { error: "Scryfall printing not found" },
+        { status: 404 },
+      );
+    }
+
+    try {
+      const updated = await updateCardVersion(
+        id,
+        { ...version, scryfallCard },
+        { actorEmail: result.user.email },
+      );
+      if (!updated) {
+        return Response.json({ error: "Card not found" }, { status: 404 });
+      }
+      return Response.json({ success: true, card: updated });
+    } catch (err) {
+      if (err instanceof CardVersionConflictError) {
+        return Response.json(
+          {
+            error:
+              "That printing already exists in this binder/finish/condition. Adjust quantity or delete one row first.",
+            targetId: err.targetId,
+          },
+          { status: 409 },
+        );
+      }
+
+      logError({
+        event: "admin.card_version_update.failed",
+        route: ROUTE,
+        actor: result.user.email,
+        error: err,
+        metadata: { cardId: id, setCode: version.setCode, collectorNumber: version.collectorNumber },
+      });
+      return Response.json(
+        { error: "Card version update failed — verify before retrying" },
+        { status: 500 },
+      );
+    }
   }
 
   // Build validated updates
