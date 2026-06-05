@@ -5,17 +5,32 @@ const {
   mockRequireAdmin,
   mockGetAdminCards,
   mockUpdateCard,
+  mockUpdateCardVersion,
+  MockCardVersionConflictError,
   mockDeleteCard,
   mockDeleteAllCards,
   mockEnforceRateLimit,
-} = vi.hoisted(() => ({
-  mockRequireAdmin: vi.fn(),
-  mockGetAdminCards: vi.fn(),
-  mockUpdateCard: vi.fn(),
-  mockDeleteCard: vi.fn(),
-  mockDeleteAllCards: vi.fn(),
-  mockEnforceRateLimit: vi.fn(),
-}));
+  mockFetchCard,
+} = vi.hoisted(() => {
+  class MockCardVersionConflictError extends Error {
+    constructor(public readonly targetId: string) {
+      super("Target card version already exists");
+      this.name = "CardVersionConflictError";
+    }
+  }
+
+  return {
+    mockRequireAdmin: vi.fn(),
+    mockGetAdminCards: vi.fn(),
+    mockUpdateCard: vi.fn(),
+    mockUpdateCardVersion: vi.fn(),
+    MockCardVersionConflictError,
+    mockDeleteCard: vi.fn(),
+    mockDeleteAllCards: vi.fn(),
+    mockEnforceRateLimit: vi.fn(),
+    mockFetchCard: vi.fn(),
+  };
+});
 
 // Mock server-only
 vi.mock("server-only", () => ({}));
@@ -29,8 +44,14 @@ vi.mock("@/lib/auth/admin-check", () => ({
 vi.mock("@/db/queries", () => ({
   getAdminCards: mockGetAdminCards,
   updateCard: mockUpdateCard,
+  updateCardVersion: mockUpdateCardVersion,
+  CardVersionConflictError: MockCardVersionConflictError,
   deleteCard: mockDeleteCard,
   deleteAllCards: mockDeleteAllCards,
+}));
+
+vi.mock("@/lib/scryfall", () => ({
+  fetchCard: mockFetchCard,
 }));
 
 vi.mock("@/lib/rate-limit", async (importOriginal) => {
@@ -237,6 +258,8 @@ describe("PATCH /api/admin/cards/[id]", () => {
   beforeEach(() => {
     mockRequireAdmin.mockReset();
     mockUpdateCard.mockReset();
+    mockUpdateCardVersion.mockReset();
+    mockFetchCard.mockReset();
     mockEnforceRateLimit.mockReset();
     mockRequireAdmin.mockResolvedValue(adminSession);
     mockEnforceRateLimit.mockResolvedValue(null);
@@ -281,6 +304,97 @@ describe("PATCH /api/admin/cards/[id]", () => {
     expect(mockUpdateCard).toHaveBeenCalledWith("card-1", {
       condition: "near_mint",
     }, { actorEmail: "admin@example.com" });
+  });
+
+  it("updates a card version by validating the requested Scryfall printing", async () => {
+    const scryfallPrinting = {
+      object: "card",
+      id: "scryfall-new-id",
+      name: "Lightning Bolt",
+      set: "clu",
+      set_name: "Ravnica: Clue Edition",
+      collector_number: "141",
+      color_identity: ["R"],
+      oracle_text: "Lightning Bolt deals 3 damage to any target.",
+      type_line: "Instant",
+      mana_cost: "{R}",
+      cmc: 1,
+      image_uris: {
+        small: "https://cards.scryfall.io/small/front/x/y/card.jpg",
+        normal: "https://cards.scryfall.io/normal/front/x/y/card.jpg",
+        large: "https://cards.scryfall.io/large/front/x/y/card.jpg",
+      },
+      prices: { usd: "2.50", usd_foil: null, usd_etched: null },
+      rarity: "uncommon",
+      layout: "normal",
+    };
+    const updatedCard = {
+      id: "clu-141-normal-near_mint-a02",
+      name: "Lightning Bolt",
+      setCode: "clu",
+      collectorNumber: "141",
+    };
+    mockFetchCard.mockResolvedValue(scryfallPrinting);
+    mockUpdateCardVersion.mockResolvedValue(updatedCard);
+
+    const [req, ctx] = makePatchRequest("lea-161-normal-near_mint-a02", {
+      version: { setCode: " CLU ", collectorNumber: " 141 " },
+    });
+    const response = await PATCH(req, ctx);
+    const data = await response.json();
+
+    expect(data).toEqual({ success: true, card: updatedCard });
+    expect(mockFetchCard).toHaveBeenCalledWith("clu", "141");
+    expect(mockUpdateCardVersion).toHaveBeenCalledWith(
+      "lea-161-normal-near_mint-a02",
+      { setCode: "clu", collectorNumber: "141", scryfallCard: scryfallPrinting },
+      { actorEmail: "admin@example.com" },
+    );
+    expect(mockUpdateCard).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the requested Scryfall printing is not found", async () => {
+    mockFetchCard.mockResolvedValue(null);
+
+    const [req, ctx] = makePatchRequest("card-1", {
+      version: { setCode: "clu", collectorNumber: "999" },
+    });
+    const response = await PATCH(req, ctx);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Scryfall printing not found" });
+    expect(mockUpdateCardVersion).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when the requested version already exists for that binder/finish/condition", async () => {
+    const scryfallPrinting = { object: "card", name: "Lightning Bolt" };
+    mockFetchCard.mockResolvedValue(scryfallPrinting);
+    mockUpdateCardVersion.mockRejectedValue(
+      new MockCardVersionConflictError("clu-141-normal-near_mint-a02"),
+    );
+
+    const [req, ctx] = makePatchRequest("lea-161-normal-near_mint-a02", {
+      version: { setCode: "clu", collectorNumber: "141" },
+    });
+    const response = await PATCH(req, ctx);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "That printing already exists in this binder/finish/condition. Adjust quantity or delete one row first.",
+      targetId: "clu-141-normal-near_mint-a02",
+    });
+  });
+
+  it("returns 400 for blank card version fields", async () => {
+    const [req, ctx] = makePatchRequest("card-1", {
+      version: { setCode: "", collectorNumber: "141" },
+    });
+    const response = await PATCH(req, ctx);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Set code is required" });
+    expect(mockFetchCard).not.toHaveBeenCalled();
   });
 
   it("returns 400 for negative price", async () => {

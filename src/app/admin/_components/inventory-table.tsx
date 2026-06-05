@@ -13,6 +13,7 @@ import { SelectionDock } from "./selection-dock";
 import { InventoryDangerZone } from "./inventory-danger-zone";
 import { useRowDensity } from "./density-toggle";
 import { InventoryLightbox } from "./inventory-lightbox";
+import { VersionEditDialog } from "./version-edit-dialog";
 
 function sortKeyToParams(
   sort: InventorySortKey,
@@ -92,6 +93,9 @@ export function InventoryTable() {
   const [inspectingCard, setInspectingCard] = useState<InventoryRow | null>(
     null,
   );
+  const [versionEditingCard, setVersionEditingCard] =
+    useState<InventoryRow | null>(null);
+  const [savingVersion, setSavingVersion] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -205,6 +209,75 @@ export function InventoryTable() {
       router.refresh();
     }
     return true;
+  }
+
+  async function handleSaveVersion(
+    setCode: string,
+    collectorNumber: string,
+  ): Promise<void> {
+    if (!versionEditingCard) return;
+
+    const editingId = versionEditingCard.id;
+    setSavingVersion(true);
+    try {
+      const res = await fetch(`/api/admin/cards/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: { setCode, collectorNumber } }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body?.error === "string"
+            ? body.error
+            : "Failed to update card version. Try again.",
+        );
+      }
+
+      const updatedCard = body.card as InventoryRow | undefined;
+      if (!updatedCard) {
+        throw new Error("Version update succeeded but returned no card.");
+      }
+
+      setCards((prev) =>
+        prev.map((card) => (card.id === editingId ? updatedCard : card)),
+      );
+      setAvailableSets((prev) =>
+        prev.includes(updatedCard.setCode)
+          ? prev
+          : [...prev, updatedCard.setCode].sort(),
+      );
+      await fetchCards();
+      setSelectedCardIds([]);
+      setVersionEditingCard(null);
+      setToastVariant("success");
+      setToastMessage(
+        `Updated ${updatedCard.name} to ${updatedCard.setCode.toUpperCase()} #${updatedCard.collectorNumber}.`,
+      );
+      router.refresh();
+    } catch (err) {
+      setToastVariant("error");
+      setToastMessage(
+        err instanceof Error
+          ? err.message
+          : "Failed to update card version. Try again.",
+      );
+    } finally {
+      setSavingVersion(false);
+    }
+  }
+
+  function openSelectedVersionEditor() {
+    const selectedCard =
+      selectedCardIds.length === 1
+        ? cards.find((card) => card.id === selectedCardIds[0])
+        : null;
+    if (!selectedCard) {
+      setToastVariant("error");
+      setToastMessage("Select exactly one card to edit its version.");
+      return;
+    }
+    setVersionEditingCard(selectedCard);
   }
 
   async function handleDelete(cardId: string) {
@@ -670,6 +743,7 @@ export function InventoryTable() {
         deleting={deletingSelected}
         exporting={exporting}
         onRequestDelete={() => setConfirmingDeleteSelected(true)}
+        onRequestEditVersion={openSelectedVersionEditor}
         onExport={handleExport}
         onClear={() => setSelectedCardIds([])}
       />
@@ -677,6 +751,16 @@ export function InventoryTable() {
       <InventoryLightbox
         card={inspectingCard}
         onClose={() => setInspectingCard(null)}
+      />
+
+      <VersionEditDialog
+        key={versionEditingCard?.id ?? "version-editor-closed"}
+        card={versionEditingCard}
+        saving={savingVersion}
+        onClose={() => {
+          if (!savingVersion) setVersionEditingCard(null);
+        }}
+        onSave={handleSaveVersion}
       />
 
       {toastElement}

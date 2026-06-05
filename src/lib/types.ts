@@ -167,7 +167,14 @@ export interface CardData {
  */
 export interface ScryfallCard {
   object: string;
+  /** Scryfall UUID for this exact printing. */
+  id?: string;
   name: string;
+  /** Lowercase Scryfall set code for this printing (e.g. "clu"). */
+  set?: string;
+  set_name?: string;
+  collector_number?: string;
+  rarity?: string;
   color_identity: string[];
   oracle_text?: string;
   type_line?: string;

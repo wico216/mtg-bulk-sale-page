@@ -5,6 +5,7 @@ interface SelectionDockProps {
   deleting: boolean;
   exporting: boolean;
   onRequestDelete: () => void;
+  onRequestEditVersion: () => void;
   onExport: () => void;
   onClear: () => void;
 }
@@ -22,6 +23,7 @@ export function SelectionDock({
   deleting,
   exporting,
   onRequestDelete,
+  onRequestEditVersion,
   onExport,
   onClear,
 }: SelectionDockProps) {
@@ -64,6 +66,13 @@ export function SelectionDock({
           <span>{count.toLocaleString()}</span>
           <span style={{ opacity: 0.7, fontWeight: 500 }}>selected</span>
         </span>
+
+        {count === 1 && (
+          <DockButton onClick={onRequestEditVersion} disabled={deleting}>
+            Edit version
+            <Kbd>V</Kbd>
+          </DockButton>
+        )}
 
         <DockButton onClick={onExport} disabled={exporting}>
           {exporting ? "Exporting…" : "Export"}
