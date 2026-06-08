@@ -430,6 +430,21 @@ export function ImportClient({ currentTotal }: { currentTotal: number }) {
     if (stage.kind !== "preview") return;
     const { payload, files, binders, selectedBinders, willDeleteBinders } =
       stage;
+
+    if (
+      selectedBinders.length > 0 &&
+      payload.toImport === 0 &&
+      payload.cards.length === 0
+    ) {
+      setStage({
+        kind: "error",
+        message:
+          "Import preview found 0 cards to import for the selected binders. No inventory was changed. Please retry the import; if it happens again, Scryfall enrichment may be unavailable.",
+        previousFiles: files,
+      });
+      return;
+    }
+
     setStage({
       kind: "committing",
       files,

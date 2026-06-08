@@ -225,6 +225,44 @@ describe("POST /api/admin/import/commit", () => {
     expect(selectedBindersArg).toEqual(["a02", "a07"]);
   });
 
+  it("returns 400 instead of mutating when enrichment skipped every selected row", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+
+    const res = await POST(
+      makeJsonRequest({
+        cards: [],
+        selectedBinders: ["a32"],
+        summary: {
+          sourceFiles: [
+            {
+              name: "ManaBox_Collection.csv",
+              parsedCards: 95,
+              skippedRows: 0,
+            },
+          ],
+          toImport: 0,
+          parseSkipped: 0,
+          scryfallSkipped: 95,
+          missingPrices: 0,
+        },
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error:
+        "Import preview enriched 0 cards. Inventory unchanged — please retry the import.",
+    });
+    expect(replaceCardsForBindersMock).not.toHaveBeenCalled();
+    const guardLog = logEventMock.mock.calls.find(
+      ([arg]) => arg.event === "admin.import_commit.zero_card_enrichment_failure",
+    );
+    expect(guardLog?.[0].metadata).toMatchObject({
+      selectedBindersCount: 1,
+      scryfallSkipped: 95,
+    });
+  });
+
   it("returns 400 when selectedBinders contains a non-normalized entry (Phase 19 D-16)", async () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
     const cards = [sampleCard("a02-1", "a02")];

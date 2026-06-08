@@ -7,6 +7,14 @@ import { getCached, setCache } from "./cache";
 const RATE_LIMIT_MS = 120;
 const MAX_RETRIES = 3;
 
+// Scryfall requires both headers on every API request. Without them the API
+// returns 400, which the importer would otherwise misclassify as a Scryfall
+// miss and silently drop valid ManaBox rows.
+const SCRYFALL_HEADERS = {
+  Accept: "application/json",
+  "User-Agent": "WikoSpellbinder/1.0 (+https://wikospellbinder.com)",
+} as const;
+
 let lastRequestTime = 0;
 
 async function rateLimitedFetch(url: string): Promise<Response> {
@@ -15,7 +23,7 @@ async function rateLimitedFetch(url: string): Promise<Response> {
     await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_MS - elapsed));
   }
   lastRequestTime = Date.now();
-  return fetch(url);
+  return fetch(url, { headers: SCRYFALL_HEADERS });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -146,7 +154,7 @@ async function fetchCollectionBatch(
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
         body,
       });
 
