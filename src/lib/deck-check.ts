@@ -1,3 +1,4 @@
+import { request as httpsRequest } from "node:https";
 import type { Finish, PublicCard } from "@/lib/types";
 import { fetchCardsByNames, fetchCardsByScryfallIds } from "@/lib/scryfall";
 
@@ -316,19 +317,70 @@ export function detectDeckSource(input: string): DeckSource {
   return "text";
 }
 
-function externalFetchHeaders(): HeadersInit {
+function externalFetchHeaders(): Record<string, string> {
   return {
     Accept: "application/json, text/plain;q=0.9, text/html;q=0.8",
     "User-Agent": "WikoSpellbinder/1.0 (+https://wikospellbinder.com)",
   };
 }
 
+async function fetchJsonViaNodeHttps(url: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        method: "GET",
+        headers: externalFetchHeaders(),
+        timeout: 20_000,
+      },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        const chunks: Buffer[] = [];
+        let byteLength = 0;
+
+        response.on("data", (chunk: Buffer | string) => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          byteLength += buffer.length;
+          if (byteLength > 5_000_000) {
+            request.destroy(new Error("Deck source response is too large."));
+            return;
+          }
+          chunks.push(buffer);
+        });
+
+        response.on("error", reject);
+        response.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+          if (status < 200 || status >= 300) {
+            reject(new Error(`Deck source returned HTTP ${status}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            reject(new Error("Deck source returned invalid JSON."));
+          }
+        });
+      },
+    );
+
+    request.on("timeout", () => request.destroy(new Error("Deck source request timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+}
+
 async function fetchJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { headers: externalFetchHeaders() });
-  if (!response.ok) {
-    throw new Error(`Deck source returned HTTP ${response.status}`);
+  try {
+    const response = await fetch(url, { headers: externalFetchHeaders() });
+    if (response.ok) return response.json();
+  } catch {
+    // Fall through to the Node HTTPS client below. Some deck providers, notably
+    // Moxfield behind Cloudflare, reject undici/global fetch but accept Node's
+    // built-in HTTPS client with the same public API URL and headers.
   }
-  return response.json();
+
+  return fetchJsonViaNodeHttps(url);
 }
 
 function cardFromMoxfieldEntry(entry: unknown, section: DeckSection, index: number): DeckCardRequest | null {
