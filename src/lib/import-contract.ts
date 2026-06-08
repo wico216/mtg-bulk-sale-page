@@ -131,7 +131,9 @@ export interface CommitRequest {
    * Phase 19 D-15/D-16: when omitted, server defaults to all distinct
    * binders mentioned in `cards` (legacy wholesale-replace behavior
    * over the binders this upload touches). When present, MUST contain
-   * every binder name appearing in `cards` (server validates).
+   * every binder name appearing in `cards`, and MAY also contain delete-only
+   * binders that are missing from `cards` because the operator left a
+   * will-delete binder checked.
    */
   selectedBinders?: string[];
   /**

@@ -212,6 +212,19 @@ describe("POST /api/admin/import/commit", () => {
     expect(selectedBindersArg).toEqual(["a02"]);
   });
 
+  it("allows delete-only selectedBinders that are missing from body.cards", async () => {
+    requireAdminMock.mockResolvedValueOnce(adminOk());
+    const cards = [sampleCard("a02-1", "a02")];
+    replaceCardsForBindersMock.mockResolvedValueOnce({ inserted: 1, deleted: 7 });
+    const res = await POST(
+      makeJsonRequest({ cards, selectedBinders: ["a02", "a07"] }),
+    );
+    expect(res.status).toBe(200);
+    const [cardsArg, selectedBindersArg] = replaceCardsForBindersMock.mock.calls[0];
+    expect(cardsArg).toStrictEqual(cards);
+    expect(selectedBindersArg).toEqual(["a02", "a07"]);
+  });
+
   it("returns 400 when selectedBinders contains a non-normalized entry (Phase 19 D-16)", async () => {
     requireAdminMock.mockResolvedValueOnce(adminOk());
     const cards = [sampleCard("a02-1", "a02")];
