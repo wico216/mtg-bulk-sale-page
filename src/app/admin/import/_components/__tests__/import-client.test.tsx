@@ -151,6 +151,71 @@ describe("ImportClient — Phase 19 picker flow", () => {
     expect(commitBody.selectedBinders).toEqual(["a02"]);
   });
 
+  it("blocks commit when selected upload binders enriched to zero cards", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        ndjsonResponse([
+          {
+            type: "binders",
+            binders: [
+              {
+                name: "a32",
+                rowCount: 95,
+                sampleNames: ["Tamiyo's Safekeeping"],
+                isNew: true,
+              },
+            ],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        ndjsonResponse([
+          { type: "binders", binders: [] },
+          { type: "progress", done: 95, total: 95, stage: "enrich" },
+          {
+            type: "result",
+            preview: {
+              toImport: 0,
+              parseSkipped: 0,
+              scryfallSkipped: 95,
+              missingPrices: 0,
+              sample: [],
+              skippedRows: [],
+              sourceFiles: [],
+              cards: [],
+            },
+          },
+        ]),
+      );
+
+    render(<ImportClient currentTotal={100} />);
+    await dropFile(user);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /Select binders to import/ }),
+      ).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /Continue/ }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Type REPLACE/)).toBeInTheDocument(),
+    );
+    await user.type(screen.getByLabelText(/Type REPLACE/), "REPLACE");
+    await user.click(screen.getByRole("button", { name: /Commit import/ }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Import preview found 0 cards to import/),
+      ).toBeInTheDocument(),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
   it("will-delete panel renders when prior selection includes a binder missing from upload", async () => {
     const user = userEvent.setup();
     // Pre-seed the store with a binder NOT in the upload.

@@ -150,6 +150,29 @@ export async function POST(request: Request): Promise<Response> {
     selectedBinders = validated;
   }
 
+  if (
+    body.cards.length === 0 &&
+    toNonNegativeInteger(body.summary?.scryfallSkipped) > 0
+  ) {
+    logEvent({
+      level: "warn",
+      event: "admin.import_commit.zero_card_enrichment_failure",
+      route: ROUTE,
+      actor: auth.user.email,
+      metadata: {
+        selectedBindersCount: selectedBinders.length,
+        scryfallSkipped: toNonNegativeInteger(body.summary?.scryfallSkipped),
+      },
+    });
+    return Response.json(
+      {
+        error:
+          "Import preview enriched 0 cards. Inventory unchanged — please retry the import.",
+      },
+      { status: 400 },
+    );
+  }
+
   // ---- knownBinders (loose; never 400s) ------------------------------------
   let knownBinders: string[] = [];
   if (Array.isArray(body.knownBinders)) {
