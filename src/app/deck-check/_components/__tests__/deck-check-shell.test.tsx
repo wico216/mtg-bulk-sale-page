@@ -6,6 +6,16 @@ import type { DeckCheckResult } from "@/lib/deck-check";
 import { useCartStore } from "@/lib/store/cart-store";
 import { DeckCheckShell } from "../deck-check-shell";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 function resultFixture(): DeckCheckResult {
   return {
     source: "text",
@@ -127,6 +137,12 @@ describe("DeckCheckShell", () => {
 
     expect(screen.getByText("Exact match")).toBeInTheDocument();
     expect(screen.getByText("Alternate printing")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cards not found in spellbook/i })).toBeInTheDocument();
+    expect(screen.queryByText("Rhystic Study")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /cards not found in spellbook/i }));
+
+    expect(screen.getByText("Rhystic Study", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Not in Spellbook")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /add all selected to satchel/i }));
@@ -134,5 +150,26 @@ describe("DeckCheckShell", () => {
     expect(useCartStore.getState().getQuantity("e2e-150-normal-near_mint")).toBe(1);
     expect(useCartStore.getState().getQuantity("e2e-045-normal-lightly_played")).toBe(1);
     expect(screen.getByRole("status")).toHaveTextContent("Added 2 cards to your satchel");
+  });
+
+  it("shows an animated loading state while the deck link is checked", async () => {
+    const user = userEvent.setup();
+    const pending = deferred<{ ok: boolean; json: () => Promise<DeckCheckResult> }>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(pending.promise));
+
+    render(<DeckCheckShell />);
+
+    await user.type(screen.getByLabelText(/deck link or exported list/i), "https://www.moxfield.com/decks/example");
+    await user.click(screen.getByRole("button", { name: /check my deck/i }));
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Checking your deck link against Spellbook");
+    expect(screen.getByRole("button", { name: /checking/i })).toBeDisabled();
+
+    pending.resolve({ ok: true, json: async () => resultFixture() });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /spellbook match report/i })).toBeInTheDocument();
+    });
   });
 });

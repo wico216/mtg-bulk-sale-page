@@ -63,17 +63,27 @@ export function DeckCheckShell() {
   const [selectedCardIds, setSelectedCardIds] = useState<Record<string, string>>({});
   const [included, setIncluded] = useState<Record<string, boolean>>({});
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
+  const [missingExpanded, setMissingExpanded] = useState(false);
+
+  const matchedItems = useMemo(() => {
+    if (!result) return [];
+    return result.items.filter((item) => item.options.length > 0);
+  }, [result]);
+
+  const missingItems = useMemo(() => {
+    if (!result) return [];
+    return result.items.filter((item) => item.options.length === 0);
+  }, [result]);
 
   const selectedItems = useMemo(() => {
-    if (!result) return [];
-    return result.items
+    return matchedItems
       .map((item) => {
         const cardId = selectedCardIds[item.request.id];
         const option = item.options.find((candidate) => candidate.card.id === cardId);
         return option && included[item.request.id] !== false ? { item, option } : null;
       })
       .filter((entry): entry is { item: DeckCheckItem; option: DeckCheckOption } => Boolean(entry));
-  }, [included, result, selectedCardIds]);
+  }, [included, matchedItems, selectedCardIds]);
 
   const selectedEstimate = useMemo(() => {
     if (selectedItems.some(({ option }) => option.card.price == null)) return null;
@@ -88,6 +98,7 @@ export function DeckCheckShell() {
     setChecking(true);
     setError(null);
     setAddedMessage(null);
+    setMissingExpanded(false);
 
     try {
       const response = await fetch("/api/deck-check", {
@@ -141,7 +152,7 @@ export function DeckCheckShell() {
             </h1>
             <p className="wiko-deck-check-copy">
               Paste a Moxfield, Archidekt, or ManaBox link — or paste an exported list.
-              Spellbook will show exact matches, alternate printings, and cards Wiko does not currently have.
+              Spellbook will show only cards Wiko currently has available, with a collapsible not-found list at the bottom.
             </p>
           </div>
           <div className="wiko-deck-check-note">
@@ -166,6 +177,7 @@ export function DeckCheckShell() {
           />
           <div className="wiko-deck-check-form-actions">
             <button type="submit" disabled={checking || input.trim().length === 0} className="wiko-primary-button">
+              {checking && <span aria-hidden="true" className="wiko-deck-check-button-spinner" />}
               {checking ? "Checking…" : "Check my deck"}
             </button>
             <span className="wiko-deck-check-help">
@@ -174,6 +186,16 @@ export function DeckCheckShell() {
           </div>
         </form>
       </section>
+
+      {checking && (
+        <div role="status" aria-live="polite" className="wiko-deck-check-loading">
+          <span aria-hidden="true" className="wiko-deck-check-spinner" />
+          <div>
+            <strong>Checking your deck link against Spellbook…</strong>
+            <p>Importing the list, matching exact printings, and finding cards Wiko has on the site.</p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="wiko-deck-check-error">
@@ -225,8 +247,13 @@ export function DeckCheckShell() {
             </div>
           )}
 
-          <div className="wiko-deck-check-list">
-            {result.items.map((item) => {
+          <div className="wiko-deck-check-list" aria-label="Cards available on Wiko's Spellbook">
+            {matchedItems.length === 0 && (
+              <div className="wiko-deck-check-empty">
+                No cards from this deck are currently available on Wiko&apos;s Spellbook.
+              </div>
+            )}
+            {matchedItems.map((item) => {
               const selectedId = selectedCardIds[item.request.id] ?? "";
               const selectedOption = item.options.find((option) => option.card.id === selectedId);
               return (
@@ -235,8 +262,7 @@ export function DeckCheckShell() {
                     <label className="wiko-deck-check-checkbox">
                       <input
                         type="checkbox"
-                        checked={included[item.request.id] !== false && item.options.length > 0}
-                        disabled={item.options.length === 0}
+                        checked={included[item.request.id] !== false}
                         onChange={(event) =>
                           setIncluded((current) => ({
                             ...current,
@@ -258,39 +284,65 @@ export function DeckCheckShell() {
                       {selectedOption && (
                         <p className="wiko-deck-check-match-reason">{selectedOption.reason}</p>
                       )}
-                      {item.options.length === 0 && (
-                        <p className="wiko-deck-check-missing">Wiko does not currently have this in the public Spellbook.</p>
-                      )}
                     </div>
                   </div>
 
-                  {item.options.length > 0 && (
-                    <div className="wiko-deck-check-row-actions">
-                      <select
-                        value={selectedId}
-                        onChange={(event) =>
-                          setSelectedCardIds((current) => ({
-                            ...current,
-                            [item.request.id]: event.target.value,
-                          }))
-                        }
-                        aria-label={`Choose Spellbook version for ${item.request.name}`}
-                      >
-                        {item.options.map((option) => (
-                          <option key={option.card.id} value={option.card.id}>
-                            {option.recommended ? "Recommended · " : ""}{optionLabel(option)}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={() => addItem(item)} className="wiko-secondary-button">
-                        Add {selectedOption?.addQuantity ?? 1}
-                      </button>
-                    </div>
-                  )}
+                  <div className="wiko-deck-check-row-actions">
+                    <select
+                      value={selectedId}
+                      onChange={(event) =>
+                        setSelectedCardIds((current) => ({
+                          ...current,
+                          [item.request.id]: event.target.value,
+                        }))
+                      }
+                      aria-label={`Choose Spellbook version for ${item.request.name}`}
+                    >
+                      {item.options.map((option) => (
+                        <option key={option.card.id} value={option.card.id}>
+                          {option.recommended ? "Recommended · " : ""}{optionLabel(option)}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => addItem(item)} className="wiko-secondary-button">
+                      Add {selectedOption?.addQuantity ?? 1}
+                    </button>
+                  </div>
                 </article>
               );
             })}
           </div>
+
+          {missingItems.length > 0 && (
+            <section className="wiko-deck-check-missing-panel" aria-label="Cards not found in Spellbook">
+              <button
+                type="button"
+                className="wiko-deck-check-missing-toggle"
+                aria-expanded={missingExpanded}
+                onClick={() => setMissingExpanded((expanded) => !expanded)}
+              >
+                <span>Cards not found in Spellbook</span>
+                <strong>{missingItems.length}</strong>
+                <span aria-hidden="true">{missingExpanded ? "−" : "+"}</span>
+              </button>
+              {missingExpanded && (
+                <div className="wiko-deck-check-missing-list">
+                  {missingItems.map((item) => (
+                    <article key={item.request.id} className="wiko-deck-check-missing-row">
+                      <div className="wiko-deck-check-card-line">
+                        <strong>{item.request.quantity}× {item.request.name}</strong>
+                        <span style={{ color: statusColor(item.status) }}>{item.statusLabel}</span>
+                      </div>
+                      <p className="wiko-deck-check-missing">
+                        Requested {item.requestedPrintingLabel ?? "any printing"}
+                        {item.request.section !== "main" ? ` · ${item.request.section}` : ""} · Wiko does not currently have this in the public Spellbook.
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </section>
       )}
     </main>

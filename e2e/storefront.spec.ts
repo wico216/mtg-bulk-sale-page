@@ -84,8 +84,19 @@ test("deck check matches pasted decklists and adds selected cards to the satchel
   await expect(page.getByRole("heading", { name: /spellbook match report/i })).toBeVisible();
   await expect(page.getByText("Spellbook match", { exact: true })).toBeVisible();
   await expect(page.getByText("Alternate printing", { exact: true })).toBeVisible();
-  await expect(page.getByText("Not in Spellbook", { exact: true })).toBeVisible();
   await expect(page.getByText(/Different printing: E2E #045/i)).toBeVisible();
+
+  const availableList = page.locator(".wiko-deck-check-list");
+  await expect(availableList).toContainText("Lightning Bolt");
+  await expect(availableList).toContainText("Counterspell");
+  await expect(availableList).not.toContainText("Rhystic Study");
+
+  const missingToggle = page.getByRole("button", { name: /cards not found in spellbook/i });
+  await expect(missingToggle).toBeVisible();
+  await expect(page.locator(".wiko-deck-check-missing-list")).toHaveCount(0);
+  await missingToggle.click();
+  await expect(page.locator(".wiko-deck-check-missing-list")).toContainText("Rhystic Study");
+  await expect(page.getByText("Not in Spellbook", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: /add all selected to satchel/i }).click();
 
