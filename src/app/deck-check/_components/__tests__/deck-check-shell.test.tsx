@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DeckCheckResult } from "@/lib/deck-check";
 import { useCartStore } from "@/lib/store/cart-store";
@@ -186,6 +186,47 @@ describe("DeckCheckShell", () => {
     expect(useCartStore.getState().getQuantity("e2e-045-normal-lightly_played")).toBe(0);
     expect(useCartStore.getState().getQuantity("e2e-046-foil-near_mint")).toBe(1);
     expect(screen.getByRole("status")).toHaveTextContent("Added 2 cards to your satchel");
+  });
+
+  it("opens card images in a larger viewer", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => resultFixture(),
+    }));
+
+    render(<DeckCheckShell />);
+
+    await user.type(screen.getByLabelText(/deck link or exported list/i), "1 Lightning Bolt\n1 Counterspell (DMR) 45");
+    await user.click(screen.getByRole("button", { name: /check my deck/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /spellbook match report/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /view lightning bolt card art larger/i }));
+
+    const boltDialog = screen.getByRole("dialog", { name: /larger image for lightning bolt/i });
+    expect(within(boltDialog).getByRole("img", { name: /Lightning Bolt enlarged card art/i })).toHaveAttribute("src", boltImage);
+    expect(within(boltDialog).getByText(/E2E #150 · Nonfoil/i)).toBeInTheDocument();
+
+    await user.click(within(boltDialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /larger image/i })).not.toBeInTheDocument();
+    });
+
+    const foilOption = screen.getByRole("button", { name: /Select Counterspell E2E #046 · Foil/i });
+    await user.click(within(foilOption).getByRole("img", { name: /Counterspell card art/i }));
+
+    const foilDialog = screen.getByRole("dialog", { name: /larger image for counterspell/i });
+    expect(within(foilDialog).getByRole("img", { name: /Counterspell enlarged card art/i })).toHaveAttribute("src", counterspellFoilImage);
+    expect(within(foilDialog).getByText(/E2E #046 · Foil/i)).toBeInTheDocument();
+    expect(screen.getByText(/Selected: E2E #046 · Foil/i)).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /larger image/i })).not.toBeInTheDocument();
+    });
   });
 
   it("shows an animated loading state while the deck link is checked", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { DeckCheckItem, DeckCheckOption, DeckCheckResult } from "@/lib/deck-check";
 import type { Finish } from "@/lib/types";
@@ -36,16 +36,43 @@ function optionShortLabel(option: DeckCheckOption): string {
   return `${card.setCode.toUpperCase()} #${card.collectorNumber} · ${formatFinish(card.finish)}`;
 }
 
+type EnlargedArt = {
+  imageUrl: string;
+  title: string;
+  alt: string;
+  detail: string;
+};
+
 function optionImageUrl(option: DeckCheckOption): string | null {
   return option.card.imageUrl ?? option.card.backImageUrl ?? null;
 }
 
-function DeckOptionArt({ option, size = "large" }: { option: DeckCheckOption; size?: "large" | "thumb" }) {
+function enlargedArtFromOption(option: DeckCheckOption): EnlargedArt | null {
+  const imageUrl = optionImageUrl(option);
+  if (!imageUrl) return null;
+
+  return {
+    imageUrl,
+    title: option.card.name,
+    alt: `${option.card.name} enlarged card art`,
+    detail: optionLabel(option),
+  };
+}
+
+function DeckOptionArt({
+  option,
+  size = "large",
+  onOpen,
+}: {
+  option: DeckCheckOption;
+  size?: "large" | "thumb";
+  onOpen?: () => void;
+}) {
   const imageUrl = optionImageUrl(option);
   const className = `wiko-deck-check-option-art wiko-deck-check-option-art-${size}`;
 
   if (imageUrl) {
-    return (
+    const image = (
       <img
         src={imageUrl}
         alt={`${option.card.name} card art`}
@@ -53,6 +80,22 @@ function DeckOptionArt({ option, size = "large" }: { option: DeckCheckOption; si
         className={className}
       />
     );
+
+    if (onOpen) {
+      return (
+        <button
+          type="button"
+          className={`wiko-deck-check-art-button wiko-deck-check-art-button-${size}`}
+          aria-label={`View ${option.card.name} card art larger`}
+          onClick={onOpen}
+        >
+          {image}
+          <span aria-hidden="true" className="wiko-deck-check-art-zoom-hint">↗</span>
+        </button>
+      );
+    }
+
+    return image;
   }
 
   return (
@@ -97,6 +140,18 @@ export function DeckCheckShell() {
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
   const [missingExpanded, setMissingExpanded] = useState(false);
   const [entryExpanded, setEntryExpanded] = useState(true);
+  const [enlargedArt, setEnlargedArt] = useState<EnlargedArt | null>(null);
+
+  useEffect(() => {
+    if (!enlargedArt) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setEnlargedArt(null);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enlargedArt]);
 
   const matchedItems = useMemo(() => {
     if (!result) return [];
@@ -175,6 +230,11 @@ export function DeckCheckShell() {
     for (const { option } of selectedItems) addOption(option);
     const count = selectedItems.reduce((sum, { option }) => sum + option.addQuantity, 0);
     setAddedMessage(`Added ${count} card${count === 1 ? "" : "s"} to your satchel. Review before checkout.`);
+  }
+
+  function openArt(option: DeckCheckOption) {
+    const art = enlargedArtFromOption(option);
+    if (art) setEnlargedArt(art);
   }
 
   return (
@@ -327,7 +387,7 @@ export function DeckCheckShell() {
                       />
                       <span className="sr-only">Include {item.request.name}</span>
                     </label>
-                    {selectedOption && <DeckOptionArt option={selectedOption} />}
+                    {selectedOption && <DeckOptionArt option={selectedOption} onOpen={() => openArt(selectedOption)} />}
                     <div>
                       <div className="wiko-deck-check-card-line">
                         <strong>{item.request.quantity}× {item.request.name}</strong>
@@ -357,12 +417,14 @@ export function DeckCheckShell() {
                             className={`wiko-deck-check-option-card${optionSelected ? " is-selected" : ""}`}
                             aria-pressed={optionSelected}
                             aria-label={`Select ${option.card.name} ${optionShortLabel(option)}`}
-                            onClick={() =>
+                            onClick={(event) => {
                               setSelectedCardIds((current) => ({
                                 ...current,
                                 [item.request.id]: option.card.id,
-                              }))
-                            }
+                              }));
+                              const target = event.target as HTMLElement | null;
+                              if (target?.closest(".wiko-deck-check-option-art")) openArt(option);
+                            }}
                           >
                             <DeckOptionArt option={option} size="thumb" />
                             <span className="wiko-deck-check-option-meta">
@@ -414,6 +476,34 @@ export function DeckCheckShell() {
             </section>
           )}
         </section>
+      )}
+      {enlargedArt && (
+        <div className="wiko-deck-check-lightbox-backdrop" onClick={() => setEnlargedArt(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Larger image for ${enlargedArt.title}`}
+            className="wiko-deck-check-lightbox-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="wiko-deck-check-lightbox-close"
+              onClick={() => setEnlargedArt(null)}
+            >
+              Close
+            </button>
+            <img
+              src={enlargedArt.imageUrl}
+              alt={enlargedArt.alt}
+              className="wiko-deck-check-lightbox-image"
+            />
+            <div className="wiko-deck-check-lightbox-caption">
+              <strong>{enlargedArt.title}</strong>
+              <span>{enlargedArt.detail}</span>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
