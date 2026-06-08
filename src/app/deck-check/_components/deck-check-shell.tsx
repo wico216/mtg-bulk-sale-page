@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import type { DeckCheckItem, DeckCheckOption, DeckCheckResult } from "@/lib/deck-check";
@@ -28,6 +29,37 @@ function optionLabel(option: DeckCheckOption): string {
   const card = option.card;
   const price = formatPrice(card.price);
   return `${card.setCode.toUpperCase()} #${card.collectorNumber} · ${formatFinish(card.finish)} · ${formatCondition(card.condition)} · ${price} · ${card.quantity} available`;
+}
+
+function optionShortLabel(option: DeckCheckOption): string {
+  const card = option.card;
+  return `${card.setCode.toUpperCase()} #${card.collectorNumber} · ${formatFinish(card.finish)}`;
+}
+
+function optionImageUrl(option: DeckCheckOption): string | null {
+  return option.card.imageUrl ?? option.card.backImageUrl ?? null;
+}
+
+function DeckOptionArt({ option, size = "large" }: { option: DeckCheckOption; size?: "large" | "thumb" }) {
+  const imageUrl = optionImageUrl(option);
+  const className = `wiko-deck-check-option-art wiko-deck-check-option-art-${size}`;
+
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={`${option.card.name} card art`}
+        loading="lazy"
+        className={className}
+      />
+    );
+  }
+
+  return (
+    <div role="img" aria-label={`${option.card.name} card art unavailable`} className={`${className} wiko-deck-check-art-placeholder`}>
+      No image
+    </div>
+  );
 }
 
 function statusColor(status: DeckCheckItem["status"]): string {
@@ -64,6 +96,7 @@ export function DeckCheckShell() {
   const [included, setIncluded] = useState<Record<string, boolean>>({});
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
   const [missingExpanded, setMissingExpanded] = useState(false);
+  const [entryExpanded, setEntryExpanded] = useState(true);
 
   const matchedItems = useMemo(() => {
     if (!result) return [];
@@ -78,12 +111,14 @@ export function DeckCheckShell() {
   const selectedItems = useMemo(() => {
     return matchedItems
       .map((item) => {
-        const cardId = selectedCardIds[item.request.id];
+        const cardId = selectedCardIds[item.request.id] ?? item.recommendedCardId ?? item.options[0]?.card.id;
         const option = item.options.find((candidate) => candidate.card.id === cardId);
         return option && included[item.request.id] !== false ? { item, option } : null;
       })
       .filter((entry): entry is { item: DeckCheckItem; option: DeckCheckOption } => Boolean(entry));
   }, [included, matchedItems, selectedCardIds]);
+
+  const entryCollapsed = Boolean(result) && !entryExpanded && !checking;
 
   const selectedEstimate = useMemo(() => {
     if (selectedItems.some(({ option }) => option.card.price == null)) return null;
@@ -114,7 +149,9 @@ export function DeckCheckShell() {
       setResult(nextResult);
       setSelectedCardIds(emptySelection(nextResult));
       setIncluded(defaultIncluded(nextResult));
+      setEntryExpanded(false);
     } catch (caught) {
+      setEntryExpanded(true);
       setError(caught instanceof Error ? caught.message : "Could not check that deck.");
     } finally {
       setChecking(false);
@@ -127,7 +164,7 @@ export function DeckCheckShell() {
   }
 
   function addItem(item: DeckCheckItem) {
-    const cardId = selectedCardIds[item.request.id];
+    const cardId = selectedCardIds[item.request.id] ?? item.recommendedCardId ?? item.options[0]?.card.id;
     const option = item.options.find((candidate) => candidate.card.id === cardId);
     if (!option) return;
     addOption(option);
@@ -142,50 +179,67 @@ export function DeckCheckShell() {
 
   return (
     <main className="wiko-deck-check-page">
-      <section className="wiko-deck-check-hero">
-        <p className="wiko-eyebrow">Deck Match · public Spellbook inventory</p>
-        <div className="wiko-deck-check-hero-grid">
+      {entryCollapsed ? (
+        <section className="wiko-deck-check-collapsed-entry" aria-label="Deck input collapsed">
           <div>
-            <h1 className="wiko-deck-check-title">
-              Check your deck against Wiko&apos;s Spellbook
-              <em>.</em>
-            </h1>
-            <p className="wiko-deck-check-copy">
-              Paste a Moxfield, Archidekt, or ManaBox link — or paste an exported list.
-              Spellbook will show only cards Wiko currently has available, with a collapsible not-found list at the bottom.
+            <p className="wiko-eyebrow">Deck check ready</p>
+            <h1 className="wiko-deck-check-collapsed-title">{result?.deckName ?? result?.sourceLabel}</h1>
+            <p>
+              Showing {matchedItems.length} Spellbook match{matchedItems.length === 1 ? "" : "es"} from {result?.summary.requestedCards ?? 0} checked cards.
             </p>
           </div>
-          <div className="wiko-deck-check-note">
-            <strong>Printing-aware:</strong> if your list asks for one version of Counterspell and Wiko has another,
-            the row is marked as an alternate printing so you can still add the playable card.
-          </div>
-        </div>
-      </section>
+          <button type="button" className="wiko-secondary-button" onClick={() => setEntryExpanded(true)}>
+            Edit deck input
+          </button>
+        </section>
+      ) : (
+        <>
+          <section className="wiko-deck-check-hero">
+            <p className="wiko-eyebrow">Deck Match · public Spellbook inventory</p>
+            <div className="wiko-deck-check-hero-grid">
+              <div>
+                <h1 className="wiko-deck-check-title">
+                  Check your deck against Wiko&apos;s Spellbook
+                  <em>.</em>
+                </h1>
+                <p className="wiko-deck-check-copy">
+                  Paste a Moxfield, Archidekt, or ManaBox link — or paste an exported list.
+                  Spellbook will show only cards Wiko currently has available, with a collapsible not-found list at the bottom.
+                </p>
+              </div>
+              <div className="wiko-deck-check-note">
+                <strong>Printing-aware:</strong> if your list asks for one version of Counterspell and Wiko has another,
+                the row is marked as an alternate printing so you can still add the playable card.
+              </div>
+            </div>
+          </section>
 
-      <section className="wiko-deck-check-panel">
-        <form onSubmit={handleSubmit} className="wiko-deck-check-form">
-          <label htmlFor="deck-input" className="wiko-deck-check-label">
-            Deck link or exported list
-          </label>
-          <textarea
-            id="deck-input"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={"https://www.moxfield.com/decks/...\n\nor paste:\n1 Sol Ring\n1 Counterspell (DMR) 45\n1 Arcane Signet"}
-            rows={8}
-            className="wiko-deck-check-input"
-          />
-          <div className="wiko-deck-check-form-actions">
-            <button type="submit" disabled={checking || input.trim().length === 0} className="wiko-primary-button">
-              {checking && <span aria-hidden="true" className="wiko-deck-check-button-spinner" />}
-              {checking ? "Checking…" : "Check my deck"}
-            </button>
-            <span className="wiko-deck-check-help">
-              ManaBox links are best-effort; pasted/exported lists always work.
-            </span>
-          </div>
-        </form>
-      </section>
+          <section className="wiko-deck-check-panel">
+            <form onSubmit={handleSubmit} className="wiko-deck-check-form">
+              <label htmlFor="deck-input" className="wiko-deck-check-label">
+                Deck link or exported list
+              </label>
+              <textarea
+                id="deck-input"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={"https://www.moxfield.com/decks/...\n\nor paste:\n1 Sol Ring\n1 Counterspell (DMR) 45\n1 Arcane Signet"}
+                rows={8}
+                className="wiko-deck-check-input"
+              />
+              <div className="wiko-deck-check-form-actions">
+                <button type="submit" disabled={checking || input.trim().length === 0} className="wiko-primary-button">
+                  {checking && <span aria-hidden="true" className="wiko-deck-check-button-spinner" />}
+                  {checking ? "Checking…" : result ? "Re-check deck" : "Check my deck"}
+                </button>
+                <span className="wiko-deck-check-help">
+                  ManaBox links are best-effort; pasted/exported lists always work.
+                </span>
+              </div>
+            </form>
+          </section>
+        </>
+      )}
 
       {checking && (
         <div role="status" aria-live="polite" className="wiko-deck-check-loading">
@@ -254,8 +308,9 @@ export function DeckCheckShell() {
               </div>
             )}
             {matchedItems.map((item) => {
-              const selectedId = selectedCardIds[item.request.id] ?? "";
-              const selectedOption = item.options.find((option) => option.card.id === selectedId);
+              const fallbackOption = item.options[0];
+              const selectedId = selectedCardIds[item.request.id] ?? item.recommendedCardId ?? fallbackOption?.card.id ?? "";
+              const selectedOption = item.options.find((option) => option.card.id === selectedId) ?? fallbackOption;
               return (
                 <article key={item.request.id} className="wiko-deck-check-row">
                   <div className="wiko-deck-check-row-main">
@@ -272,6 +327,7 @@ export function DeckCheckShell() {
                       />
                       <span className="sr-only">Include {item.request.name}</span>
                     </label>
+                    {selectedOption && <DeckOptionArt option={selectedOption} />}
                     <div>
                       <div className="wiko-deck-check-card-line">
                         <strong>{item.request.quantity}× {item.request.name}</strong>
@@ -282,28 +338,42 @@ export function DeckCheckShell() {
                         {item.request.section !== "main" ? ` · ${item.request.section}` : ""}
                       </p>
                       {selectedOption && (
-                        <p className="wiko-deck-check-match-reason">{selectedOption.reason}</p>
+                        <>
+                          <p className="wiko-deck-check-match-reason">{selectedOption.reason}</p>
+                          <p className="wiko-deck-check-match-reason">Selected: {optionLabel(selectedOption)}</p>
+                        </>
                       )}
                     </div>
                   </div>
 
                   <div className="wiko-deck-check-row-actions">
-                    <select
-                      value={selectedId}
-                      onChange={(event) =>
-                        setSelectedCardIds((current) => ({
-                          ...current,
-                          [item.request.id]: event.target.value,
-                        }))
-                      }
-                      aria-label={`Choose Spellbook version for ${item.request.name}`}
-                    >
-                      {item.options.map((option) => (
-                        <option key={option.card.id} value={option.card.id}>
-                          {option.recommended ? "Recommended · " : ""}{optionLabel(option)}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="wiko-deck-check-option-picker" aria-label={`Available Spellbook versions for ${item.request.name}`}>
+                      {item.options.map((option) => {
+                        const optionSelected = option.card.id === selectedId;
+                        return (
+                          <button
+                            key={option.card.id}
+                            type="button"
+                            className={`wiko-deck-check-option-card${optionSelected ? " is-selected" : ""}`}
+                            aria-pressed={optionSelected}
+                            aria-label={`Select ${option.card.name} ${optionShortLabel(option)}`}
+                            onClick={() =>
+                              setSelectedCardIds((current) => ({
+                                ...current,
+                                [item.request.id]: option.card.id,
+                              }))
+                            }
+                          >
+                            <DeckOptionArt option={option} size="thumb" />
+                            <span className="wiko-deck-check-option-meta">
+                              <strong>{optionShortLabel(option)}</strong>
+                              <span>{formatCondition(option.card.condition)} · {formatPrice(option.card.price)}</span>
+                              <span>{option.addQuantity} of {option.card.quantity} available</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                     <button type="button" onClick={() => addItem(item)} className="wiko-secondary-button">
                       Add {selectedOption?.addQuantity ?? 1}
                     </button>

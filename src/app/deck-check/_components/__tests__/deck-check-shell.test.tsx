@@ -16,6 +16,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+const boltImage = "https://cards.scryfall.io/normal/front/0/0/test-bolt.jpg";
+const counterspellImage = "https://cards.scryfall.io/normal/front/0/1/test-counterspell.jpg";
+const counterspellFoilImage = "https://cards.scryfall.io/normal/front/0/2/test-counterspell-foil.jpg";
+
 function resultFixture(): DeckCheckResult {
   return {
     source: "text",
@@ -55,7 +59,7 @@ function resultFixture(): DeckCheckResult {
               condition: "near_mint",
               quantity: 3,
               colorIdentity: ["R"],
-              imageUrl: null,
+              imageUrl: boltImage,
               backImageUrl: null,
               oracleText: "Lightning Bolt deals 3 damage to any target.",
               typeLine: "Instant",
@@ -89,7 +93,7 @@ function resultFixture(): DeckCheckResult {
               condition: "lightly_played",
               quantity: 4,
               colorIdentity: ["U"],
-              imageUrl: null,
+              imageUrl: counterspellImage,
               backImageUrl: null,
               oracleText: "Counter target spell.",
               typeLine: "Instant",
@@ -97,6 +101,31 @@ function resultFixture(): DeckCheckResult {
               rarity: "uncommon",
               finish: "normal",
               scryfallId: "e2e-counterspell",
+            },
+          },
+          {
+            matchType: "alternate",
+            reason: "Different printing: E2E #046",
+            recommended: false,
+            addQuantity: 1,
+            card: {
+              id: "e2e-046-foil-near_mint",
+              name: "Counterspell",
+              setCode: "e2e",
+              setName: "E2E Masters",
+              collectorNumber: "046",
+              price: 3,
+              condition: "near_mint",
+              quantity: 2,
+              colorIdentity: ["U"],
+              imageUrl: counterspellFoilImage,
+              backImageUrl: null,
+              oracleText: "Counter target spell.",
+              typeLine: "Instant",
+              manaValue: 2,
+              rarity: "uncommon",
+              finish: "foil",
+              scryfallId: "e2e-counterspell-foil",
             },
           },
         ],
@@ -137,9 +166,15 @@ describe("DeckCheckShell", () => {
 
     expect(screen.getByText("Exact match")).toBeInTheDocument();
     expect(screen.getByText("Alternate printing")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit deck input/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /check your deck against wiko's spellbook/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: /Lightning Bolt card art/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("img", { name: /Counterspell card art/i }).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: /Select Counterspell E2E #046 · Foil/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /cards not found in spellbook/i })).toBeInTheDocument();
     expect(screen.queryByText("Rhystic Study")).not.toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: /Select Counterspell E2E #046 · Foil/i }));
     await user.click(screen.getByRole("button", { name: /cards not found in spellbook/i }));
 
     expect(screen.getByText("Rhystic Study", { exact: false })).toBeInTheDocument();
@@ -148,7 +183,8 @@ describe("DeckCheckShell", () => {
     await user.click(screen.getByRole("button", { name: /add all selected to satchel/i }));
 
     expect(useCartStore.getState().getQuantity("e2e-150-normal-near_mint")).toBe(1);
-    expect(useCartStore.getState().getQuantity("e2e-045-normal-lightly_played")).toBe(1);
+    expect(useCartStore.getState().getQuantity("e2e-045-normal-lightly_played")).toBe(0);
+    expect(useCartStore.getState().getQuantity("e2e-046-foil-near_mint")).toBe(1);
     expect(screen.getByRole("status")).toHaveTextContent("Added 2 cards to your satchel");
   });
 
