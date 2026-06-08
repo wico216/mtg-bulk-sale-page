@@ -15,7 +15,7 @@ import type {
   ImportHistoryResult,
 } from "@/db/queries";
 import type { AdminHealthSnapshot } from "@/db/admin-health";
-import type { CardData, InventoryRow, PublicCard } from "@/lib/types";
+import type { AdminCard, CardData, InventoryRow, PublicCard } from "@/lib/types";
 
 export function e2eFixturesEnabled(): boolean {
   return process.env.E2E_FIXTURES === "1" && process.env.NODE_ENV !== "production";
@@ -196,6 +196,29 @@ export const e2eFixtureAdminCards: InventoryRow[] = e2eFixtureCards.map(
     binder: fixtureBinders[index],
   }),
 );
+
+export const e2eFixturePrivateWBinderCards: AdminCard[] = e2eFixtureCards
+  .slice(0, 4)
+  .map((card, index) => ({
+    ...card,
+    id: `${card.setCode}-${card.collectorNumber}-${card.finish}-${card.condition}`,
+    binders: [`w${String(index + 1).padStart(2, "0")}`],
+  }));
+
+export function getE2ePrivateWBinderCards(): AdminCard[] {
+  return e2eFixturePrivateWBinderCards;
+}
+
+export function getE2ePrivateWBinderMeta(
+  cards = getE2ePrivateWBinderCards(),
+): CardData["meta"] {
+  return {
+    lastUpdated: "2026-05-23T00:00:00.000Z",
+    totalCards: cards.reduce((sum, card) => sum + card.quantity, 0),
+    totalSkipped: 0,
+    totalMissingPrices: 0,
+  };
+}
 
 function normalizeFixturePage(value: number | undefined): number {
   if (!Number.isFinite(value) || value === undefined) return 1;

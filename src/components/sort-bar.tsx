@@ -1,7 +1,13 @@
 "use client";
 
-import { type SortOption, useFilterStore } from "@/lib/store/filter-store";
+import { useMemo } from "react";
+import {
+  filterAndSortCards,
+  type SortOption,
+  useFilterStore,
+} from "@/lib/store/filter-store";
 import { groupCardVariants } from "@/lib/card-variants";
+import type { PublicCard } from "@/lib/types";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "recent-desc", label: "Newest added" },
@@ -22,12 +28,42 @@ function IconSearch({ size = 14 }: { size?: number }) {
   );
 }
 
-export default function SortBar() {
+interface SortBarProps {
+  cards?: PublicCard[];
+}
+
+export default function SortBar({ cards }: SortBarProps) {
+  const allCards = useFilterStore((s) => s.allCards);
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const setSearchQuery = useFilterStore((s) => s.setSearchQuery);
+  const selectedColors = useFilterStore((s) => s.selectedColors);
+  const selectedSets = useFilterStore((s) => s.selectedSets);
+  const selectedRarities = useFilterStore((s) => s.selectedRarities);
+  const selectedTypes = useFilterStore((s) => s.selectedTypes);
+  const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
+  const priceRange = useFilterStore((s) => s.priceRange);
   const sortBy = useFilterStore((s) => s.sortBy);
   const setSortBy = useFilterStore((s) => s.setSortBy);
-  const filteredCount = useFilterStore((s) => groupCardVariants(s.getFilteredCards()).length);
+  const storeCardsMatchProps = useMemo(
+    () =>
+      cards !== undefined &&
+      allCards.length === cards.length &&
+      allCards.every((storeCard, index) => storeCard.id === cards[index]?.id),
+    [allCards, cards],
+  );
+  const sourceCards = cards === undefined || storeCardsMatchProps ? allCards : cards;
+  const filteredCount = groupCardVariants(
+    filterAndSortCards(sourceCards, {
+      searchQuery,
+      selectedColors,
+      selectedSets,
+      selectedRarities,
+      selectedTypes,
+      selectedFinishes,
+      priceRange,
+      sortBy,
+    }),
+  ).length;
 
   return (
     <div

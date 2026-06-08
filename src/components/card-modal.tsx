@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Finish, PublicCard } from "@/lib/types";
+import type { CardSelectionController } from "@/lib/card-selection";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 import { useCartStore } from "@/lib/store/cart-store";
 import { ManaSymbol } from "@/components/mana-symbol";
 
@@ -169,19 +171,47 @@ const btnSecondary: React.CSSProperties = {
 interface CardModalProps {
   card: PublicCard;
   variants?: PublicCard[];
+  selectionController?: CardSelectionController;
   onClose: () => void;
   onImageClick: (imageUrl: string) => void;
 }
 
-export default function CardModal({ card, variants = [card], onClose, onImageClick }: CardModalProps) {
+type CardWithOptionalBinders = PublicCard & { binders?: string[] };
+
+function getVariantBinders(variants: PublicCard[]): string[] {
+  const binders = variants.flatMap((variant) =>
+    Array.isArray((variant as CardWithOptionalBinders).binders)
+      ? ((variant as CardWithOptionalBinders).binders ?? [])
+      : [],
+  );
+  return [...new Set(binders)].sort();
+}
+
+export default function CardModal({
+  card,
+  variants = [card],
+  selectionController,
+  onClose,
+  onImageClick,
+}: CardModalProps) {
   const cartItems = useCartStore((s) => s.items);
-  const addItem = useCartStore((s) => s.addItem);
-  const setQuantity = useCartStore((s) => s.setQuantity);
-  const removeItem = useCartStore((s) => s.removeItem);
-  const inCart = cartItems.has(card.id);
-  const qty = cartItems.get(card.id) ?? 0;
+  const cartAddItem = useCartStore((s) => s.addItem);
+  const cartSetQuantity = useCartStore((s) => s.setQuantity);
+  const cartRemoveItem = useCartStore((s) => s.removeItem);
+  const selectionItems = selectionController?.items ?? cartItems;
+  const addItem = selectionController?.addItem ?? cartAddItem;
+  const setQuantity = selectionController?.setQuantity ?? cartSetQuantity;
+  const removeItem = selectionController?.removeItem ?? cartRemoveItem;
+  const inCart = selectionItems.has(card.id);
+  const qty = selectionItems.get(card.id) ?? 0;
   const hasMultipleVariants = variants.length > 1;
-  const anyVariantInCart = variants.some((variant) => cartItems.has(variant.id));
+  const anyVariantInCart = variants.some((variant) => selectionItems.has(variant.id));
+  const binderLabels = getVariantBinders(variants).map(formatBinderForDisplay);
+  const addLabel = selectionController?.copy?.addLabel ?? "Add to satchel";
+  const reviewHref = selectionController?.copy?.reviewHref ?? "/cart";
+  const reviewLabel = selectionController?.copy?.reviewLabel ?? "Go to cart";
+  const selectedBadgeLabel = selectionController?.copy?.selectedBadgeLabel ?? "satchel";
+  const availableLabel = selectionController?.copy?.quantityAvailableLabel ?? "available";
   const [imageSide, setImageSide] = useState({
     cardId: card.id,
     showingBack: false,
@@ -435,6 +465,23 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
             </dd>
             <dt style={{ color: "var(--muted)" }}>In stock</dt>
             <dd style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{totalQuantity(variants)}</dd>
+            {binderLabels.length > 0 && (
+              <>
+                <dt style={{ color: "var(--muted)" }}>W folders</dt>
+                <dd
+                  style={{
+                    margin: 0,
+                    color: "var(--accent)",
+                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                    fontSize: 11,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {binderLabels.join(" · ")}
+                </dd>
+              </>
+            )}
           </dl>
 
           {card.oracleText && (
@@ -489,14 +536,14 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
                       letterSpacing: "0.08em",
                     }}
                   >
-                    choose finish
+                    {selectionController?.copy?.chooseOptionsLabel ?? "choose finish"}
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {variants.map((variant) => {
                     const optionLabel = variantOptionLabel(variant, variants);
-                    const variantQty = cartItems.get(variant.id) ?? 0;
+                    const variantQty = selectionItems.get(variant.id) ?? 0;
                     const variantInCart = variantQty > 0;
 
                     return (
@@ -527,18 +574,18 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
                               textTransform: "uppercase",
                             }}
                           >
-                            {formatPrice(variant.price)} · {variant.quantity} available
+                            {formatPrice(variant.price)} · {variant.quantity} {availableLabel}
                           </div>
                         </div>
 
                         {!variantInCart ? (
                           <button
                             type="button"
-                            aria-label={`Add ${optionLabel} to satchel`}
+                            aria-label={`Add ${optionLabel} to ${selectedBadgeLabel}`}
                             onClick={() => addItem(variant.id, variant.quantity)}
                             style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}
                           >
-                            Add
+                            {addLabel}
                           </button>
                         ) : (
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -585,8 +632,8 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
                     <button type="button" onClick={onClose} style={btnSecondary}>
                       Close
                     </button>
-                    <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
-                      Go to cart
+                    <Link href={reviewHref} style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
+                      {reviewLabel}
                     </Link>
                   </div>
                 )}
@@ -618,7 +665,7 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
                 </div>
                 {!inCart ? (
                   <button type="button" onClick={() => addItem(card.id, card.quantity)} style={btnPrimary}>
-                    Add to satchel
+                    {addLabel}
                   </button>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
@@ -664,8 +711,8 @@ export default function CardModal({ card, variants = [card], onClose, onImageCli
                       <button type="button" onClick={onClose} style={btnSecondary}>
                         Close
                       </button>
-                      <Link href="/cart" style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
-                        Go to cart
+                      <Link href={reviewHref} style={{ ...btnPrimary, padding: "10px 14px", fontSize: 12 }}>
+                        {reviewLabel}
                       </Link>
                     </div>
                   </div>

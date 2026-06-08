@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import type { PublicCard, CardData } from "@/lib/types";
+import type { CardSelectionController } from "@/lib/card-selection";
 import type { SortOption } from "@/lib/store/filter-store";
-import { useFilterStore } from "@/lib/store/filter-store";
+import { filterAndSortCards, useFilterStore } from "@/lib/store/filter-store";
 import CardTile from "@/components/card-tile";
 import CardModal from "@/components/card-modal";
 import { groupCardVariants, type CardVariantGroup } from "@/lib/card-variants";
@@ -15,6 +16,7 @@ interface CardGridProps {
   meta: CardData["meta"];
   initialSort?: SortOption;
   virtualizeCards?: boolean;
+  selectionController?: CardSelectionController;
 }
 
 const GRID_COLUMN_ESTIMATE = 2;
@@ -31,10 +33,14 @@ function clampVirtualRow(value: number, totalRows: number): number {
   return Math.max(0, Math.min(totalRows, value));
 }
 
-export default function CardGrid({ cards, initialSort, virtualizeCards = false }: CardGridProps) {
+export default function CardGrid({
+  cards,
+  initialSort,
+  virtualizeCards = false,
+  selectionController,
+}: CardGridProps) {
   const setAllCards = useFilterStore((s) => s.setAllCards);
   const clearFilters = useFilterStore((s) => s.clearFilters);
-  const getFilteredCards = useFilterStore((s) => s.getFilteredCards);
   const allCards = useFilterStore((s) => s.allCards);
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const selectedColors = useFilterStore((s) => s.selectedColors);
@@ -46,11 +52,28 @@ export default function CardGrid({ cards, initialSort, virtualizeCards = false }
   const sortBy = useFilterStore((s) => s.sortBy);
   const setSortBy = useFilterStore((s) => s.setSortBy);
 
+  const storeCardsMatchProps = useMemo(
+    () =>
+      allCards.length === cards.length &&
+      allCards.every((storeCard, index) => storeCard.id === cards[index]?.id),
+    [allCards, cards],
+  );
+  const sourceCards = storeCardsMatchProps ? allCards : cards;
+
   const filteredCards = useMemo(
-    () => getFilteredCards(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () =>
+      filterAndSortCards(sourceCards, {
+        searchQuery,
+        selectedColors,
+        selectedSets,
+        selectedRarities,
+        selectedTypes,
+        selectedFinishes,
+        priceRange,
+        sortBy,
+      }),
     [
-      allCards,
+      sourceCards,
       searchQuery,
       selectedColors,
       selectedSets,
@@ -130,16 +153,17 @@ export default function CardGrid({ cards, initialSort, virtualizeCards = false }
   }, [selectedGroup, lightboxUrl]);
 
   useEffect(() => {
-    if (!virtualizeCards) {
-      rowHeightLockedRef.current = false;
-      setVirtualRows({ start: 0, end: GRID_INITIAL_ROWS });
-      return;
-    }
-
     rowHeightLockedRef.current = false;
-    const nextEnd = Math.min(totalRows, GRID_INITIAL_ROWS);
-    setVirtualRows({ start: 0, end: nextEnd });
-    window.scrollTo({ top: 0 });
+    const nextRows = virtualizeCards
+      ? { start: 0, end: Math.min(totalRows, GRID_INITIAL_ROWS) }
+      : { start: 0, end: GRID_INITIAL_ROWS };
+
+    const frame = window.requestAnimationFrame(() => {
+      setVirtualRows(nextRows);
+      if (virtualizeCards) window.scrollTo({ top: 0 });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [
     searchQuery,
     selectedColors,
@@ -303,6 +327,7 @@ export default function CardGrid({ cards, initialSort, virtualizeCards = false }
                     key={group.id}
                     card={group.card}
                     variants={group.variants}
+                    selectionController={selectionController}
                     onClick={() => setSelectedGroup(group)}
                   />
                 ))}
@@ -315,6 +340,7 @@ export default function CardGrid({ cards, initialSort, virtualizeCards = false }
                   key={group.id}
                   card={group.card}
                   variants={group.variants}
+                  selectionController={selectionController}
                   onClick={() => setSelectedGroup(group)}
                 />
               ))}
@@ -326,6 +352,7 @@ export default function CardGrid({ cards, initialSort, virtualizeCards = false }
         <CardModal
           card={selectedGroup.card}
           variants={selectedGroup.variants}
+          selectionController={selectionController}
           onClose={() => setSelectedGroup(null)}
           onImageClick={(imageUrl) => {
             setSelectedGroup(null);

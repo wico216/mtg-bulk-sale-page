@@ -426,5 +426,18 @@ describe("placeCheckoutOrder", () => {
       // join key (set_code, collector_number, finish, condition) instead.
       expect(allocatorBody).not.toMatch(/\bid IN \(/);
     });
+
+    it("public checkout allocator excludes private W binders at the row-lock source", () => {
+      const source = readFileSync(join(process.cwd(), "src/db/orders.ts"), "utf8");
+      const allocatorMatch = source.match(
+        /export async function placeCheckoutOrder[\s\S]*?(?=\nexport (?:async )?function )/,
+      );
+      const allocatorBody = allocatorMatch?.[0] ?? "";
+
+      expect(allocatorBody).toContain("WHERE LOWER(cards.binder) NOT LIKE 'w%'");
+      expect(allocatorBody.indexOf("WHERE LOWER(cards.binder) NOT LIKE 'w%'")).toBeLessThan(
+        allocatorBody.indexOf("FOR UPDATE OF cards"),
+      );
+    });
   });
 });

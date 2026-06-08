@@ -2,12 +2,14 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import {
+  filterAndSortCards,
   PRICE_MAX,
   type PriceRange,
   useFilterStore,
 } from "@/lib/store/filter-store";
 import { ManaSymbol } from "@/components/mana-symbol";
 import { groupCardVariants } from "@/lib/card-variants";
+import type { PublicCard } from "@/lib/types";
 
 const COLOR_KEYS = ["W", "U", "B", "R", "G"] as const;
 type ColorKey = (typeof COLOR_KEYS)[number];
@@ -457,12 +459,19 @@ function SetFilter({
 export interface FilterRailProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  cards?: PublicCard[];
   /** When true, skip sticky/height styling so the rail flows inside a drawer. */
   embedded?: boolean;
 }
 
-export default function FilterRail({ collapsed, onToggleCollapse, embedded = false }: FilterRailProps) {
+export default function FilterRail({
+  collapsed,
+  onToggleCollapse,
+  cards,
+  embedded = false,
+}: FilterRailProps) {
   const allCards = useFilterStore((s) => s.allCards);
+  const searchQuery = useFilterStore((s) => s.searchQuery);
   const selectedColors = useFilterStore((s) => s.selectedColors);
   const selectedSets = useFilterStore((s) => s.selectedSets);
   const selectedRarities = useFilterStore((s) => s.selectedRarities);
@@ -477,28 +486,47 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
   const toggleFinish = useFilterStore((s) => s.toggleFinish);
   const clearFilters = useFilterStore((s) => s.clearFilters);
   const hasActiveFilters = useFilterStore((s) => s.hasActiveFilters());
-  const filteredCount = useFilterStore((s) => groupCardVariants(s.getFilteredCards()).length);
-  const totalCount = groupCardVariants(allCards).length;
+  const storeCardsMatchProps = useMemo(
+    () =>
+      cards !== undefined &&
+      allCards.length === cards.length &&
+      allCards.every((storeCard, index) => storeCard.id === cards[index]?.id),
+    [allCards, cards],
+  );
+  const sourceCards = cards === undefined || storeCardsMatchProps ? allCards : cards;
+  const filteredCount = groupCardVariants(
+    filterAndSortCards(sourceCards, {
+      searchQuery,
+      selectedColors,
+      selectedSets,
+      selectedRarities,
+      selectedTypes,
+      selectedFinishes,
+      priceRange,
+      sortBy: "name-asc",
+    }),
+  ).length;
+  const totalCount = groupCardVariants(sourceCards).length;
 
   const setCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    allCards.forEach((c) => {
+    sourceCards.forEach((c) => {
       m[c.setName] = (m[c.setName] || 0) + c.quantity;
     });
     return m;
-  }, [allCards]);
+  }, [sourceCards]);
 
   const rarityCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    allCards.forEach((c) => {
+    sourceCards.forEach((c) => {
       m[c.rarity] = (m[c.rarity] || 0) + 1;
     });
     return m;
-  }, [allCards]);
+  }, [sourceCards]);
 
   const typeCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    allCards.forEach((card) => {
+    sourceCards.forEach((card) => {
       const typeLine = card.typeLine?.toLowerCase() ?? "";
       TYPE_OPTIONS.forEach((typeName) => {
         if (typeLine.includes(typeName.toLowerCase())) {
@@ -507,17 +535,17 @@ export default function FilterRail({ collapsed, onToggleCollapse, embedded = fal
       });
     });
     return m;
-  }, [allCards]);
+  }, [sourceCards]);
 
   const colorCounts = useMemo(() => {
     const m: Record<ColorKey, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-    allCards.forEach((c) =>
+    sourceCards.forEach((c) =>
       c.colorIdentity.forEach((col) => {
         if (col in m) m[col as ColorKey]++;
       }),
     );
     return m;
-  }, [allCards]);
+  }, [sourceCards]);
 
   const sortedSets = useMemo(
     () =>
