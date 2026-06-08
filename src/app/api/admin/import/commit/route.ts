@@ -89,21 +89,11 @@ function validateSelectedBinders(
       );
     }
   }
-  // Every entry must appear in body.cards (commit-time source of truth).
-  const cardBinderSet = new Set(cards.map((c) => c.binder));
-  for (const s of raw) {
-    if (!cardBinderSet.has(s)) {
-      return Response.json(
-        {
-          error: `selectedBinders entry "${s}" not present in body.cards`,
-        },
-        { status: 400 },
-      );
-    }
-  }
-  // Conversely, every card.binder MUST be in selectedBinders (the typed
-  // deletedFromUnselected: 0 invariant — Plan 19-01 D-18). The helper would
-  // throw on this too, but a 400 here yields a cleaner error than a 500.
+  // Every card.binder MUST be in selectedBinders (the typed
+  // deletedFromUnselected: 0 invariant — Plan 19-01 D-18). selectedBinders
+  // may intentionally include binders that are missing from body.cards: those
+  // are delete-only binders from the will-delete panel, and
+  // replaceCardsForBinders supports deleting them without inserting rows.
   const selectedSet = new Set(raw);
   for (const c of cards) {
     if (!selectedSet.has(c.binder)) {
