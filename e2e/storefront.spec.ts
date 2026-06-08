@@ -74,6 +74,25 @@ test("new arrivals page shows recently added inventory newest first", async ({ p
   await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(0);
 });
 
+test("deck check matches pasted decklists and adds selected cards to the satchel", async ({ page }) => {
+  await page.goto("/deck-check");
+
+  await expect(page.getByRole("heading", { name: /check your deck/i })).toBeVisible();
+  await page.getByLabel(/deck link or exported list/i).fill("1 Lightning Bolt\n1 Counterspell (DMR) 45\n1 Rhystic Study");
+  await page.getByRole("button", { name: /check my deck/i }).click();
+
+  await expect(page.getByRole("heading", { name: /spellbook match report/i })).toBeVisible();
+  await expect(page.getByText("Spellbook match", { exact: true })).toBeVisible();
+  await expect(page.getByText("Alternate printing", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not in Spellbook", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Different printing: E2E #045/i)).toBeVisible();
+
+  await page.getByRole("button", { name: /add all selected to satchel/i }).click();
+
+  await expect(page.getByRole("status")).toContainText("Added 2 cards to your satchel");
+  await expect(page.getByRole("link", { name: "Cart", exact: true })).toContainText("2");
+});
+
 test("storefront groups foil and nonfoil finishes while keeping extended art separate", async ({ page }) => {
   await page.goto("/");
 

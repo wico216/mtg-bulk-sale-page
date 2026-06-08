@@ -1253,6 +1253,345 @@ a { color: inherit; }
   }
 }
 
+/* Deck Check: paste a deck link/list and add Spellbook matches to satchel. */
+.wiko-deck-check-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 34px 24px 96px;
+}
+
+.wiko-eyebrow {
+  margin: 0 0 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wiko-deck-check-hero,
+.wiko-deck-check-panel,
+.wiko-deck-check-results {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.wiko-deck-check-hero {
+  padding: 28px;
+  margin-bottom: 18px;
+}
+
+.wiko-deck-check-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 22px;
+  align-items: end;
+}
+
+.wiko-deck-check-title,
+.wiko-deck-check-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.wiko-deck-check-title {
+  max-width: 760px;
+  font-size: clamp(38px, 7vw, 72px);
+  line-height: 0.92;
+}
+
+.wiko-deck-check-title em {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.wiko-deck-check-section-title {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.wiko-deck-check-copy {
+  max-width: 740px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.wiko-deck-check-note {
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.wiko-deck-check-note strong {
+  color: var(--ink);
+}
+
+.wiko-deck-check-panel,
+.wiko-deck-check-results {
+  margin-top: 18px;
+  padding: 22px;
+}
+
+.wiko-deck-check-form {
+  display: grid;
+  gap: 12px;
+}
+
+.wiko-deck-check-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.wiko-deck-check-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 180px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 14px;
+  font: 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.wiko-deck-check-form-actions,
+.wiko-deck-check-results-head,
+.wiko-deck-check-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wiko-deck-check-results-head {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.wiko-deck-check-help,
+.wiko-deck-check-requested,
+.wiko-deck-check-match-reason,
+.wiko-deck-check-missing {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wiko-primary-button,
+.wiko-secondary-button,
+.wiko-secondary-link {
+  min-height: 40px;
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wiko-primary-button {
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.wiko-primary-button:disabled,
+.wiko-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.wiko-secondary-button,
+.wiko-secondary-link {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.wiko-deck-check-error,
+.wiko-deck-check-warning,
+.wiko-deck-check-added {
+  margin-top: 14px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.wiko-deck-check-error {
+  border: 1px solid #f87171;
+  background: color-mix(in oklch, #f87171 14%, var(--bg));
+  color: var(--ink);
+}
+
+.wiko-deck-check-warning {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.wiko-deck-check-warning p,
+.wiko-deck-check-added p {
+  margin: 0;
+}
+
+.wiko-deck-check-added {
+  border: 1px solid color-mix(in oklch, var(--accent) 60%, var(--border));
+  background: color-mix(in oklch, var(--accent) 12%, var(--bg));
+  color: var(--ink);
+}
+
+.wiko-deck-check-added a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.wiko-deck-check-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.wiko-deck-check-stats > div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.wiko-deck-check-stats strong {
+  display: block;
+  color: var(--ink);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wiko-deck-check-stats span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wiko-deck-check-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wiko-deck-check-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--bg);
+}
+
+.wiko-deck-check-row-main {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.wiko-deck-check-checkbox {
+  padding-top: 3px;
+}
+
+.wiko-deck-check-card-line {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.wiko-deck-check-card-line strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.wiko-deck-check-card-line span {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wiko-deck-check-requested,
+.wiko-deck-check-match-reason,
+.wiko-deck-check-missing {
+  margin: 5px 0 0;
+}
+
+.wiko-deck-check-row-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.wiko-deck-check-row-actions select {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+@media (max-width: 820px) {
+  .wiko-deck-check-page { padding: 20px 14px 72px; }
+  .wiko-deck-check-hero-grid,
+  .wiko-deck-check-row {
+    grid-template-columns: 1fr;
+  }
+  .wiko-deck-check-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .wiko-header-deck-link {
+    padding: 7px 7px !important;
+    font-size: 10px !important;
+  }
+  .wiko-deck-check-hero,
+  .wiko-deck-check-panel,
+  .wiko-deck-check-results {
+    padding: 16px;
+  }
+  .wiko-deck-check-row-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media print {
   body::before,
   .wiko-header,

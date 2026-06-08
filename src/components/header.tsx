@@ -278,6 +278,26 @@ export default function Header() {
           >
             New
           </Link>
+          <Link
+            href="/deck-check"
+            aria-label="Check my deck"
+            className="wiko-header-deck-link"
+            style={{
+              color: "var(--ink)",
+              textDecoration: "none",
+              padding: "7px 9px",
+              border: "1px solid var(--border)",
+              borderRadius: 3,
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontFamily: "inherit",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            Deck
+          </Link>
           <button
             type="button"
             onClick={() => setShowLogin(true)}
