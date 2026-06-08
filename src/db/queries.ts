@@ -16,6 +16,17 @@ import type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 
 export type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 
+const PUBLIC_SALE_BINDER_SQL = sql`LOWER(binder) NOT LIKE 'w%'`;
+const PRIVATE_W_BINDER_SQL = sql`LOWER(binder) LIKE 'w%'`;
+
+function publicSaleBinderWhere(): SQL {
+  return sql`LOWER(${cards.binder}) NOT LIKE 'w%'`;
+}
+
+function privateWBinderWhere(): SQL {
+  return sql`LOWER(${cards.binder}) LIKE 'w%'`;
+}
+
 /**
  * Data access layer for the storefront.
  * All storefront pages and API routes import card data from this single module.
@@ -207,6 +218,7 @@ const aggregatedCardsSelect = sql`
     MAX(created_at)                                                            AS "createdAt",
     MAX(updated_at)                                                            AS "updatedAt"
   FROM cards
+  WHERE ${PUBLIC_SALE_BINDER_SQL}
   GROUP BY set_code, collector_number, finish, condition
   HAVING SUM(quantity) > 0
 `;
@@ -255,12 +267,45 @@ export async function getRecentlyAddedCards(): Promise<AdminCard[]> {
       MAX(updated_at)                                                            AS "updatedAt"
     FROM cards
     CROSS JOIN latest_upload
+    WHERE ${PUBLIC_SALE_BINDER_SQL}
     GROUP BY set_code, collector_number, finish, condition
     HAVING SUM(quantity) > 0
       AND MAX(latest_upload.uploaded_at) IS NOT NULL
       AND MAX(created_at) >= MAX(latest_upload.uploaded_at) - INTERVAL '10 minutes'
       AND MAX(created_at) <= MAX(latest_upload.uploaded_at) + INTERVAL '10 minutes'
     ORDER BY MAX(created_at) DESC, MAX(name) ASC
+  `);
+  return result.rows.map(rowToAggregatedCard);
+}
+
+export async function getPrivateWBinderCardsAggregated(): Promise<AdminCard[]> {
+  const result = await db.execute<AggregatedCardRow>(sql`
+    SELECT
+      set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
+      MAX(name)                                                                  AS "name",
+      set_code                                                                   AS "setCode",
+      MAX(set_name)                                                              AS "setName",
+      collector_number                                                           AS "collectorNumber",
+      AVG(price)::int                                                            AS "price",
+      condition                                                                  AS "condition",
+      SUM(quantity)::int                                                         AS "quantity",
+      MAX(color_identity)                                                        AS "colorIdentity",
+      MAX(image_url)                                                             AS "imageUrl",
+      MAX(back_image_url)                                                        AS "backImageUrl",
+      MAX(oracle_text)                                                           AS "oracleText",
+      MAX(type_line)                                                             AS "typeLine",
+      MAX(mana_value)                                                            AS "manaValue",
+      MAX(rarity)                                                                AS "rarity",
+      finish                                                                     AS "finish",
+      ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)                             AS "binders",
+      MAX(scryfall_id)                                                           AS "scryfallId",
+      MAX(created_at)                                                            AS "createdAt",
+      MAX(updated_at)                                                            AS "updatedAt"
+    FROM cards
+    WHERE ${PRIVATE_W_BINDER_SQL}
+    GROUP BY set_code, collector_number, finish, condition
+    HAVING SUM(quantity) > 0
+    ORDER BY MAX(name) ASC
   `);
   return result.rows.map(rowToAggregatedCard);
 }
@@ -276,7 +321,25 @@ export async function getCardsMeta(): Promise<CardData["meta"]> {
       totalCards: count(),
       lastUpdated: max(cards.updatedAt),
     })
-    .from(cards);
+    .from(cards)
+    .where(publicSaleBinderWhere());
+
+  return {
+    lastUpdated: result.lastUpdated?.toISOString() ?? new Date().toISOString(),
+    totalCards: result.totalCards,
+    totalSkipped: 0,
+    totalMissingPrices: 0,
+  };
+}
+
+export async function getPrivateWBinderCardsMeta(): Promise<CardData["meta"]> {
+  const [result] = await db
+    .select({
+      totalCards: count(),
+      lastUpdated: max(cards.updatedAt),
+    })
+    .from(cards)
+    .where(privateWBinderWhere());
 
   return {
     lastUpdated: result.lastUpdated?.toISOString() ?? new Date().toISOString(),

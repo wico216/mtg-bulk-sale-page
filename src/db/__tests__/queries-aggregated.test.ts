@@ -169,6 +169,25 @@ describe("rowToAggregatedCard (Phase 20 D-01/D-04)", () => {
     );
   });
 
+  it("public aggregate and meta queries exclude private W binders before sale aggregation", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
+
+    expect(source).toContain("PUBLIC_SALE_BINDER_SQL = sql`LOWER(binder) NOT LIKE 'w%'`");
+    expect(source).toContain("WHERE ${PUBLIC_SALE_BINDER_SQL}");
+    expect(source).toContain(".where(publicSaleBinderWhere())");
+  });
+
+  it("admin W binder aggregate query includes only private W binders", () => {
+    const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
+    const privateQuery = source.match(
+      /export async function getPrivateWBinderCardsAggregated\(\): Promise<AdminCard\[\]> \{[\s\S]*?return result\.rows\.map\(rowToAggregatedCard\);\n\}/,
+    )?.[0];
+
+    expect(privateQuery).toBeDefined();
+    expect(privateQuery).toContain("WHERE ${PRIVATE_W_BINDER_SQL}");
+    expect(privateQuery).toContain("ARRAY_AGG(DISTINCT binder ORDER BY binder ASC)");
+  });
+
   it("getRecentlyAddedCards returns only latest-upload grouped cards without a hard cap", () => {
     const source = readFileSync(join(process.cwd(), "src/db/queries.ts"), "utf8");
     const recentQuery = source.match(

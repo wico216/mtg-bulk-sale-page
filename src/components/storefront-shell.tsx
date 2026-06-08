@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PublicCard, CardData } from "@/lib/types";
+import type { CardSelectionController } from "@/lib/card-selection";
 import type { SortOption } from "@/lib/store/filter-store";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
@@ -12,6 +13,7 @@ interface StorefrontShellProps {
   cards: PublicCard[];
   meta: CardData["meta"];
   initialSort?: SortOption;
+  selectionController?: CardSelectionController;
 }
 
 const RAIL_COLLAPSED_KEY = "wiko.railCollapsed";
@@ -48,6 +50,7 @@ export default function StorefrontShell({
   cards,
   meta,
   initialSort,
+  selectionController,
 }: StorefrontShellProps) {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -285,12 +288,13 @@ export default function StorefrontShell({
                 </span>
               )}
             </div>
-            <SortBar />
+            <SortBar cards={cards} />
           </div>
           <CardGrid
             cards={cards}
             meta={meta}
             initialSort={initialSort}
+            selectionController={selectionController}
             virtualizeCards
           />
         </main>
@@ -350,6 +354,7 @@ export default function StorefrontShell({
               <FilterRail
                 collapsed={false}
                 onToggleCollapse={() => setMobileOpen(false)}
+                cards={cards}
                 embedded
               />
             </div>
@@ -364,13 +369,15 @@ export default function StorefrontShell({
       <FilterRail
         collapsed={railCollapsed}
         onToggleCollapse={() => setRailCollapsed((v) => !v)}
+        cards={cards}
       />
       <main style={{ flex: 1, minWidth: 0 }}>
-        <SortBar />
+        <SortBar cards={cards} />
         <CardGrid
           cards={cards}
           meta={meta}
           initialSort={initialSort}
+          selectionController={selectionController}
           virtualizeCards
         />
       </main>

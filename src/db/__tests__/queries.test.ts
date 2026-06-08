@@ -19,6 +19,14 @@ type MockDbClient = {
   select: ReturnType<typeof vi.fn>;
 };
 
+function mockSelectWhereRows(
+  rows: { totalCards: number; lastUpdated: Date | null }[],
+): ReturnType<typeof vi.fn> {
+  const mockWhere = vi.fn().mockResolvedValue(rows);
+  const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+  return vi.fn().mockReturnValue({ from: mockFrom });
+}
+
 /**
  * Factory for creating mock DB rows matching cards.$inferSelect shape.
  */
@@ -137,14 +145,12 @@ describe("getCardsMeta", () => {
   it("returns CardData['meta'] shape with all 4 required fields", async () => {
     // Set up the mock chain for Drizzle query builder
     const { db } = await import("@/db/client");
-    const mockFrom = vi.fn().mockResolvedValue([
+    (db as unknown as MockDbClient).select = mockSelectWhereRows([
       {
         totalCards: 42,
         lastUpdated: new Date("2026-04-11T18:00:00Z"),
       },
     ]);
-    const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as unknown as MockDbClient).select = mockSelect;
 
     // Re-import to pick up the mock
     vi.doMock("server-only", () => ({}));
@@ -161,14 +167,12 @@ describe("getCardsMeta", () => {
 
   it("returns totalSkipped as exactly 0", async () => {
     const { db } = await import("@/db/client");
-    const mockFrom = vi.fn().mockResolvedValue([
+    (db as unknown as MockDbClient).select = mockSelectWhereRows([
       {
         totalCards: 10,
         lastUpdated: new Date("2026-04-11T18:00:00Z"),
       },
     ]);
-    const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as unknown as MockDbClient).select = mockSelect;
 
     vi.doMock("server-only", () => ({}));
     const { getCardsMeta } = await import("../queries");
@@ -178,14 +182,12 @@ describe("getCardsMeta", () => {
 
   it("returns totalMissingPrices as exactly 0", async () => {
     const { db } = await import("@/db/client");
-    const mockFrom = vi.fn().mockResolvedValue([
+    (db as unknown as MockDbClient).select = mockSelectWhereRows([
       {
         totalCards: 10,
         lastUpdated: new Date("2026-04-11T18:00:00Z"),
       },
     ]);
-    const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    (db as unknown as MockDbClient).select = mockSelect;
 
     vi.doMock("server-only", () => ({}));
     const { getCardsMeta } = await import("../queries");

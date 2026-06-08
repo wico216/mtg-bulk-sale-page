@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { PublicCard, Finish } from "@/lib/types";
+import type { CardSelectionController } from "@/lib/card-selection";
+import { formatBinderForDisplay } from "@/lib/binder-name";
 import { useCartStore } from "@/lib/store/cart-store";
 
 function formatPrice(price: number | null): string {
@@ -88,17 +90,37 @@ function IconTransform({ size = 15 }: { size?: number }) {
 interface CardTileProps {
   card: PublicCard;
   variants?: PublicCard[];
+  selectionController?: CardSelectionController;
   onClick: () => void;
 }
 
-export default function CardTile({ card, variants = [card], onClick }: CardTileProps) {
+type CardWithOptionalBinders = PublicCard & { binders?: string[] };
+
+function getVariantBinders(variants: PublicCard[]): string[] {
+  const binders = variants.flatMap((variant) =>
+    Array.isArray((variant as CardWithOptionalBinders).binders)
+      ? ((variant as CardWithOptionalBinders).binders ?? [])
+      : [],
+  );
+  return [...new Set(binders)].sort();
+}
+
+export default function CardTile({
+  card,
+  variants = [card],
+  selectionController,
+  onClick,
+}: CardTileProps) {
   const cartItems = useCartStore((s) => s.items);
-  const inCart = variants.some((variant) => cartItems.has(variant.id));
-  const qty = variants.reduce((sum, variant) => sum + (cartItems.get(variant.id) ?? 0), 0);
   const addItem = useCartStore((s) => s.addItem);
+  const selectionItems = selectionController?.items ?? cartItems;
+  const addSelectionItem = selectionController?.addItem ?? addItem;
+  const inCart = variants.some((variant) => selectionItems.has(variant.id));
+  const qty = variants.reduce((sum, variant) => sum + (selectionItems.get(variant.id) ?? 0), 0);
   const isGrouped = variants.length > 1;
   const displayName = formatDisplayName(card, variants.length);
   const tilePrice = formatTilePrice(card, variants);
+  const binderLabels = getVariantBinders(variants).map(formatBinderForDisplay);
   const [showingBack, setShowingBack] = useState(false);
   const hasBackFace = Boolean(card.backImageUrl);
   const activeImageUrl =
@@ -262,10 +284,18 @@ export default function CardTile({ card, variants = [card], onClick }: CardTileP
               onClick();
               return;
             }
-            if (!inCart) addItem(card.id, card.quantity);
+            if (!inCart) addSelectionItem(card.id, card.quantity);
           }}
-          aria-label={isGrouped ? "Choose finish options" : "Quick add to cart"}
-          title={isGrouped ? "Choose finish" : "Quick add"}
+          aria-label={
+            isGrouped
+              ? (selectionController?.copy?.chooseOptionsLabel ?? "Choose finish options")
+              : (selectionController?.copy?.quickAddLabel ?? "Quick add to cart")
+          }
+          title={
+            isGrouped
+              ? "Choose finish"
+              : (selectionController?.copy?.quickAddLabel ?? "Quick add")
+          }
           style={{
             position: "absolute",
             top: 8,
@@ -324,6 +354,24 @@ export default function CardTile({ card, variants = [card], onClick }: CardTileP
             }}
           >
             {variants.length} options
+          </div>
+        )}
+        {binderLabels.length > 0 && (
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 10,
+              color: "var(--accent)",
+              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={binderLabels.join(", ")}
+          >
+            {binderLabels.join(" · ")}
           </div>
         )}
         <div

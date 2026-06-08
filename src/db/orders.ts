@@ -541,12 +541,13 @@ export async function placeCheckoutOrder(input: {
     -- locked_rows computes the window functions on top of the locked
     -- snapshot. Lock granularity is unchanged — every cards row that
     -- matches any (set_code, collector_number, finish, condition) in
-    -- requested is locked, regardless of binder.
+    -- requested, excluding private W binders that are never public sale stock.
     locked_cards AS (
       SELECT cards.*,
              requested.aggregated_id AS aggregated_id
       FROM cards
       INNER JOIN requested USING (set_code, collector_number, finish, condition)
+      WHERE LOWER(cards.binder) NOT LIKE 'w%'
       ORDER BY cards.set_code, cards.collector_number, cards.finish, cards.condition, cards.binder
       FOR UPDATE OF cards
     ),

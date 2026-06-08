@@ -170,9 +170,7 @@ function matchesSearchQuery(card: PublicCard, query: string): boolean {
   return searchTokens(query).every((token) => matchesSearchToken(card, token));
 }
 
-interface FilterState {
-  /** Source data set once on mount */
-  allCards: PublicCard[];
+export interface FilterCriteria {
   /** Text search input */
   searchQuery: string;
   /** Mana color filter (W, U, B, R, G, C) */
@@ -189,6 +187,11 @@ interface FilterState {
   priceRange: PriceRange;
   /** Current sort order */
   sortBy: SortOption;
+}
+
+interface FilterState extends FilterCriteria {
+  /** Source data set once on mount */
+  allCards: PublicCard[];
 
   setAllCards: (cards: PublicCard[]) => void;
   setSearchQuery: (query: string) => void;
@@ -203,6 +206,106 @@ interface FilterState {
 
   getFilteredCards: () => PublicCard[];
   hasActiveFilters: () => boolean;
+}
+
+export function filterAndSortCards(
+  cards: PublicCard[],
+  criteria: FilterCriteria,
+): PublicCard[] {
+  const {
+    searchQuery,
+    selectedColors,
+    selectedSets,
+    selectedRarities,
+    selectedTypes,
+    selectedFinishes,
+    priceRange,
+    sortBy,
+  } = criteria;
+
+  let result = cards;
+
+  const query = searchQuery.trim();
+  if (query) {
+    result = result.filter((card) => matchesSearchQuery(card, query));
+  }
+
+  if (selectedColors.size > 0) {
+    const wantsColorless = selectedColors.has("C");
+    const colorCodes = [...selectedColors].filter((c) => c !== "C");
+
+    // Subset semantics (matches Scryfall's c<= operator): a card matches when
+    // its color identity is fully contained in the selected colors. Selecting
+    // W+U yields mono-W, mono-U, and W+U cards; not W+G or 3-color cards.
+    result = result.filter((card) => {
+      if (card.colorIdentity.length === 0) return wantsColorless;
+      return card.colorIdentity.every((ci) => colorCodes.includes(ci));
+    });
+  }
+
+  if (selectedSets.size > 0) {
+    result = result.filter((card) => selectedSets.has(card.setName));
+  }
+
+  if (selectedRarities.size > 0) {
+    result = result.filter((card) => selectedRarities.has(card.rarity));
+  }
+
+  if (selectedTypes.size > 0) {
+    result = result.filter((card) => {
+      const typeLine = normalize(card.typeLine);
+      return [...selectedTypes].some((typeName) =>
+        typeLine.includes(typeName.toLowerCase()),
+      );
+    });
+  }
+
+  if (selectedFinishes.size > 0) {
+    result = result.filter((card) => selectedFinishes.has(card.finish));
+  }
+
+  const [minPrice, maxPrice] = priceRange;
+  if (minPrice > 0 || maxPrice < PRICE_MAX) {
+    result = result.filter((card) => {
+      const p = card.price ?? 0;
+      if (p < minPrice) return false;
+      if (maxPrice < PRICE_MAX && p > maxPrice) return false;
+      return true;
+    });
+  }
+
+  return [...result].sort((a, b) => {
+    switch (sortBy) {
+      case "recent-desc": {
+        const aTime = Date.parse(a.createdAt ?? "");
+        const bTime = Date.parse(b.createdAt ?? "");
+        const safeATime = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY;
+        const safeBTime = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY;
+        return safeBTime - safeATime || a.name.localeCompare(b.name);
+      }
+      case "price-desc": {
+        if (a.price === null && b.price === null) return 0;
+        if (a.price === null) return 1;
+        if (b.price === null) return -1;
+        return b.price - a.price;
+      }
+      case "price-asc": {
+        if (a.price === null && b.price === null) return 0;
+        if (a.price === null) return 1;
+        if (b.price === null) return -1;
+        return a.price - b.price;
+      }
+      case "name-desc":
+        return b.name.localeCompare(a.name);
+      case "set":
+        return a.setName.localeCompare(b.setName) || a.name.localeCompare(b.name);
+      case "rarity":
+        return (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[b.rarity] ?? 9);
+      case "name-asc":
+      default:
+        return a.name.localeCompare(b.name);
+    }
+  });
 }
 
 export const useFilterStore = create<FilterState>()((set, get) => ({
@@ -292,103 +395,8 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
     })),
 
   getFilteredCards: () => {
-    const {
-      allCards,
-      searchQuery,
-      selectedColors,
-      selectedSets,
-      selectedRarities,
-      selectedTypes,
-      selectedFinishes,
-      priceRange,
-      sortBy,
-    } = get();
-
-    let result = allCards;
-
-    const query = searchQuery.trim();
-    if (query) {
-      result = result.filter((card) => matchesSearchQuery(card, query));
-    }
-
-    if (selectedColors.size > 0) {
-      const wantsColorless = selectedColors.has("C");
-      const colorCodes = [...selectedColors].filter((c) => c !== "C");
-
-      // Subset semantics (matches Scryfall's c<= operator): a card matches when
-      // its color identity is fully contained in the selected colors. Selecting
-      // W+U yields mono-W, mono-U, and W+U cards; not W+G or 3-color cards.
-      result = result.filter((card) => {
-        if (card.colorIdentity.length === 0) return wantsColorless;
-        return card.colorIdentity.every((ci) => colorCodes.includes(ci));
-      });
-    }
-
-    if (selectedSets.size > 0) {
-      result = result.filter((card) => selectedSets.has(card.setName));
-    }
-
-    if (selectedRarities.size > 0) {
-      result = result.filter((card) => selectedRarities.has(card.rarity));
-    }
-
-    if (selectedTypes.size > 0) {
-      result = result.filter((card) => {
-        const typeLine = normalize(card.typeLine);
-        return [...selectedTypes].some((typeName) =>
-          typeLine.includes(typeName.toLowerCase()),
-        );
-      });
-    }
-
-    if (selectedFinishes.size > 0) {
-      result = result.filter((card) => selectedFinishes.has(card.finish));
-    }
-
-    const [minPrice, maxPrice] = priceRange;
-    if (minPrice > 0 || maxPrice < PRICE_MAX) {
-      result = result.filter((card) => {
-        const p = card.price ?? 0;
-        if (p < minPrice) return false;
-        if (maxPrice < PRICE_MAX && p > maxPrice) return false;
-        return true;
-      });
-    }
-
-    result = [...result].sort((a, b) => {
-      switch (sortBy) {
-        case "recent-desc": {
-          const aTime = Date.parse(a.createdAt ?? "");
-          const bTime = Date.parse(b.createdAt ?? "");
-          const safeATime = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY;
-          const safeBTime = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY;
-          return safeBTime - safeATime || a.name.localeCompare(b.name);
-        }
-        case "price-desc": {
-          if (a.price === null && b.price === null) return 0;
-          if (a.price === null) return 1;
-          if (b.price === null) return -1;
-          return b.price - a.price;
-        }
-        case "price-asc": {
-          if (a.price === null && b.price === null) return 0;
-          if (a.price === null) return 1;
-          if (b.price === null) return -1;
-          return a.price - b.price;
-        }
-        case "name-desc":
-          return b.name.localeCompare(a.name);
-        case "set":
-          return a.setName.localeCompare(b.setName) || a.name.localeCompare(b.name);
-        case "rarity":
-          return (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[b.rarity] ?? 9);
-        case "name-asc":
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
-
-    return result;
+    const state = get();
+    return filterAndSortCards(state.allCards, state);
   },
 
   hasActiveFilters: () => {
