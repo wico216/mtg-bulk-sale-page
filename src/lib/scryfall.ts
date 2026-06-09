@@ -285,3 +285,95 @@ export async function fetchCardsByScryfallIds(
 
   return result;
 }
+
+function normalizeCollectionName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+async function fetchCollectionNameBatch(names: string[]): Promise<ScryfallCard[]> {
+  const url = "https://api.scryfall.com/cards/collection";
+  const body = JSON.stringify({
+    identifiers: names.map((name) => ({ name })),
+  });
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await acquireGate();
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+        body,
+      });
+
+      if (response.status === 429 || response.status >= 500) {
+        if (attempt < MAX_RETRIES) {
+          const retryAfter = response.headers.get("retry-after");
+          const retryAfterMs = retryAfter ? parseFloat(retryAfter) * 1000 : NaN;
+          const backoff = Number.isFinite(retryAfterMs)
+            ? retryAfterMs
+            : 250 * Math.pow(2, attempt);
+          await sleep(backoff);
+          continue;
+        }
+        console.warn(
+          `Scryfall /cards/collection name lookup ${response.status} after ${MAX_RETRIES} retries`,
+        );
+        return [];
+      }
+
+      if (!response.ok) {
+        console.warn(`Scryfall /cards/collection name lookup warning: ${response.status}`);
+        return [];
+      }
+
+      const json = (await response.json()) as { data?: ScryfallCard[] };
+      return Array.isArray(json.data) ? json.data : [];
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(250 * Math.pow(2, attempt));
+        continue;
+      }
+      console.warn(
+        `Scryfall /cards/collection name lookup error after ${MAX_RETRIES} retries:`,
+        error,
+      );
+      return [];
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Batch-fetch Scryfall cards by exact card names. Used by public deck-check
+ * imports when pasted/exported decklists lack Scryfall IDs. Keys in the returned
+ * map are normalized card names, not Scryfall IDs.
+ */
+export async function fetchCardsByNames(names: string[]): Promise<Map<string, ScryfallCard>> {
+  const result = new Map<string, ScryfallCard>();
+  const unique = Array.from(new Set(names.map(normalizeCollectionName))).filter(Boolean);
+  if (unique.length === 0) return result;
+
+  const uncached: string[] = [];
+  for (const name of unique) {
+    const cached = getCached<ScryfallCard>(`name-${name}`);
+    if (cached) {
+      result.set(name, cached);
+    } else {
+      uncached.push(name);
+    }
+  }
+
+  for (let i = 0; i < uncached.length; i += COLLECTION_BATCH_SIZE) {
+    const batch = uncached.slice(i, i + COLLECTION_BATCH_SIZE);
+    const cards = await fetchCollectionNameBatch(batch);
+    for (const card of cards) {
+      const key = normalizeCollectionName(card.name);
+      result.set(key, card);
+      setCache(`name-${key}`, card);
+    }
+  }
+
+  return result;
+}

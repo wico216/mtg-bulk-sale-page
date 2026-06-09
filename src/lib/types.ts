@@ -169,6 +169,8 @@ export interface ScryfallCard {
   object: string;
   /** Scryfall UUID for this exact printing. */
   id?: string;
+  /** Scryfall Oracle UUID for the same playable card across printings. */
+  oracle_id?: string;
   name: string;
   /** Lowercase Scryfall set code for this printing (e.g. "clu"). */
   set?: string;

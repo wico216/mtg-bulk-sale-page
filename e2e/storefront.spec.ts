@@ -74,6 +74,71 @@ test("new arrivals page shows recently added inventory newest first", async ({ p
   await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(0);
 });
 
+test("deck check matches pasted decklists and adds selected cards to the satchel", async ({ page }) => {
+  await page.goto("/deck-check");
+  await page.route("**/api/deck-check", async (route) => {
+    const response = await route.fetch();
+    const result = (await response.json()) as {
+      items?: Array<{ options?: Array<{ card?: { name?: string; imageUrl?: string | null } }> }>;
+    };
+
+    for (const item of result.items ?? []) {
+      for (const option of item.options ?? []) {
+        if (option.card?.name === "Lightning Bolt") option.card.imageUrl = "/file.svg";
+        if (option.card?.name === "Counterspell") option.card.imageUrl = "/window.svg";
+      }
+    }
+
+    await route.fulfill({ response, json: result });
+  });
+
+  await expect(page.getByRole("heading", { name: /check your deck/i })).toBeVisible();
+  await page.getByLabel(/deck link or exported list/i).fill("1 Lightning Bolt\n1 Counterspell (DMR) 45\n1 Rhystic Study");
+  await page.getByRole("button", { name: /check my deck/i }).click();
+
+  await expect(page.getByRole("heading", { name: /spellbook match report/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /edit deck input/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /check your deck/i })).toHaveCount(0);
+  await expect(page.getByText("Spellbook match", { exact: true })).toBeVisible();
+  await expect(page.getByText("Alternate printing", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Different printing: E2E #045/i)).toBeVisible();
+
+  const availableList = page.locator(".wiko-deck-check-list");
+  await expect(availableList).toContainText("Lightning Bolt");
+  await expect(availableList).toContainText("Counterspell");
+  await expect(availableList.getByRole("img", { name: /Lightning Bolt card art/i }).first()).toBeVisible();
+  await expect(availableList.getByRole("img", { name: /Counterspell card art/i }).first()).toBeVisible();
+  await expect(availableList.locator(".wiko-deck-check-option-card")).toHaveCount(2);
+
+  await availableList.getByRole("button", { name: /view lightning bolt card art larger/i }).click();
+  const boltLightbox = page.getByRole("dialog", { name: /larger image for lightning bolt/i });
+  await expect(boltLightbox.getByRole("img", { name: /Lightning Bolt enlarged card art/i })).toBeVisible();
+  await boltLightbox.getByRole("button", { name: /close/i }).click();
+  await expect(boltLightbox).toHaveCount(0);
+
+  const selectedCounterspellOption = availableList.getByRole("button", { name: /Select Counterspell E2E #045 · Nonfoil/i });
+  await selectedCounterspellOption.getByRole("img", { name: /Counterspell card art/i }).click();
+  const counterspellLightbox = page.getByRole("dialog", { name: /larger image for counterspell/i });
+  await expect(counterspellLightbox.getByRole("img", { name: /Counterspell enlarged card art/i })).toBeVisible();
+  await expect(counterspellLightbox).toContainText("E2E #045 · Nonfoil");
+  await page.keyboard.press("Escape");
+  await expect(counterspellLightbox).toHaveCount(0);
+
+  await expect(availableList).not.toContainText("Rhystic Study");
+
+  const missingToggle = page.getByRole("button", { name: /cards not found in spellbook/i });
+  await expect(missingToggle).toBeVisible();
+  await expect(page.locator(".wiko-deck-check-missing-list")).toHaveCount(0);
+  await missingToggle.click();
+  await expect(page.locator(".wiko-deck-check-missing-list")).toContainText("Rhystic Study");
+  await expect(page.getByText("Not in Spellbook", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /add all selected to satchel/i }).click();
+
+  await expect(page.getByRole("status")).toContainText("Added 2 cards to your satchel");
+  await expect(page.getByRole("link", { name: "Cart", exact: true })).toContainText("2");
+});
+
 test("storefront groups foil and nonfoil finishes while keeping extended art separate", async ({ page }) => {
   await page.goto("/");
 
