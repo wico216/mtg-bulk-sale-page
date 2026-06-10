@@ -370,6 +370,47 @@ async function fetchJsonViaNodeHttps(url: string): Promise<unknown> {
   });
 }
 
+async function fetchTextViaNodeHttps(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        method: "GET",
+        headers: externalFetchHeaders(),
+        timeout: 20_000,
+      },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        const chunks: Buffer[] = [];
+        let byteLength = 0;
+
+        response.on("data", (chunk: Buffer | string) => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          byteLength += buffer.length;
+          if (byteLength > 5_000_000) {
+            request.destroy(new Error("Deck source response is too large."));
+            return;
+          }
+          chunks.push(buffer);
+        });
+
+        response.on("error", reject);
+        response.on("end", () => {
+          if (status < 200 || status >= 300) {
+            reject(new Error(`Deck source returned HTTP ${status}`));
+            return;
+          }
+          resolve(Buffer.concat(chunks).toString("utf8"));
+        });
+      },
+    );
+
+    request.on("timeout", () => request.destroy(new Error("Deck source request timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+}
+
 async function fetchJson(url: string): Promise<unknown> {
   try {
     const response = await fetch(url, { headers: externalFetchHeaders() });
@@ -381,6 +422,17 @@ async function fetchJson(url: string): Promise<unknown> {
   }
 
   return fetchJsonViaNodeHttps(url);
+}
+
+async function fetchText(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, { headers: externalFetchHeaders() });
+    if (response.ok) return response.text();
+  } catch {
+    // Fall through to the Node HTTPS client for parity with fetchJson.
+  }
+
+  return fetchTextViaNodeHttps(url);
 }
 
 function cardFromMoxfieldEntry(entry: unknown, section: DeckSection, index: number): DeckCardRequest | null {
@@ -446,16 +498,18 @@ function cardFromArchidektEntry(entry: unknown, index: number): DeckCardRequest 
     ["card", "oracleCard", "name"],
   ]);
   if (!name) return null;
-  const quantity = safeNumber(getPathValue(entry, ["quantity"])) ?? 1;
-  const section = normalizeSourceSection(getPathValue(entry, ["categories"]));
+  const quantity = safeNumber(getPathValue(entry, ["quantity"])) ?? safeNumber(getPathValue(cardRoot, ["qty"])) ?? 1;
+  const section = normalizeSourceSection(
+    getPathValue(entry, ["categories"]) ?? getPathValue(cardRoot, ["categories"]) ?? getPathValue(cardRoot, ["defaultCategory"]),
+  );
   return {
     id: `archidekt-${index}`,
     name,
     quantity: Math.max(1, Math.trunc(quantity)),
     section,
     setCode: normalizeSetCode(
-      firstString(edition, [["editioncode"], ["editionCode"], ["set"], ["code"]]) ??
-        firstString(cardRoot, [["set"], ["setCode"]]),
+      firstString(edition, [["editioncode"], ["editionCode"], ["setCode"], ["code"], ["set"]]) ??
+        firstString(cardRoot, [["setCode"], ["set_code"], ["set"]]),
     ),
     collectorNumber: normalizeCollectorNumber(
       firstString(edition, [["collectorNumber"], ["collector_number"], ["collector"]]) ??
@@ -464,13 +518,28 @@ function cardFromArchidektEntry(entry: unknown, index: number): DeckCardRequest 
     finish: inferFinish(JSON.stringify(getPathValue(entry, ["modifier"]) ?? "")),
     scryfallId:
       firstString(edition, [["scryfall_id"], ["scryfallId"], ["uid"]]) ??
-      firstString(cardRoot, [["scryfall_id"], ["scryfallId"]]),
-    oracleId: firstString(cardRoot, [["oracle_id"], ["oracleId"], ["oracleCard", "oracle_id"]]),
+      firstString(cardRoot, [["scryfall_id"], ["scryfallId"], ["uid"]]),
+    oracleId: firstString(cardRoot, [["oracle_id"], ["oracleId"], ["oracleCardUid"], ["oracleCard", "oracle_id"]]),
   };
 }
 
+function archidektDeckRoot(json: unknown): unknown {
+  return getPathValue(json, ["props", "pageProps", "redux", "deck"]) ?? getPathValue(json, ["deck"]) ?? json;
+}
+
+function parseArchidektNextData(html: string): unknown {
+  const match = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (!match) throw new Error("Archidekt snapshot page did not expose deck data.");
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    throw new Error("Archidekt snapshot deck data was not valid JSON.");
+  }
+}
+
 function cardsFromArchidektJson(json: unknown): ImportedDeck {
-  const cardsRoot = getPathValue(json, ["cards"]);
+  const deckRoot = archidektDeckRoot(json);
+  const cardsRoot = getPathValue(deckRoot, ["cards"]) ?? getPathValue(deckRoot, ["cardMap"]);
   const entries = Array.isArray(cardsRoot)
     ? cardsRoot
     : cardsRoot && typeof cardsRoot === "object"
@@ -483,17 +552,21 @@ function cardsFromArchidektJson(json: unknown): ImportedDeck {
   return {
     source: "archidekt",
     sourceLabel: "Archidekt",
-    deckName: firstString(json, [["name"]]),
+    deckName: firstString(deckRoot, [["name"]]),
     cards: dedupeRequests(cards).slice(0, REQUEST_LIMIT),
     warnings: [],
   };
 }
 
-function extractDeckId(url: URL): string | null {
+function extractPathId(url: URL, segment: string): string | null {
   const parts = url.pathname.split("/").filter(Boolean);
-  const deckIndex = parts.findIndex((part) => part.toLowerCase() === "decks");
-  if (deckIndex >= 0 && parts[deckIndex + 1]) return parts[deckIndex + 1];
+  const index = parts.findIndex((part) => part.toLowerCase() === segment);
+  if (index >= 0 && parts[index + 1]) return parts[index + 1];
   return null;
+}
+
+function extractDeckId(url: URL): string | null {
+  return extractPathId(url, "decks");
 }
 
 async function fetchMoxfieldDeck(url: URL): Promise<ImportedDeck> {
@@ -518,6 +591,15 @@ async function fetchMoxfieldDeck(url: URL): Promise<ImportedDeck> {
 }
 
 async function fetchArchidektDeck(url: URL): Promise<ImportedDeck> {
+  const snapshotId = extractPathId(url, "snapshots");
+  if (snapshotId) {
+    const deck = cardsFromArchidektJson(
+      parseArchidektNextData(await fetchText(`https://archidekt.com/snapshots/${encodeURIComponent(snapshotId)}`)),
+    );
+    if (deck.cards.length === 0) throw new Error("Archidekt snapshot returned no cards.");
+    return deck;
+  }
+
   const id = extractDeckId(url);
   if (!id) throw new Error("Could not find an Archidekt deck id in that link.");
   const deck = cardsFromArchidektJson(
