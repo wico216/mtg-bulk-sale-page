@@ -228,7 +228,7 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
 
   return (
     <>
-      <div className="max-w-3xl mx-auto px-4 pt-6 pb-32">
+      <div className="max-w-3xl md:max-w-5xl mx-auto px-4 pt-6 pb-32">
         {/* Page heading */}
         <h1
           style={{
@@ -243,19 +243,45 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
           Checkout
         </h1>
 
-        <div className="flex flex-col md:grid md:grid-cols-3 md:gap-8">
-          {/* Order summary on top always */}
-          <div className="md:col-span-3">
+        <div className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] md:gap-10 md:items-start">
+          {/* Order summary on top for mobile, sticky rail on desktop */}
+          <div className="order-1 md:order-2 wiko-checkout-rail">
             <OrderSummary
               items={orderSummaryItems}
               totalPrice={totalPrice}
               totalItems={totalItems}
               editCartLink={true}
             />
+            <p
+              className="hidden md:block"
+              style={{
+                ...reassuranceStyle,
+                margin: "20px 0 10px",
+                textAlign: "center",
+              }}
+            >
+              No payment needed now — pay at pickup.
+            </p>
+            <button
+              type="submit"
+              form="checkout-form"
+              disabled={submitting || items.size === 0}
+              className="hidden md:block w-full"
+              style={{
+                ...submitButtonStyle,
+                padding: "14px 22px",
+                fontSize: 14,
+                opacity: submitting ? 0.7 : items.size === 0 ? 0.45 : 1,
+                cursor:
+                  submitting || items.size === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              {submitting ? "Placing order..." : "Place order"}
+            </button>
           </div>
 
-          {/* Form below summary */}
-          <div className="mt-8 md:col-span-3">
+          {/* Form below summary on mobile, left column on desktop */}
+          <div className="order-2 md:order-1 mt-8 md:mt-0">
             <h2 className="wiko-eyebrow" style={{ marginBottom: 14 }}>
               Your details
             </h2>
@@ -370,33 +396,6 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                   </button>
                 </div>
               )}
-
-              {/* Pay-in-person reassurance + desktop-only submit button */}
-              <p
-                className="hidden md:block"
-                style={{
-                  ...reassuranceStyle,
-                  margin: "20px 0 10px",
-                  textAlign: "center",
-                }}
-              >
-                No payment needed now — pay at pickup.
-              </p>
-              <button
-                type="submit"
-                disabled={submitting || items.size === 0}
-                className="hidden md:block w-full"
-                style={{
-                  ...submitButtonStyle,
-                  padding: "14px 22px",
-                  fontSize: 14,
-                  opacity: submitting ? 0.7 : items.size === 0 ? 0.45 : 1,
-                  cursor:
-                    submitting || items.size === 0 ? "not-allowed" : "pointer",
-                }}
-              >
-                {submitting ? "Placing order..." : "Place order"}
-              </button>
             </form>
           </div>
         </div>
