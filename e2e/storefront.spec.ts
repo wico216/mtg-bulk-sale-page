@@ -315,6 +315,35 @@ test("mobile filter drawer keeps selected set visible and summarized", async ({ 
   await expect(controls.getByText("Set: E2E Masters Extended Art")).toBeVisible();
 });
 
+test("mobile filter drawer show button updates live and applies filters", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+  await expect(page.getByRole("button", { name: /show \d+ cards?/i })).toHaveCount(0);
+
+  await page.getByRole("button", { name: /filter/i }).click();
+  const drawer = page.getByRole("dialog", { name: "Filters" });
+  await expect(drawer).toBeVisible();
+
+  const showButton = drawer.getByRole("button", { name: "Show 4 cards" });
+  await expect(showButton).toBeVisible();
+  const showButtonBox = await showButton.boundingBox();
+  const viewportHeight = page.viewportSize()?.height;
+  expect(showButtonBox).not.toBeNull();
+  expect(viewportHeight).toBeDefined();
+  expect(showButtonBox!.height).toBeGreaterThanOrEqual(44);
+  expect(showButtonBox!.y + showButtonBox!.height).toBeLessThanOrEqual(viewportHeight!);
+
+  await drawer.getByText("Common", { exact: true }).click();
+  await expect(drawer.getByRole("button", { name: "Show 1 card" })).toBeVisible();
+
+  await drawer.getByRole("button", { name: "Show 1 card" }).click();
+  await expect(drawer).toHaveCount(0);
+  await expect(page.locator(".wiko-card-grid .wiko-tile")).toHaveCount(1);
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Lightning Bolt" })).toHaveCount(1);
+});
+
 test("mobile search controls hide/reveal only after intentional scroll distance", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");

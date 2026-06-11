@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicCard, CardData } from "@/lib/types";
 import type { CardSelectionController } from "@/lib/card-selection";
-import type { SortOption } from "@/lib/store/filter-store";
+import {
+  filterAndSortCards,
+  type SortOption,
+  useFilterStore,
+} from "@/lib/store/filter-store";
 import FilterChips from "@/components/filter-chips";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
 import CardGrid from "@/components/card-grid";
-import { useFilterStore } from "@/lib/store/filter-store";
+import { groupCardVariants } from "@/lib/card-variants";
 
 interface StorefrontShellProps {
   cards: PublicCard[];
@@ -44,6 +48,75 @@ function IconSliders({ size = 14 }: { size?: number }) {
       <circle cx="8" cy="12" r="2" fill="currentColor" />
       <circle cx="17" cy="18" r="2" fill="currentColor" />
     </svg>
+  );
+}
+
+function DrawerApplyFooter({
+  cards,
+  onApply,
+}: {
+  cards: PublicCard[];
+  onApply: () => void;
+}) {
+  const allCards = useFilterStore((s) => s.allCards);
+  const searchQuery = useFilterStore((s) => s.searchQuery);
+  const selectedColors = useFilterStore((s) => s.selectedColors);
+  const selectedSets = useFilterStore((s) => s.selectedSets);
+  const selectedRarities = useFilterStore((s) => s.selectedRarities);
+  const selectedTypes = useFilterStore((s) => s.selectedTypes);
+  const selectedFinishes = useFilterStore((s) => s.selectedFinishes);
+  const priceRange = useFilterStore((s) => s.priceRange);
+  const sortBy = useFilterStore((s) => s.sortBy);
+  const storeCardsMatchProps = useMemo(
+    () =>
+      allCards.length === cards.length &&
+      allCards.every((storeCard, index) => storeCard.id === cards[index]?.id),
+    [allCards, cards],
+  );
+  const sourceCards = storeCardsMatchProps ? allCards : cards;
+  const count = groupCardVariants(
+    filterAndSortCards(sourceCards, {
+      searchQuery,
+      selectedColors,
+      selectedSets,
+      selectedRarities,
+      selectedTypes,
+      selectedFinishes,
+      priceRange,
+      sortBy,
+    }),
+  ).length;
+
+  return (
+    <div
+      style={{
+        position: "sticky",
+        bottom: 0,
+        zIndex: 2,
+        background: "var(--bg)",
+        borderTop: "1px solid var(--border)",
+        padding: "12px 16px calc(12px + env(safe-area-inset-bottom))",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onApply}
+        style={{
+          width: "100%",
+          minHeight: 44,
+          background: "var(--accent)",
+          color: "var(--accent-fg)",
+          border: "none",
+          borderRadius: 3,
+          fontSize: 14,
+          fontWeight: 600,
+          fontFamily: "inherit",
+          cursor: "pointer",
+        }}
+      >
+        Show {count.toLocaleString()} {count === 1 ? "card" : "cards"}
+      </button>
+    </div>
   );
 }
 
@@ -357,6 +430,10 @@ export default function StorefrontShell({
                 onToggleCollapse={() => setMobileOpen(false)}
                 cards={cards}
                 embedded
+              />
+              <DrawerApplyFooter
+                cards={cards}
+                onApply={() => setMobileOpen(false)}
               />
             </div>
           </div>
