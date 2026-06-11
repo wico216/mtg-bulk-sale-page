@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -7,6 +7,23 @@ test.beforeEach(async ({ page }) => {
     sessionStorage.clear();
   });
 });
+
+async function addLightningBoltAndOpenCheckout(page: Page) {
+  await page.goto("/");
+
+  const boltTile = page.locator(".wiko-tile").filter({ hasText: "Lightning Bolt" });
+  await expect(boltTile).toHaveCount(1);
+  await boltTile.getByRole("button", { name: "Quick add to cart" }).click({ force: true });
+
+  const cartLink = page.getByRole("link", { name: "Cart" });
+  await expect(cartLink).toBeVisible();
+  await cartLink.click();
+  await expect(page).toHaveURL(/\/cart$/);
+
+  await page.getByRole("link", { name: /Proceed to checkout/i }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
+}
 
 test("buyer can add a card, edit the satchel, and complete checkout", async ({ page }) => {
   await page.route("**/api/checkout", async (route) => {
@@ -101,6 +118,88 @@ test("buyer can add a card, edit the satchel, and complete checkout", async ({ p
   await expect(page.getByRole("heading", { name: "Order placed!" })).toBeVisible();
   await expect(page.getByText("Order ORD-E2E-0001")).toBeVisible();
   await expect(page.getByText(/2 cards\s*—\s*\$7\.00/i)).toBeVisible();
+});
+
+test("checkout keeps one submit button and uses a sticky desktop summary rail", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await addLightningBoltAndOpenCheckout(page);
+  await page.waitForFunction(() => {
+    const rail = document.querySelector(".wiko-checkout-rail");
+    return rail && getComputedStyle(rail).position === "sticky";
+  });
+  await page.evaluate(() => {
+    const rail = document.querySelector(".wiko-checkout-rail");
+    if (!rail) throw new Error("Checkout rail not found");
+    const railTop = rail.getBoundingClientRect().top;
+    window.scrollTo(0, window.scrollY + railTop - 84 + 2);
+  });
+
+  await expect(page.getByRole("button", { name: "Place order" })).toHaveCount(1);
+
+  const desktopLayout = await page.evaluate(() => {
+    const rail = document.querySelector(".wiko-checkout-rail") as HTMLElement | null;
+    const form = document.querySelector("#checkout-form") as HTMLElement | null;
+    if (!rail || !form) throw new Error("Checkout layout not found");
+
+    const railBox = rail.getBoundingClientRect();
+    const formBox = form.getBoundingClientRect();
+    const railStyle = getComputedStyle(rail);
+
+    return {
+      railBorderTopWidth: railStyle.borderTopWidth,
+      railLeft: railBox.left,
+      railPaddingTop: railStyle.paddingTop,
+      railPosition: railStyle.position,
+      railTop: railBox.top,
+      railTopOffset: railStyle.top,
+      formRight: formBox.right,
+    };
+  });
+
+  expect(desktopLayout.railPosition).toBe("sticky");
+  expect(desktopLayout.railTopOffset).toBe("84px");
+  expect(desktopLayout.railTop).toBeGreaterThanOrEqual(83);
+  expect(desktopLayout.railTop).toBeLessThanOrEqual(85);
+  expect(desktopLayout.railBorderTopWidth).toBe("1px");
+  expect(desktopLayout.railPaddingTop).toBe("20px");
+  expect(desktopLayout.railLeft).toBeGreaterThan(desktopLayout.formRight);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/checkout");
+  await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Place order" })).toHaveCount(1);
+
+  const mobileLayout = await page.evaluate(() => {
+    const rail = document.querySelector(".wiko-checkout-rail") as HTMLElement | null;
+    const form = document.querySelector("#checkout-form") as HTMLElement | null;
+    const button = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('button[form="checkout-form"]'),
+    ).find((candidate) => getComputedStyle(candidate).display !== "none");
+    if (!rail || !form || !button) throw new Error("Mobile checkout layout not found");
+
+    const railBox = rail.getBoundingClientRect();
+    const formBox = form.getBoundingClientRect();
+    const buttonBox = button.getBoundingClientRect();
+    const railStyle = getComputedStyle(rail);
+
+    return {
+      buttonBottom: buttonBox.bottom,
+      buttonTop: buttonBox.top,
+      formTop: formBox.top,
+      railBorderTopWidth: railStyle.borderTopWidth,
+      railPaddingTop: railStyle.paddingTop,
+      railPosition: railStyle.position,
+      railTop: railBox.top,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(mobileLayout.railPosition).toBe("static");
+  expect(mobileLayout.railBorderTopWidth).toBe("0px");
+  expect(mobileLayout.railPaddingTop).toBe("0px");
+  expect(mobileLayout.railTop).toBeLessThan(mobileLayout.formTop);
+  expect(mobileLayout.buttonTop).toBeGreaterThan(700);
+  expect(mobileLayout.buttonBottom).toBeLessThanOrEqual(mobileLayout.viewportHeight);
 });
 
 test("mobile satchel uses touch-friendly cart cards and keeps checkout visible", async ({ page }) => {

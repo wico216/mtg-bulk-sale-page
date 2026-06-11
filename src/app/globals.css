@@ -324,6 +324,19 @@ html[data-mode="light"] .wiko-tile-image[data-finish]::after {
   color: var(--dim);
 }
 
+/* Desktop checkout summary rail. No base/mobile rule: the mobile checkout
+ * keeps the pre-existing summary-on-top + fixed bottom submit pattern. */
+@media (min-width: 768px) {
+  .wiko-checkout-rail {
+    position: sticky;
+    top: 84px; /* 68px sticky header + 16px breathing room */
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    background: var(--bg);
+  }
+}
+
 /* Site footer — link hover needs !important because the inline style owns
  * the resting color (matches the codebase's responsive-override pattern). */
 .wiko-site-footer a:hover {
