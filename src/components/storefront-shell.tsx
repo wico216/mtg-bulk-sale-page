@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PublicCard, CardData } from "@/lib/types";
 import type { CardSelectionController } from "@/lib/card-selection";
 import type { SortOption } from "@/lib/store/filter-store";
+import FilterChips from "@/components/filter-chips";
 import FilterRail from "@/components/filter-rail";
 import SortBar from "@/components/sort-bar";
 import CardGrid from "@/components/card-grid";
@@ -372,7 +373,27 @@ export default function StorefrontShell({
         cards={cards}
       />
       <main style={{ flex: 1, minWidth: 0 }}>
-        <SortBar cards={cards} />
+        {/* Search/sort stay pinned under the 68px header while the grid
+            scrolls (mobile already does this via its own controls block).
+            z-order: header 50 > mobile controls 40 > this 30 > grid. */}
+        <div
+          className="wiko-desktop-storefront-controls"
+          style={{
+            position: "sticky",
+            top: 68,
+            zIndex: 30,
+            background: "var(--bg)",
+            borderBottom: "1px solid var(--border)",
+            paddingBottom: 14,
+          }}
+        >
+          <SortBar cards={cards} />
+        </div>
+        {/* Removable active-filter chips — desktop only; mobile keeps its
+            Filter-button dot + selected-set pill. Deliberately outside the
+            sticky block: its height varies with active filters and a
+            variable-height sticky header feels jumpy while scrolling. */}
+        <FilterChips />
         <CardGrid
           cards={cards}
           meta={meta}

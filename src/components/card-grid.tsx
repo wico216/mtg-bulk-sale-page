@@ -265,7 +265,7 @@ export default function CardGrid({
         >
           The shelves are bare.
         </div>
-        <p style={{ fontSize: 13, margin: 0 }}>Run the inventory generator to stock up.</p>
+        <p style={{ fontSize: 13, margin: 0 }}>Check back soon — new cards are on the way.</p>
       </div>
     );
   }

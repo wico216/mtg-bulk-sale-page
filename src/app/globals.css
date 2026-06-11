@@ -174,6 +174,27 @@ input[type="range"]::-moz-range-thumb {
   opacity: 1 !important;
 }
 
+/* Keyboard parity: tabbing to a tile reveals the quick-add and lifts the
+ * art exactly like hover, and the tile itself gets a visible focus ring. */
+.wiko-tile:focus-within .wiko-tile-add {
+  opacity: 1 !important;
+}
+.wiko-tile:focus-within .wiko-tile-image {
+  transform: translateY(-2px);
+}
+.wiko-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Active-filter chips (desktop). Hover needs !important — inline styles
+ * own the resting colors. */
+.wiko-filter-chip:hover {
+  border-color: var(--border-strong) !important;
+  color: var(--ink) !important;
+}
+
 /* ——— Shared storefront primitives (premium polish pass) ——— */
 
 /* Token-styled skeleton block for hydration/loading states (replaces the

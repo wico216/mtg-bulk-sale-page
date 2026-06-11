@@ -35,6 +35,10 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   // v1.3 Phase 20 D-12: one-time migration toast visibility.
   const [showMigrationToast, setShowMigrationToast] = useState(false);
 
+  // Inline empty-the-satchel confirmation (replaces window.confirm so the
+  // step matches the page's theme and stays keyboard-friendly).
+  const [confirmingClear, setConfirmingClear] = useState(false);
+
   // O(1) card lookup keyed on the aggregated cart id. Most ids follow the
   // historical `${setCode}-${collectorNumber}-${finish}-${condition}` shape,
   // but set codes can themselves contain hyphens (for example `pmei-2024`),
@@ -119,12 +123,6 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
     }
     return sum;
   }, [items, cardMap]);
-
-  function handleClearCart() {
-    if (window.confirm("Are you sure you want to clear your cart?")) {
-      clearCart();
-    }
-  }
 
   // Loading state before hydration. NOTE: the migration toast does NOT
   // render here because the reconciliation effect hasn't run yet — it
@@ -250,24 +248,83 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
           >
             The Satchel
           </h1>
-          <button
-            type="button"
-            onClick={handleClearCart}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--muted)",
-              fontSize: 12,
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-              fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            Empty the satchel
-          </button>
+          {confirmingClear ? (
+            <div
+              role="group"
+              aria-label="Confirm emptying the satchel"
+              style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Remove all cards?
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearCart();
+                  setConfirmingClear(false);
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--bad)",
+                  borderRadius: 3,
+                  color: "var(--bad-soft)",
+                  padding: "5px 10px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Empty it
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingClear(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--muted)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textUnderlineOffset: 3,
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Keep them
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(true)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                fontSize: 12,
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Empty the satchel
+            </button>
+          )}
         </div>
 
         <div className="wiko-cart-list space-y-3">
