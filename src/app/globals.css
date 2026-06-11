@@ -532,6 +532,13 @@ a { color: inherit; }
     background: color-mix(in oklch, var(--bg) 88%, transparent) !important;
     backdrop-filter: blur(8px);
   }
+
+  .wiko-tile-add.wiko-tile-add--options {
+    width: auto !important;
+    min-width: 64px !important;
+    padding: 0 8px !important;
+    border-radius: 3px !important;
+  }
 }
 
 /* Mobile card details: stack image and details so long card names/set names stay readable. */

@@ -311,7 +311,7 @@ export default function CardTile({
         )}
         <button
           type="button"
-          className={`wiko-tile-add${justAdded ? " wiko-tile-add--added" : ""}`}
+          className={`wiko-tile-add${isGrouped ? " wiko-tile-add--options" : ""}${justAdded ? " wiko-tile-add--added" : ""}`}
           onClick={(e) => {
             e.stopPropagation();
             if (isGrouped) {

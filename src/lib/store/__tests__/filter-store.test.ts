@@ -123,7 +123,8 @@ describe("filter-store Scryfall-style search", () => {
     ]);
   });
 
-  it("filters by menu card type and clears that filter", () => {
+  it("filters by menu card type and clears search plus filters", () => {
+    useFilterStore.getState().setSearchQuery("Sol");
     useFilterStore.getState().toggleType("Artifact");
 
     expect(useFilterStore.getState().hasActiveFilters()).toBe(true);
@@ -133,6 +134,7 @@ describe("filter-store Scryfall-style search", () => {
 
     useFilterStore.getState().clearFilters();
 
+    expect(useFilterStore.getState().searchQuery).toBe("");
     expect(useFilterStore.getState().selectedTypes.size).toBe(0);
     expect(useFilterStore.getState().hasActiveFilters()).toBe(false);
   });
