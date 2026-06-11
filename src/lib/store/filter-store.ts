@@ -384,7 +384,7 @@ export const useFilterStore = create<FilterState>()((set, get) => ({
 
   clearFilters: () =>
     set((state) => ({
-      searchQuery: state.searchQuery,
+      searchQuery: "",
       selectedColors: new Set<string>(),
       selectedSets: new Set<string>(),
       selectedRarities: new Set<string>(),

@@ -1,10 +1,15 @@
 <div align="center">
 
-# Viki — MTG Bulk Store
+# 🧙‍♂️ Wiko's Spellbook
 
-**A small, friend-only online store for selling Magic: The Gathering bulk cards.**
+**A trove of singles — the friend-shop for my Magic: The Gathering collection.**
 
-Live inventory backed by Postgres, Google-OAuth-protected admin panel, and one-tap checkout that emails buyer and seller. Built for the case where you have a binder of cards, a few friends, and zero patience for a real e-commerce platform.
+Friends browse the live inventory, reserve cards in a couple of taps, and pay in person at pickup.
+No accounts, no payment processor, no marketplace fees — just a binder collection with a really nice storefront.
+
+<p>
+  <a href="https://wikospellbinder.com"><b>🔮 Visit the live shop</b></a>
+</p>
 
 <p>
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" />
@@ -15,263 +20,210 @@ Live inventory backed by Postgres, Google-OAuth-protected admin panel, and one-t
   <img alt="Drizzle ORM" src="https://img.shields.io/badge/Drizzle-ORM-C5F74F?logo=drizzle&logoColor=black" />
   <img alt="Auth.js" src="https://img.shields.io/badge/Auth.js-v5-7C3AED" />
   <img alt="Resend" src="https://img.shields.io/badge/Resend-Email-000000" />
-  <img alt="Vitest" src="https://img.shields.io/badge/Tests-Vitest-6E9F18?logo=vitest&logoColor=white" />
+  <img alt="Vitest" src="https://img.shields.io/badge/Vitest-652%20tests-6E9F18?logo=vitest&logoColor=white" />
+  <img alt="Playwright" src="https://img.shields.io/badge/Playwright-54%20e2e-2EAD33?logo=playwright&logoColor=white" />
   <img alt="License" src="https://img.shields.io/badge/License-Private-lightgrey" />
 </p>
 
 </div>
 
----
-
-## Screenshots
+![Storefront — Arcane midnight theme](docs/screenshots/storefront.png)
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/screenshots/storefront.png" alt="Public storefront — browse cards" />
-      <br />
-      <sub><b>Storefront</b> — browse, filter, add to cart</sub>
+      <img src="docs/screenshots/storefront-light.png" alt="Storefront in the parchment light theme" />
+      <br /><sub><b>Parchment light theme</b> — one toggle, zero flash</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/screenshots/cart.png" alt="Cart and checkout" />
-      <br />
-      <sub><b>Cart &amp; checkout</b> — confirm order, notify seller</sub>
+      <img src="docs/screenshots/card-modal.png" alt="Card detail modal with finish variants" />
+      <br /><sub><b>Card details</b> — finishes grouped, oracle text, mana symbols</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/screenshots/admin-inventory.png" alt="Admin inventory" />
-      <br />
-      <sub><b>Admin inventory</b> — edit cards, CSV import/export</sub>
+      <img src="docs/screenshots/checkout.png" alt="Checkout — reserve now, pay at pickup" />
+      <br /><sub><b>Checkout</b> — reserve now, pay in person at pickup</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/screenshots/admin-orders.png" alt="Admin orders and audit" />
-      <br />
-      <sub><b>Orders &amp; audit</b> — mark fulfilled, audit trail</sub>
+      <img src="docs/screenshots/mobile.png" alt="Mobile storefront" height="420" />
+      <br /><sub><b>Mobile-first</b> — most buyers shop from their phone</sub>
     </td>
   </tr>
 </table>
 
-> Drop captures into `docs/screenshots/` — paths above are placeholders.
+> Screenshots show the built-in fixture mode (placeholder card art). The live shop renders real Scryfall card images.
 
 ---
 
-## Features
+## The shop, in one minute
 
-- **Public storefront** with live inventory aggregated by card, foil, and condition. Double-faced cards flip; foils are labeled.
-- **Cart and checkout** that decrements stock atomically. Payment is settled in person; the system emails both buyer and seller a receipt via Resend.
-- **Google-OAuth admin panel** locked to a single `ADMIN_EMAIL`. Local username/password fallback exists in dev and is force-disabled in production.
-- **CSV import and export** for the inventory. Full-replace imports show an export-first reminder; every commit is recorded in `import_history`.
-- **Audit log** for every admin mutation, append-only. Order timeline is visible from `/admin/orders`.
-- **Operational health page** at `/admin/health` showing DB reachability, env configuration (`Configured` / `Missing` — never values), and last-activity timestamps.
-- **Production smoke script** that hits the deployed app and asserts auth, guards, and shell rendering without ever mutating data.
-- **Rate-limited admin mutations** (Phase 15-01) with auth-before-rate-limit ordering, so unauthenticated callers cannot tarpit the limiter.
+- **Browse a live inventory** aggregated straight from Postgres — one tile per printing, with regular / foil / etched copies grouped into a variant picker. Double-faced cards flip. Foils shimmer.
+- **Search like a Magic player** — instant filtering by name (with Scryfall-style syntax: `t:instant`, `c<=ur`, `mv>=4`), mana color, set, rarity, type, finish, and price.
+- **Deck check** — paste a Moxfield or Archidekt link (or any exported decklist) and the shop tells you exactly which cards it stocks, suggests the best-condition printing of each, totals it up, and adds the lot to your satchel in one click.
+- **The Satchel** — a cart that survives reloads and *heals itself*: quantities clamp to live stock and stale entries migrate or drop on every visit.
+- **Checkout without the checkout** — name + email is all it takes. No account, no card number. Stock is decremented atomically; you pay in person when you pick up.
+- **Receipts for both sides** — buyer and seller each get an email the moment an order lands (and an email outage can never lose an order).
+- **New arrivals** (`/new`) — whatever the latest binder import added, newest first.
+- **Dark & light themes** — Arcane midnight by default, warm parchment if you prefer; applied pre-paint with no flash.
+
+## The back office
+
+Everything the shopkeeper needs lives behind a Google-OAuth login locked to a single admin email:
+
+- **Inventory** — paginated table over every per-binder row: inline price/quantity/condition editing, a "change printing" dialog that re-resolves against Scryfall, bulk delete, CSV export, and a typed-confirmation danger zone.
+- **ManaBox import** (`/admin/import`) — drag in CSV exports, pick exactly which binders to replace (with NEW / will-delete annotations), preview after Scryfall enrichment, then commit a scoped per-binder replace behind a typed `REPLACE` confirmation.
+- **Orders** (`/admin/orders`) — a queue-first workflow with status tabs, search, private notes, cancellation with optional stock restore, and a per-order audit timeline.
+- **Pick batches** (`/admin/orders/pick`) — select orders and get one walk-path list sorted binder → set → name, with per-card *Got it / Missing* toggles and one-tap bulk confirmation. Built to be used standing at the binders, phone in hand.
+- **Price intelligence** — a Vercel cron refreshes every card's Scryfall price daily at 09:00 UTC (manual trigger on `/admin/health`); the **Price Movers** report ranks what jumped since the last snapshot.
+- **ManaBox removals** (`/admin/manabox`) — a printable checklist of sold cards to mirror back into the ManaBox catalog app.
+- **W-binders** (`/admin/w-binders`) — a private storefront-style browser for the operator's personal collection, which is invisible to (and unsellable by) the public shop.
+- **Audit & health** — an append-only audit log of every high-impact mutation, import history per CSV commit, and a health page reporting DB reachability and env configuration (as `Configured`/`Missing` — never values).
+- **QA gates** (`/qa`) — a lightweight pre-release review surface where a trusted reviewer watches recorded proof runs and signs off.
+
+## How it's built
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) · React 19 · TypeScript 5 |
+| Styling | Tailwind CSS v4 + a hand-rolled token system (oklch scene tokens, Instrument Serif / Inter / Geist Mono) |
+| Database | Neon Postgres via `@neondatabase/serverless` (neon-http) |
+| ORM | Drizzle ORM + Drizzle Kit |
+| Auth | Auth.js v5 — Google OAuth, single-admin allowlist, dev-only password fallback |
+| Email | Resend |
+| Client state | Zustand (cart, filters, import & pick stores; localStorage persistence) |
+| CSV | PapaParse |
+| Card data | Scryfall API (images, prices, oracle text — no key required) |
+| Tests | Vitest + Testing Library + happy-dom · Playwright (chromium + webkit) |
+| Hosting | Vercel (free tier) + Neon (free tier) |
+
+### Engineering notes worth reading
+
+<details>
+<summary><b>The checkout is one SQL statement</b></summary>
+
+The neon-http driver has no interactive transactions, so the entire checkout — lock every matching per-binder row (`FOR UPDATE OF cards`), allocate the order across binders in deterministic binder order, decrement stock, insert the order and its line items — runs as **a single CTE chain** in one `db.execute`. All-or-nothing: a conflict returns exactly which cards fell short ("requested 3, available 1"), and a schema-level `CHECK (quantity >= 0)` makes silent overselling structurally impossible (a violation surfaces as HTTP 503, never a sold card you don't have). See `src/db/orders.ts`.
+
+</details>
+
+<details>
+<summary><b>Binder locations can't leak — the type system enforces it</b></summary>
+
+Inventory rows carry a 5-segment composite key `${set}-${collector}-${finish}-${condition}-${binder}` so the same printing can live in multiple physical binders. But binder names are real-world locations, so the storefront only ever sees `PublicCard` — a type with no binder fields, produced by `toPublicCards()` at the server boundary. The admin's `AdminCard` extends it. A leak is a compile error, not a code-review hope. Binders whose name starts with `w` are the operator's personal collection and are excluded from every public query *and* the checkout allocator. See `src/lib/types.ts`, `src/lib/public-card.ts`, `src/lib/binder-scope.ts`.
+
+</details>
+
+<details>
+<summary><b>The card grid is hand-virtualized</b></summary>
+
+No virtualization library: `src/components/card-grid.tsx` estimates row height, measures the real one from rendered tiles, tracks the column count from computed styles, and renders only the visible window plus overscan — the DOM stays bounded no matter how many thousands of cards are in stock (there's an e2e spec that proves it with a 1,200-card synthetic inventory).
+
+</details>
+
+<details>
+<summary><b>Imports stream in two stages to respect Scryfall</b></summary>
+
+CSV import previews stream NDJSON: stage one parses and returns the binder list so the operator can choose a subset; stage two enriches **only the selected binders** against Scryfall (120 ms request gap, retry/backoff, in-process cache). Commits are scoped `DELETE WHERE binder IN (…)` replaces, recorded in both the audit log and an `import_history` table. See `src/app/api/admin/import/`.
+
+</details>
+
+<details>
+<summary><b>Serverless-honest infrastructure</b></summary>
+
+Rate limiting is a Postgres-backed sliding window (lazily-created table, single-statement check-and-record, fails *open*) because in-memory counters are meaningless across serverless instances: checkout 10/min before body parse, admin mutations 60/min *after* auth so unauthenticated callers always see 401, never 429. The daily price refresh single-flights through a row-lease (`INSERT … ON CONFLICT` with stale takeover) because advisory locks don't survive neon-http's per-statement sessions. See `src/lib/rate-limit.ts`, `src/lib/price-refresh.ts`.
+
+</details>
 
 ---
 
-## Tech stack
-
-| Layer            | Choice                                                                 |
-|------------------|------------------------------------------------------------------------|
-| Framework        | Next.js 16 (App Router) · React 19 · TypeScript 5                       |
-| Styling          | Tailwind CSS v4                                                         |
-| Database         | Neon Postgres via `@neondatabase/serverless`                            |
-| ORM / migrations | Drizzle ORM + Drizzle Kit                                               |
-| Auth             | Auth.js v5 (Google OAuth, single-admin allow-list)                      |
-| Email            | Resend                                                                  |
-| State (client)   | Zustand                                                                 |
-| CSV              | PapaParse                                                               |
-| Tests            | Vitest · Testing Library · happy-dom                                    |
-| Host             | Vercel                                                                  |
-
----
-
-## Quick start
+## Getting started
 
 ```bash
 npm install
-cp .env.local.example .env.local      # fill in values — see env table below
-npm run dev                            # http://localhost:3000
-npm test                               # full Vitest suite
-npm run build                          # production build (requires .env.local)
+cp .env.local.example .env.local   # then fill in values — see the env table
+npm run dev                        # http://localhost:3000
 ```
 
-Then visit:
+### Run it with **no database at all**
 
-- <http://localhost:3000> — public storefront
-- <http://localhost:3000/admin> — admin (Google in prod, username/password in dev)
-- <http://localhost:3000/admin/health> — every check should read `Configured` / `OK`
-
----
-
-## Environment variables
-
-All env keys are listed in `.env.local.example`. The admin health page (`/admin/health`) reports which categories are `configured` vs `missing` so an operator can verify configuration without ever seeing the values themselves.
-
-| Key                     | Required by              | Notes |
-|-------------------------|--------------------------|-------|
-| `DATABASE_URL`          | All Postgres reads/writes | Neon connection string. `npm run build` also needs it because `/checkout` and admin pages run server queries at build time. |
-| `AUTH_SECRET`           | Auth.js v5               | Generate with `openssl rand -base64 32`. |
-| `ADMIN_EMAIL`           | Admin authorization      | The single email allowed admin access. |
-| `AUTH_GOOGLE_ID`        | Google OAuth             | Google Cloud Console → OAuth 2.0 Client ID. |
-| `AUTH_GOOGLE_SECRET`    | Google OAuth             | Google Cloud Console → OAuth 2.0 Client Secret. |
-| `RESEND_API_KEY`        | Order notification emails | <https://resend.com/api-keys>. |
-| `SELLER_EMAIL`          | Order notification emails | Inbox for `[ORDER]` notifications. |
-| `ORDER_EMAIL_FROM`      | Order notification emails | Optional sender identity. Defaults to `Viki MTG Store <orders@wikospellbinder.com>`; use a Resend-verified sender if changed. |
-| `ENABLE_PASSWORD_LOGIN` | Local dev only           | `false` to hide the local username/password form. Always disabled in production regardless. |
-| `ADMIN_USERNAME`        | Local dev only           | Required when local password login is enabled. |
-| `ADMIN_PASSWORD`        | Local dev only           | Required when local password login is enabled. |
-| `AUTH_URL`              | Optional                 | Set in production if you use a custom domain (`https://yourdomain.com`). |
-
-### Environment matrix
-
-| Environment | `DATABASE_URL` | `AUTH_SECRET` | `AUTH_GOOGLE_*` | `RESEND_*` + `SELLER_EMAIL` | `ENABLE_PASSWORD_LOGIN` |
-|-------------|----------------|---------------|-----------------|------------------------------|--------------------------|
-| Local dev   | required       | required      | optional        | optional                     | `true` (default)         |
-| Preview     | required       | required      | required        | required                     | forced off               |
-| Production  | required       | required      | required        | required                     | forced off               |
-
----
-
-## Documentation
-
-<details>
-<summary><b>Local verification</b></summary>
+The repo ships a deterministic fixture mode — the same one the e2e suite uses:
 
 ```bash
-npm test                   # full Vitest suite — must be green before push
-npx tsc --noEmit           # TypeScript only
-npm run build              # production build — catches build-time route issues
+E2E_FIXTURES=1 npm run dev   # PowerShell: $env:E2E_FIXTURES="1"; npm run dev
 ```
 
-For interactive smoke locally:
+Storefront, cart, deck check, and the admin data surfaces all render from in-memory fixtures: no Postgres, no Google OAuth, no Resend key. (Hard-disabled in production builds.) This is also why `npm run test:e2e` works on a fresh clone with zero setup.
 
-1. `npm run dev`
-2. Open <http://localhost:3000> — browse, add to cart, checkout (uses Resend in `re_test_*` mode if you have a test key).
-3. Open <http://localhost:3000/admin> — sign in with Google (production-style) or the local username/password form (dev only).
-4. Visit <http://localhost:3000/admin/health> — every check should be `Configured` / `OK`.
+### Environment variables
 
-</details>
+| Key | Needed for | Notes |
+|---|---|---|
+| `DATABASE_URL` | everything Postgres + `npm run build` | Neon connection string |
+| `AUTH_SECRET` | Auth.js (all envs) | `openssl rand -base64 32` |
+| `ADMIN_EMAIL` | admin authorization | exact, case-sensitive match against the Google account |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth | required in preview/production; optional locally |
+| `RESEND_API_KEY` | order emails | orders still commit if email fails |
+| `SELLER_EMAIL` | order emails | inbox for `[ORDER]` notifications |
+| `ORDER_EMAIL_FROM` | order emails (optional) | defaults to `Wiko's Spellbook <orders@wikospellbinder.com>`; must be Resend-verified if changed |
+| `CRON_SECRET` | production price-refresh cron | route fails closed (401) when unset |
+| `ENABLE_PASSWORD_LOGIN` | local dev only | force-disabled in production regardless |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | local dev password login | never used in production |
+| `QA_GATE_PASSWORD` / `QA_GATE_COOKIE_SECRET` | `/qa` review gate (optional) | cookie secret falls back to `AUTH_SECRET` |
+| `AUTH_URL` | optional | set in production with a custom domain |
 
-<details>
-<summary><b>Production smoke script</b></summary>
+| Environment | `DATABASE_URL` | `AUTH_SECRET` | Google OAuth | Resend + seller | `CRON_SECRET` | password login |
+|---|---|---|---|---|---|---|
+| Local dev | required | required | optional | optional | – | on (default) |
+| Preview | required | required | required | required | – | forced off |
+| Production | required | required | required | required | required | forced off |
 
-The repo ships a read-only/guard-focused smoke script that runs the same checks operators have historically done by hand. It never mutates production data — mutation is intentionally not implemented behind a flag, so the only way to exercise authenticated paths in production is the admin UI.
+## Testing
 
 ```bash
-npm run smoke:production -- --help
-npm run smoke:production -- --deployment https://your-app.vercel.app
+npm test              # Vitest — 652 unit/component tests (happy-dom opt-in per file)
+npm run test:e2e      # Playwright — 54 tests (52 in the default run), chromium + webkit, fully self-contained (fixture mode)
+npm run test:all      # lint + unit + build + e2e, the same order CI runs
 ```
 
-Output:
+- **Opt-in DB suites:** set `TEST_DATABASE_URL` to a **disposable Neon branch** (the tests insert and delete rows) to enable concurrency proofs like the double-checkout race in `src/db/__tests__/orders.concurrent.test.ts`. Most self-skip without it; two query-shape tests in `queries-aggregated.test.ts` fail locally without the variable (CI supplies it as a secret).
+- **Opt-in scale test:** `E2E_BULK_FIXTURE_COUNT=1200 npm run test:e2e` exercises the virtualized grid against a synthetic 1,200-card inventory.
+- **Perf pin:** parsing the checked-in 12,749-row ManaBox CSV fixture must stay under 2 s (`csv-parser-perf.test.ts`).
 
-```
-Production smoke against: https://your-app.vercel.app
-================================================================
-[PASS] GET / -- 200 + HTML
-[PASS] GET /admin/login -- Google sign-in visible, password field hidden
-[PASS] GET /admin (unauth) -- redirected to /admin/login
-[PASS] DELETE /api/admin/cards (unauth) -- 401 from requireAdmin guard
-[PASS] GET /api/admin/health (unauth) -- 401 from requireAdmin guard
-----------------------------------------------------------------
-5 / 5 checks passed
-```
+CI (`.github/workflows/test.yml`) runs lint (informational) → unit → build → e2e on every PR and push to `main`, uploading Playwright traces on failure. A second workflow smoke-tests the production deployment every 6 hours, read-only.
 
-Exit code is `0` if every check passes, `1` otherwise. Pipe `--json` for a single JSON line per run if you want to feed it into a log drain.
+## Operations
 
-**Vercel deployment protection.** If the deployment has Vercel Authentication / Deployment Protection enabled, pass a protection bypass token (created in the Vercel dashboard):
+<details>
+<summary><b>Deploy checklist</b></summary>
 
-```bash
-export VERCEL_BYPASS_TOKEN="<from vercel dashboard>"
-npm run smoke:production -- \
-  --deployment https://your-app.vercel.app \
-  --bypass-token "$VERCEL_BYPASS_TOKEN"
-```
-
-The token is sent as `x-vercel-protection-bypass` and is never logged. Alternatively, run the script inside a `vercel curl` shell context that already has bypass cookies set.
-
-**Covers:**
-
-- App shell renders (`GET /` returns HTML).
-- Admin login page shows Google sign-in.
-- Admin login page hides the local password field in production.
-- Unauthenticated `/admin` redirects to `/admin/login`.
-- Unauthenticated admin mutation API (`DELETE /api/admin/cards`) returns 401 from `requireAdmin()` — proving rate-limit/auth ordering still works (auth must precede rate limit so unauthenticated callers never get tarpitted to 429; see Phase 15-01 SUMMARY).
-- Unauthenticated `/api/admin/health` returns 401.
-
-**Does NOT cover (intentionally):**
-
-- Authenticated paths (login flow, order placement, admin mutation).
-- Outbound notification delivery (Resend).
-- Backup/restore correctness.
+1. Push to `main` (Vercel deploys) with every env var from the table set for the target environment.
+2. Ensure the Neon schema is current — schema changes are **manual operator-run scripts** (`npm run migrate:*`), each with a `:dry-run` variant to rehearse against a Neon branch first. All are idempotent and print the timestamps you'd need for a point-in-time restore.
+3. Run the post-deploy smoke: `npm run smoke:production -- --deployment https://your-app.vercel.app` — five guard checks that never touch production data, including an unauthenticated `DELETE` probe that hard-fails if the admin guard ever lets it through (use `smoke:production:readonly` to skip that probe). Supports `--bypass-token` for Vercel deployment protection and `--json` for log drains.
+4. Open `/admin/health` and confirm everything reads `Configured` / `OK`.
 
 </details>
 
 <details>
-<summary><b>Operational runbook</b></summary>
+<summary><b>Runbook — where to look when something breaks</b></summary>
 
-### Health page
+| Symptom | Look at |
+|---|---|
+| Orders not placing | Vercel function logs: `checkout.db_failed`, `checkout.stock_conflict`, `checkout.rate_limited` |
+| Order placed, email missing | `notification.seller_email_failed` / `notification.buyer_email_failed` — the order is still committed, by design |
+| Prices stale | `cron.refresh_prices.*` events; `lastPriceRefreshAt` on `/admin/health`; manual refresh button there |
+| Admin sees 403 after Google login | `ADMIN_EMAIL` mismatch — comparison is exact and case-sensitive |
+| 429s on admin actions | sliding-window limits in `src/lib/rate-limit.ts` (checkout 10/min, mutations 60/min, bulk 20/min) |
 
-`/admin/health` (admin-only) shows:
-
-- Database reachability (`SELECT 1`).
-- `AUTH_SECRET`, Google OAuth, and email configuration as `Configured` or `Missing` — never values.
-- Last order, last import commit, and last audit entry timestamps.
-- A `Notification failures (24h)` tile that currently shows `Unknown — log drain not yet wired`. Failure events ARE emitted to Vercel function logs by `src/lib/notifications.ts` (events `notification.seller_email_failed`, `notification.buyer_email_failed`); a queryable count surface is deferred — see Phase 15-01 SUMMARY.
-
-`/api/admin/health` returns the same shape as JSON. Both surfaces are admin-only and never echo env values.
-
-### Backup and export
-
-The store's source of truth is the Neon Postgres `cards` table plus the `orders`, `order_items`, `admin_audit_log`, and `import_history` tables.
-
-Snapshot strategies:
-
-1. **CSV export of inventory.** Use the admin CSV export from the inventory page (`/admin`) before any large destructive operation (full inventory delete or CSV import). The exported file can be re-imported via `/admin/import` if a rollback is needed.
-2. **Database snapshot.** Neon supports point-in-time recovery on paid tiers; on the free tier, take a `pg_dump`:
-   ```bash
-   pg_dump "$DATABASE_URL" --no-owner --no-privileges \
-     --file backups/$(date +%Y-%m-%d-%H%M).sql
-   ```
-   Store the dump outside the repo (it contains buyer PII).
-3. **Audit + import history.** Both are append-only tables. They give a durable forensic trail of high-impact mutations independent of the cards table; do NOT truncate them as part of routine cleanup.
-
-Before any full-inventory replace (`/admin/import` commit) the admin UI shows an export reminder and links to `/admin/audit` so the operator can confirm the previous commit before overwriting.
-
-### Failure diagnosis
-
-| Symptom                                | Where to look |
-|----------------------------------------|---------------|
-| Orders not placed                      | Vercel function logs grouped on `checkout.*` events from `src/lib/logger.ts`. Look for `checkout.db_failed`, `checkout.stock_conflict`, or `checkout.rate_limited`. |
-| Order placed but buyer/seller email missing | `notification.seller_email_failed` / `notification.buyer_email_failed` in function logs. Order is still committed — this is intentional (Phase 11 D-17). |
-| `/admin/health` shows database error   | Neon project paused or `DATABASE_URL` rotated. Reset connection string in Vercel env, redeploy. |
-| `/admin/health` shows Google OAuth missing | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` not configured for the current Vercel environment. |
-| Admin can sign in but sees 403         | `ADMIN_EMAIL` does not match the signed-in Google email exactly (case-sensitive comparison; see `src/lib/auth/helpers.ts`). |
-| 429 on admin mutation                  | Phase 15-01 rate limit triggered. Bucket thresholds are in `src/lib/rate-limit.ts` (`RATE_LIMIT_BUCKETS`). |
+**Backups:** CSV-export the inventory from `/admin` before any destructive import (the export re-imports cleanly), and `pg_dump "$DATABASE_URL" --no-owner --no-privileges` for the full database — store dumps outside the repo, they contain buyer PII. `admin_audit_log` and `import_history` are append-only forensic tables; never truncate them.
 
 </details>
-
-<details>
-<summary><b>Deploy on Vercel</b></summary>
-
-1. Push to the branch that Vercel deploys (usually `main`).
-2. Set every env var from the table above in the Vercel project for the target environment (Production / Preview / Development).
-3. Ensure the Neon Postgres database has all required schema: `cards`, `orders`, `order_items`, `admin_audit_log`, `import_history`, and the lazily-created `rate_limit_hits` (created on first rate-limited call; see Phase 15-01 SUMMARY).
-4. Run `npm run smoke:production -- --deployment <url>` from a workstation immediately after deploy.
-5. Sign in to `/admin/health` and confirm every check is green.
-
-</details>
-
----
 
 ## Project documentation
 
-- [`.planning/PROJECT.md`](.planning/PROJECT.md) — product context, validated requirements, decisions.
-- [`.planning/REQUIREMENTS.md`](.planning/REQUIREMENTS.md) — requirement registry (OPS-01 .. OPS-05 cover this phase).
-- [`.planning/phases/15-production-hardening/`](.planning/phases/15-production-hardening/) — production-hardening phase plans, context, and security review artifact.
-
----
+- [`.planning/PROJECT.md`](.planning/PROJECT.md) — product framing, validated requirements, and the full decision log
+- [`.planning/`](.planning/) — per-phase plans, research, verification records, and retrospectives for every milestone since v1.0
+- [`docs/`](docs/) — design plans and operational notes
 
 ## License
 
-Private project. All rights reserved.
+Private project. All rights reserved — this is one person's card collection, not a platform. But if the architecture is useful to you, take the ideas.

@@ -107,6 +107,11 @@ test("mobile satchel uses touch-friendly cart cards and keeps checkout visible",
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
+  // Wait for the mobile layout branch before interacting — same settle
+  // guard the other mobile specs use. Clicking earlier can resolve element
+  // coordinates against the pre-hydration desktop-branch layout.
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+
   const boltTile = page.locator(".wiko-tile").filter({ hasText: "Lightning Bolt" });
   await expect(boltTile).toHaveCount(1);
   await boltTile.getByRole("button", { name: "Quick add to cart" }).click({ force: true });

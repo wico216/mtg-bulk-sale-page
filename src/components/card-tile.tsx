@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { PublicCard, Finish } from "@/lib/types";
 import type { CardSelectionController } from "@/lib/card-selection";
@@ -49,6 +49,7 @@ function FinishPill({ finish }: { finish: Finish }) {
         position: "absolute",
         top: 6,
         left: 6,
+        zIndex: 2,
         fontSize: 9,
         fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
         letterSpacing: "0.1em",
@@ -126,6 +127,31 @@ export default function CardTile({
   const activeImageUrl =
     showingBack && card.backImageUrl ? card.backImageUrl : card.imageUrl;
 
+  // Image fade-in. loadedUrl tracks WHICH url finished loading so the
+  // Transform flip fades the other face in too. The `complete` check is
+  // load-bearing: cached/SSR-decoded images (and tiles re-mounted by the
+  // grid virtualizer on scroll-back) never re-fire onLoad — without it
+  // they would stay stuck at opacity 0. A callback ref (not an effect —
+  // react-hooks/set-state-in-effect) performs the check at attach time;
+  // the same-value setState bails out, so no render loop.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const imageLoaded = loadedUrl === activeImageUrl;
+  const handleImageRef = (img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth > 0) setLoadedUrl(activeImageUrl);
+  };
+
+  // Quick-add ✓ confirmation. After 900ms the button returns to the
+  // pre-existing end state (hidden while inCart, ×qty badge showing).
+  // Timer cleared on unmount — the virtualizer unmounts tiles freely.
+  const [justAdded, setJustAdded] = useState(false);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+    },
+    [],
+  );
+
   return (
     <div
       className="wiko-tile"
@@ -145,6 +171,9 @@ export default function CardTile({
     >
       <div
         className="wiko-tile-image"
+        data-finish={
+          !isGrouped && card.finish !== "normal" ? card.finish : undefined
+        }
         style={{
           position: "relative",
           width: "100%",
@@ -157,11 +186,13 @@ export default function CardTile({
       >
         {activeImageUrl ? (
           <Image
+            ref={handleImageRef}
             src={activeImageUrl}
             alt={`${card.name} ${showingBack ? "back" : "front"}`}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 20vw"
-            className="object-cover"
+            className={`object-cover wiko-card-img${imageLoaded ? " wiko-card-img--loaded" : ""}`}
+            onLoad={() => setLoadedUrl(activeImageUrl)}
           />
         ) : (
           <div
@@ -188,6 +219,7 @@ export default function CardTile({
               position: "absolute",
               top: 6,
               left: 6,
+              zIndex: 2,
               fontSize: 9,
               fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
               letterSpacing: "0.1em",
@@ -245,6 +277,7 @@ export default function CardTile({
               position: "absolute",
               top: 6,
               right: 6,
+              zIndex: 2,
               fontSize: 9,
               fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
               color: "var(--muted)",
@@ -263,6 +296,7 @@ export default function CardTile({
               position: "absolute",
               bottom: 6,
               right: 6,
+              zIndex: 2,
               fontSize: 10,
               fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
               background: "var(--accent)",
@@ -277,19 +311,26 @@ export default function CardTile({
         )}
         <button
           type="button"
-          className="wiko-tile-add"
+          className={`wiko-tile-add${isGrouped ? " wiko-tile-add--options" : ""}${justAdded ? " wiko-tile-add--added" : ""}`}
           onClick={(e) => {
             e.stopPropagation();
             if (isGrouped) {
               onClick();
               return;
             }
-            if (!inCart) addSelectionItem(card.id, card.quantity);
+            if (!inCart) {
+              addSelectionItem(card.id, card.quantity);
+              setJustAdded(true);
+              if (addedTimer.current) clearTimeout(addedTimer.current);
+              addedTimer.current = setTimeout(() => setJustAdded(false), 900);
+            }
           }}
           aria-label={
             isGrouped
               ? (selectionController?.copy?.chooseOptionsLabel ?? "Choose finish options")
-              : (selectionController?.copy?.quickAddLabel ?? "Quick add to cart")
+              : justAdded
+                ? "Added to satchel"
+                : (selectionController?.copy?.quickAddLabel ?? "Quick add to cart")
           }
           title={
             isGrouped
@@ -300,15 +341,18 @@ export default function CardTile({
             position: "absolute",
             top: 8,
             right: 8,
+            zIndex: 2,
             opacity: 0,
             width: isGrouped ? 64 : 28,
             height: 28,
             borderRadius: isGrouped ? 3 : "50%",
-            background: "var(--bg)",
-            border: "1px solid var(--border-strong)",
-            color: "var(--ink)",
+            background: justAdded ? "var(--accent)" : "var(--bg)",
+            border: justAdded
+              ? "1px solid transparent"
+              : "1px solid var(--border-strong)",
+            color: justAdded ? "var(--accent-fg)" : "var(--ink)",
             cursor: "pointer",
-            display: !isGrouped && inCart ? "none" : "flex",
+            display: !isGrouped && inCart && !justAdded ? "none" : "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: isGrouped ? 10 : 16,
@@ -320,7 +364,7 @@ export default function CardTile({
             fontFamily: "inherit",
           }}
         >
-          {isGrouped ? "Options" : "+"}
+          {isGrouped ? "Options" : justAdded ? "✓" : "+"}
         </button>
       </div>
 

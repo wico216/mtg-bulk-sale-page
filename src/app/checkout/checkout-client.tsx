@@ -32,6 +32,33 @@ function formatCheckoutError(data: CheckoutErrorResponse): string {
   return data.error || "Something went wrong. Your order was not placed.";
 }
 
+const fieldLabelStyle: React.CSSProperties = {
+  display: "block",
+  marginBottom: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "var(--ink)",
+};
+
+const submitButtonStyle: React.CSSProperties = {
+  background: "var(--accent)",
+  color: "var(--accent-fg)",
+  border: "none",
+  borderRadius: 3,
+  fontWeight: 600,
+  letterSpacing: "0.02em",
+  fontFamily: "inherit",
+  cursor: "pointer",
+};
+
+const reassuranceStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--muted)",
+  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+};
+
 export default function CheckoutClient({ cards }: CheckoutClientProps) {
   const router = useRouter();
 
@@ -146,21 +173,15 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
   if (!hydrated) {
     return (
       <div className="max-w-3xl mx-auto px-4">
-        <div className="h-8 w-32 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse mt-2 mb-6" />
+        <div className="wiko-skeleton" style={{ height: 32, width: 128, marginTop: 8, marginBottom: 24 }} />
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-10 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse"
-            />
+            <div key={i} className="wiko-skeleton" style={{ height: 40 }} />
           ))}
         </div>
         <div className="space-y-3 mt-6">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-20 bg-zinc-50 dark:bg-zinc-900 rounded-lg animate-pulse"
-            />
+            <div key={i} className="wiko-skeleton" style={{ height: 80 }} />
           ))}
         </div>
       </div>
@@ -171,13 +192,33 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
   if (items.size === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 text-center py-16">
-        <p className="text-lg text-zinc-500 mb-4">Your cart is empty</p>
-        <p className="text-sm text-zinc-400 mb-6">
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontFamily: "var(--font-display)",
+            fontSize: 24,
+            fontStyle: "italic",
+            color: "var(--ink)",
+          }}
+        >
+          Your cart is empty
+        </p>
+        <p style={{ margin: "0 0 24px", fontSize: 13, color: "var(--muted)" }}>
           Add some cards before checking out.
         </p>
         <Link
           href="/"
-          className="inline-block px-5 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+          style={{
+            display: "inline-block",
+            background: "var(--accent)",
+            color: "var(--accent-fg)",
+            padding: "10px 18px",
+            borderRadius: 3,
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: "0.02em",
+            textDecoration: "none",
+          }}
         >
           Browse cards
         </Link>
@@ -189,7 +230,18 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
     <>
       <div className="max-w-3xl mx-auto px-4 pt-6 pb-32">
         {/* Page heading */}
-        <h1 className="text-xl font-semibold mb-6">Checkout</h1>
+        <h1
+          style={{
+            margin: "0 0 24px",
+            fontFamily: "var(--font-display)",
+            fontSize: 32,
+            fontWeight: 400,
+            fontStyle: "italic",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          Checkout
+        </h1>
 
         <div className="flex flex-col md:grid md:grid-cols-3 md:gap-8">
           {/* Order summary on top always */}
@@ -204,7 +256,7 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
 
           {/* Form below summary */}
           <div className="mt-8 md:col-span-3">
-            <h2 className="text-sm font-semibold text-zinc-500 mb-4">
+            <h2 className="wiko-eyebrow" style={{ marginBottom: 14 }}>
               Your details
             </h2>
             <form
@@ -215,10 +267,7 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
               <div className="space-y-4">
                 {/* Name field */}
                 <div>
-                  <label
-                    htmlFor="name"
-                    className="text-sm font-semibold mb-1 block"
-                  >
+                  <label htmlFor="name" style={fieldLabelStyle}>
                     Name
                   </label>
                   <input
@@ -230,16 +279,13 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={submitting}
-                    className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="wiko-input"
                   />
                 </div>
 
                 {/* Email field */}
                 <div>
-                  <label
-                    htmlFor="email"
-                    className="text-sm font-semibold mb-1 block"
-                  >
+                  <label htmlFor="email" style={fieldLabelStyle}>
                     Email
                   </label>
                   <input
@@ -251,16 +297,13 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={submitting}
-                    className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="wiko-input"
                   />
                 </div>
 
                 {/* Phone field (optional) — Quick 260514-7z2 */}
                 <div>
-                  <label
-                    htmlFor="buyerPhone"
-                    className="text-sm font-semibold mb-1 block"
-                  >
+                  <label htmlFor="buyerPhone" style={fieldLabelStyle}>
                     Phone (optional)
                   </label>
                   <input
@@ -274,19 +317,16 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     disabled={submitting}
-                    className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="wiko-input"
                   />
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--muted)" }}>
                     For shipping coordination. Optional.
                   </p>
                 </div>
 
                 {/* Message field */}
                 <div>
-                  <label
-                    htmlFor="message"
-                    className="text-sm font-semibold mb-1 block"
-                  >
+                  <label htmlFor="message" style={fieldLabelStyle}>
                     Message (optional)
                   </label>
                   <textarea
@@ -296,7 +336,8 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     disabled={submitting}
-                    className="w-full border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-transparent text-sm outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="wiko-input"
+                    style={{ resize: "vertical" }}
                   />
                 </div>
               </div>
@@ -305,29 +346,54 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
               {error !== null && (
                 <div
                   role="alert"
-                  className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 text-sm text-red-600 dark:text-red-400 mt-4"
+                  style={{
+                    marginTop: 16,
+                    border: "1px solid var(--bad)",
+                    background: "color-mix(in oklch, var(--bad) 12%, var(--bg))",
+                    borderRadius: 6,
+                    padding: "12px 14px",
+                    fontSize: 13,
+                    color: "var(--ink)",
+                  }}
                 >
-                  <p>{error}</p>
+                  <p style={{ margin: 0 }}>{error}</p>
                   <button
                     type="submit"
-                    className="mt-2 px-5 py-2 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+                    style={{
+                      ...submitButtonStyle,
+                      marginTop: 10,
+                      padding: "10px 18px",
+                      fontSize: 13,
+                    }}
                   >
                     Try again
                   </button>
                 </div>
               )}
 
-              {/* Desktop-only submit button */}
+              {/* Pay-in-person reassurance + desktop-only submit button */}
+              <p
+                className="hidden md:block"
+                style={{
+                  ...reassuranceStyle,
+                  margin: "20px 0 10px",
+                  textAlign: "center",
+                }}
+              >
+                No payment needed now — pay at pickup.
+              </p>
               <button
                 type="submit"
                 disabled={submitting || items.size === 0}
-                className={`hidden md:block w-full mt-6 px-5 py-3 text-sm font-semibold rounded-md transition-colors ${
-                  submitting
-                    ? "bg-accent text-white opacity-70 cursor-not-allowed"
-                    : items.size === 0
-                      ? "opacity-30 cursor-not-allowed bg-zinc-300 text-zinc-500"
-                      : "bg-accent text-white hover:bg-accent-hover"
-                }`}
+                className="hidden md:block w-full"
+                style={{
+                  ...submitButtonStyle,
+                  padding: "14px 22px",
+                  fontSize: 14,
+                  opacity: submitting ? 0.7 : items.size === 0 ? 0.45 : 1,
+                  cursor:
+                    submitting || items.size === 0 ? "not-allowed" : "pointer",
+                }}
               >
                 {submitting ? "Placing order..." : "Place order"}
               </button>
@@ -337,17 +403,58 @@ export default function CheckoutClient({ cards }: CheckoutClientProps) {
       </div>
 
       {/* Sticky mobile submit bar (D-06) */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-3 md:hidden">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
-          <p className="text-sm font-medium">
-            {totalItems} {totalItems === 1 ? "card" : "cards"} &mdash; $
-            {totalPrice.toFixed(2)}
-          </p>
+      <div
+        className="md:hidden"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 40,
+          borderTop: "1px solid var(--border)",
+          background: "var(--surface)",
+          padding: "12px 16px calc(12px + env(safe-area-inset-bottom))",
+        }}
+      >
+        <div
+          className="max-w-3xl mx-auto"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 14,
+                fontWeight: 500,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {totalItems} {totalItems === 1 ? "card" : "cards"} &mdash; $
+              {totalPrice.toFixed(2)}
+            </p>
+            <p style={{ ...reassuranceStyle, margin: "3px 0 0", fontSize: 10 }}>
+              No payment now — pay at pickup.
+            </p>
+          </div>
           <button
             type="submit"
             form="checkout-form"
             disabled={submitting || items.size === 0}
-            className="px-5 py-2 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            style={{
+              ...submitButtonStyle,
+              flexShrink: 0,
+              minHeight: 44,
+              padding: "12px 18px",
+              fontSize: 13,
+              opacity: submitting || items.size === 0 ? 0.7 : 1,
+              cursor:
+                submitting || items.size === 0 ? "not-allowed" : "pointer",
+            }}
           >
             {submitting ? "Placing order..." : "Place order"}
           </button>

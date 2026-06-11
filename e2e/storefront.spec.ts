@@ -74,6 +74,22 @@ test("new arrivals page shows recently added inventory newest first", async ({ p
   await expect(page.locator(".wiko-tile").filter({ hasText: "Sol Ring" })).toHaveCount(0);
 });
 
+test("active filter chips clear all search and menu filters", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByPlaceholder(/Search cards/i).fill("Lightning Bolt");
+
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Lightning Bolt" })).toHaveCount(1);
+  await expect(page.locator(".wiko-tile").filter({ hasText: "Counterspell" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /remove filter: search Lightning Bolt/i })).toBeVisible();
+
+  await page.getByRole("button", { name: "Clear all active filters" }).click();
+
+  await expect(page.getByPlaceholder(/Search cards/i)).toHaveValue("");
+  await expect(page.getByRole("button", { name: /remove filter: search Lightning Bolt/i })).toHaveCount(0);
+  await expect(page.locator(".wiko-card-grid .wiko-tile")).toHaveCount(4);
+});
+
 test("deck check matches pasted decklists and adds selected cards to the satchel", async ({ page }) => {
   await page.goto("/deck-check");
   await page.route("**/api/deck-check", async (route) => {
@@ -162,6 +178,36 @@ test("storefront groups foil and nonfoil finishes while keeping extended art sep
 
   await modal.getByRole("button", { name: /add foil to satchel/i }).click();
   await expect(page.getByRole("link", { name: "Cart", exact: true })).toContainText("1");
+});
+
+test("mobile grouped card options button stays readable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+  await page.getByPlaceholder(/Search cards/i).fill("Sol Ring");
+
+  const regularPrintingTile = page
+    .locator(".wiko-card-grid .wiko-tile")
+    .filter({ hasText: "Sol Ring" })
+    .filter({ hasText: "2 options" });
+  await expect(regularPrintingTile).toHaveCount(1);
+
+  const optionsButton = regularPrintingTile.getByRole("button", { name: /choose finish options/i });
+  await expect(optionsButton).toBeVisible();
+  await expect(optionsButton).toContainText("Options");
+
+  const metrics = await optionsButton.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return {
+      width: Math.round(box.width),
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    };
+  });
+
+  expect(metrics.width).toBeGreaterThanOrEqual(64);
+  expect(metrics.clientWidth).toBeGreaterThanOrEqual(metrics.scrollWidth);
 });
 
 test("card details modal keeps readable single-column layout on phone screens", async ({ page }) => {
@@ -303,6 +349,11 @@ test("mobile form controls use 16px text to avoid iOS focus zoom", async ({ page
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
 
+  // Settle guard: ensure the mobile layout branch has replaced the
+  // pre-hydration desktop branch before measuring/clicking (the desktop
+  // branch's controls detach on the swap, which reads as NaN font sizes).
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+
   const expectFocusControlNotToZoom = async (label: string, locator: ReturnType<typeof page.locator>) => {
     await expect(locator, `${label} should be visible before checking its font size`).toBeVisible();
     const fontSize = await locator.evaluate((element) =>
@@ -337,6 +388,11 @@ test("mobile form controls use 16px text to avoid iOS focus zoom", async ({ page
 test("mobile card tiles reserve consistent height for smooth slow scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
+
+  // Settle guard: measure tiles only after the mobile layout branch is in
+  // (pre-hydration desktop-branch tiles are rail-squeezed and wrap titles
+  // differently, so their heights are not representative).
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
 
   const tiles = page.locator(".wiko-card-grid .wiko-tile");
   await expect(page.getByText(/cards in stock/i)).toBeVisible();

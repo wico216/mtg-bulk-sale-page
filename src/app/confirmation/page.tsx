@@ -8,15 +8,23 @@ export const metadata = {
 
 export default function ConfirmationPage() {
   return (
-    <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ink)",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
       <Header />
       <main>
         <Suspense
           fallback={
-            <div className="max-w-md mx-auto px-4 py-16 text-center">
-              <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 animate-pulse mx-auto mb-6" />
-              <div className="h-8 w-48 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse mx-auto mb-4" />
-              <div className="h-5 w-32 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse mx-auto" />
+            <div style={{ maxWidth: 448, margin: "0 auto", padding: "64px 16px", textAlign: "center" }}>
+              <div className="wiko-skeleton" style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 24px" }} />
+              <div className="wiko-skeleton" style={{ height: 32, width: 192, margin: "0 auto 16px" }} />
+              <div className="wiko-skeleton" style={{ height: 20, width: 128, margin: "0 auto" }} />
             </div>
           }
         >

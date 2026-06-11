@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Finish, PublicCard } from "@/lib/types";
@@ -222,6 +222,9 @@ export default function CardModal({
     showingBack && card.backImageUrl ? card.backImageUrl : card.imageUrl;
   const hasBackFace = Boolean(card.backImageUrl);
 
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -230,9 +233,48 @@ export default function CardModal({
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
 
+  // Focus the dialog on open; hand focus back to the opener (the originating
+  // tile) on close. The tile stays mounted while the modal is open — body
+  // scroll is locked, so the grid virtualizer cannot evict it meanwhile.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    closeButtonRef.current?.focus();
+    return () => {
+      if (
+        previouslyFocused instanceof HTMLElement &&
+        document.contains(previouslyFocused)
+      ) {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
+
+  // Hand-rolled focus trap: wrap Tab / Shift+Tab at the panel edges (no
+  // dependency; everything inside the panel is focusable-queryable).
+  const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const focusables = panel.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !panel.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
       onClick={onClose}
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -246,7 +288,12 @@ export default function CardModal({
       }}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wiko-card-modal-title"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={trapFocus}
         style={{
           background: "var(--bg)",
           color: "var(--ink)",
@@ -372,6 +419,7 @@ export default function CardModal({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
             <div style={{ minWidth: 0 }}>
               <h3
+                id="wiko-card-modal-title"
                 style={{
                   margin: 0,
                   fontFamily: "var(--font-display)",
@@ -412,6 +460,7 @@ export default function CardModal({
               </a>
             </div>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               aria-label="Close"

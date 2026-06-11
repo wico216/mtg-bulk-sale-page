@@ -162,6 +162,20 @@ export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [mode, toggleMode] = useMode();
 
+  // Cart badge pulse: remounting the badge with a fresh key retriggers the
+  // CSS animation on every count change. Render-time derived-state
+  // adjustment (the React-sanctioned alternative to setState-in-effect);
+  // the null seed swallows the first post-hydration value so a persisted
+  // cart restoring on page load doesn't pop.
+  const [pulseKey, setPulseKey] = useState(0);
+  const [prevItems, setPrevItems] = useState<number | null>(null);
+  if (cartHydrated && prevItems !== totalItems) {
+    setPrevItems(totalItems);
+    if (prevItems !== null && totalItems > 0) {
+      setPulseKey((k) => k + 1);
+    }
+  }
+
   const handleBrandClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (window.location.pathname === "/") {
       event.preventDefault();
@@ -345,6 +359,8 @@ export default function Header() {
             </span>
             {cartHydrated && totalItems > 0 && (
               <span
+                key={pulseKey}
+                className={pulseKey > 0 ? "wiko-cart-badge-pulse" : undefined}
                 style={{
                   background: "var(--accent)",
                   color: "var(--accent-fg)",
