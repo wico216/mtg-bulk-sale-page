@@ -165,27 +165,117 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
-/* Card tile — lift + reveal quick-add on hover. */
-.wiko-tile:hover .wiko-tile-image {
+/* Card tile — lift + accent-tinted glow + reveal quick-add on hover AND
+ * keyboard focus. The old black-only 0.12-alpha shadow was invisible on the
+ * dark bg; the accent ring/glow reads in both modes (lighter alphas on
+ * parchment, where dark shadows already carry). */
+.wiko-tile:hover .wiko-tile-image,
+.wiko-tile:focus-within .wiko-tile-image {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--accent) 55%, transparent),
+    0 6px 20px color-mix(in oklch, var(--accent) 25%, transparent),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+}
+html[data-mode="light"] .wiko-tile:hover .wiko-tile-image,
+html[data-mode="light"] .wiko-tile:focus-within .wiko-tile-image {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--accent) 45%, transparent),
+    0 6px 18px color-mix(in oklch, var(--accent) 16%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.1);
 }
 .wiko-tile:hover .wiko-tile-add {
   opacity: 1 !important;
 }
 
-/* Keyboard parity: tabbing to a tile reveals the quick-add and lifts the
- * art exactly like hover, and the tile itself gets a visible focus ring. */
+/* Keyboard parity: tabbing to a tile reveals the quick-add exactly like
+ * hover, and the tile itself gets a visible focus ring. */
 .wiko-tile:focus-within .wiko-tile-add {
   opacity: 1 !important;
-}
-.wiko-tile:focus-within .wiko-tile-image {
-  transform: translateY(-2px);
 }
 .wiko-tile:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 6px;
+}
+
+/* Finish sheen — static iridescence on foil/etched tiles; hover/focus sweeps
+ * it diagonally. Transform-only transition, NOTHING animates at rest — the
+ * virtualized grid renders dozens of tiles and must stay cheap to scroll.
+ * Sits at z-index 1: above the card art, below badges/controls (z 2); the
+ * tile wrapper's overflow:hidden clips the oversized gradient. */
+.wiko-tile-image[data-finish="foil"]::after,
+.wiko-tile-image[data-finish="etched"]::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    oklch(0.85 0.1 220 / 0.3) 42%,
+    oklch(0.88 0.1 320 / 0.32) 50%,
+    oklch(0.9 0.11 95 / 0.3) 58%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  transform: translate3d(-16%, -16%, 0);
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+/* Etched: single gold band — quieter than the rainbow foil. */
+.wiko-tile-image[data-finish="etched"]::after {
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    oklch(0.86 0.07 85 / 0.34) 50%,
+    transparent 68%
+  );
+  opacity: 0.45;
+}
+.wiko-tile:hover .wiko-tile-image[data-finish]::after,
+.wiko-tile:focus-within .wiko-tile-image[data-finish]::after {
+  transform: translate3d(16%, 16%, 0);
+  opacity: 0.7;
+}
+/* Light mode: `screen` washes out on parchment — same swap as .wiko-starfield. */
+html[data-mode="light"] .wiko-tile-image[data-finish]::after {
+  mix-blend-mode: multiply;
+  opacity: 0.2;
+}
+
+/* Card image fade-in (opacity-only; the wrapper's surface-2 bg is the
+ * placeholder). CardTile adds --loaded onLoad, with a `complete` check for
+ * cached images so virtualizer re-mounts appear instantly. */
+.wiko-card-img {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.wiko-card-img--loaded {
+  opacity: 1;
+}
+
+/* Quick-add ✓ confirmation pop. opacity:1 !important keeps the ✓ visible if
+ * the pointer leaves the tile mid-confirmation (base state is hover-revealed). */
+@keyframes wiko-add-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.wiko-tile-add--added {
+  opacity: 1 !important;
+  animation: wiko-add-pop 0.28s ease-out;
+}
+
+/* Header cart-badge pulse — retriggered by remounting the badge (key bump). */
+@keyframes wiko-badge-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.wiko-cart-badge-pulse {
+  animation: wiko-badge-pulse 0.36s ease-out;
 }
 
 /* Active-filter chips (desktop). Hover needs !important — inline styles
