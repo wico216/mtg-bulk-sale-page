@@ -252,6 +252,7 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
             <div
               role="group"
               aria-label="Confirm emptying the satchel"
+              className="wiko-cart-clear-confirm"
               style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
             >
               <span

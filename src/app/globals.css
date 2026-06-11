@@ -406,11 +406,28 @@ a { color: inherit; }
   .wiko-header { padding: 12px 14px !important; gap: 8px; }
   .wiko-header-mascot svg { width: 32px !important; height: 32px !important; }
   .wiko-header-brand { gap: 10px !important; }
-  .wiko-header-title { font-size: 19px !important; }
+  .wiko-header-title {
+    font-size: 19px !important;
+    /* nowrap text otherwise paints past its flex box, under the action
+     * buttons — ellipsize instead (display:block makes text-overflow work
+     * on the span). */
+    display: block !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
   .wiko-header-tagline { display: none !important; }
   .wiko-header-satchel-label { display: none !important; }
   .wiko-header-actions { gap: 6px !important; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
+}
+
+/* Phone-width header: the Admin button (keeper-only, also reachable at
+ * /admin directly) yields its space so the brand title fits untruncated. */
+@media (max-width: 480px) {
+  .wiko-header-admin-btn { display: none !important; }
+}
+@media (max-width: 400px) {
+  .wiko-header-title { font-size: 18px !important; }
 }
 
 /* Virtualized storefront grids keep the production card DOM bounded while preserving the full scroll range.
@@ -594,6 +611,12 @@ a { color: inherit; }
   .wiko-cart-heading button {
     font-size: 11px !important;
     margin-top: 8px !important;
+  }
+
+  /* Inline clear-cart confirm: comfortable thumb targets on touch. */
+  .wiko-cart-clear-confirm button {
+    min-height: 44px;
+    padding: 10px 14px !important;
   }
 
   .wiko-cart-list {
