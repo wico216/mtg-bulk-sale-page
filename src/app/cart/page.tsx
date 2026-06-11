@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import SiteFooter from "@/components/site-footer";
 import CartPageClient from "./cart-page-client";
 import { getCardsAggregated } from "@/db/queries";
 import {
@@ -49,10 +50,14 @@ function CartShell({ children }: { children: React.ReactNode }) {
         color: "var(--ink)",
         position: "relative",
         zIndex: 1,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <Header />
-      {children}
+      <div style={{ flex: 1 }}>{children}</div>
+      {/* marginBottom clears the fixed CartSummaryBar when the cart has items. */}
+      <SiteFooter style={{ marginBottom: 96 }} />
     </div>
   );
 }

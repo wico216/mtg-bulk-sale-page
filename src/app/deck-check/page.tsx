@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import SiteFooter from "@/components/site-footer";
 import { DeckCheckShell } from "@/app/deck-check/_components/deck-check-shell";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,15 @@ export default function DeckCheckPage() {
         color: "var(--ink)",
         position: "relative",
         zIndex: 1,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <Header />
-      <DeckCheckShell />
+      <div style={{ flex: 1 }}>
+        <DeckCheckShell />
+      </div>
+      <SiteFooter />
     </div>
   );
 }

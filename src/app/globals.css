@@ -213,6 +213,17 @@ input[type="range"]::-moz-range-thumb {
   color: var(--dim);
 }
 
+/* Site footer — link hover needs !important because the inline style owns
+ * the resting color (matches the codebase's responsive-override pattern). */
+.wiko-site-footer a:hover {
+  color: var(--ink) !important;
+}
+@media (max-width: 640px) {
+  .wiko-site-footer {
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
 /* One switch for every polish-pass animation (skeleton pulse, image fade,
  * add-to-cart pop, cart-badge pulse, foil sheen sweep). */
 @media (prefers-reduced-motion: reduce) {

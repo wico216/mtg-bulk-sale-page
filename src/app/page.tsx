@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import SiteFooter from "@/components/site-footer";
 import StorefrontShell from "@/components/storefront-shell";
 import {
   loadStorefrontData,
@@ -16,10 +17,13 @@ function PageShell({ children }: { children: React.ReactNode }) {
         color: "var(--ink)",
         position: "relative",
         zIndex: 1,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <Header />
-      {children}
+      <div style={{ flex: 1 }}>{children}</div>
+      <SiteFooter />
     </div>
   );
 }
