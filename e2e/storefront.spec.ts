@@ -8,6 +8,49 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("saved light mode survives hydration and reloads", async ({ page }) => {
+  const consoleMessages: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleMessages.push(message.text());
+    }
+  });
+
+  const rootMode = () => page.evaluate(() => document.documentElement.getAttribute("data-mode"));
+  const storedMode = () => page.evaluate(() => localStorage.getItem("wiko.mode"));
+  const themeColor = () =>
+    page.evaluate(() => document.querySelector('meta[name="theme-color"]')?.getAttribute("content"));
+
+  await expect.poll(rootMode).toBe("dark");
+  await expect.poll(storedMode).toBeNull();
+
+  await page.evaluate(() => localStorage.setItem("wiko.mode", "light"));
+  await page.reload();
+
+  await expect.poll(rootMode).toBe("light");
+  await expect.poll(themeColor).toBe("#f7f3ea");
+  await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await expect.poll(rootMode).toBe("dark");
+  await expect.poll(storedMode).toBe("dark");
+  await page.reload();
+  await expect.poll(rootMode).toBe("dark");
+  await expect(page.getByRole("button", { name: "Switch to light mode" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect.poll(rootMode).toBe("light");
+  await expect.poll(storedMode).toBe("light");
+  await page.reload();
+  await expect.poll(rootMode).toBe("light");
+  await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+
+  const hydrationMessages = consoleMessages.filter((text) =>
+    /hydration|hydrated|server rendered html|did not match/i.test(text),
+  );
+  expect(hydrationMessages).toEqual([]);
+});
+
 test("storefront supports search, card details, and unauthenticated admin redirect", async ({ page }) => {
   await page.goto("/");
 

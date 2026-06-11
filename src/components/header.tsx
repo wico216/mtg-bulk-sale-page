@@ -22,6 +22,27 @@ function updateSafariThemeColor(mode: Mode) {
   meta.setAttribute("content", SAFARI_THEME_COLOR[mode]);
 }
 
+function getDocumentMode(): Mode {
+  if (typeof document === "undefined") return "dark";
+  const current = document.documentElement.getAttribute("data-mode");
+  return current === "light" || current === "dark" ? current : "dark";
+}
+
+const modeSubscribers = new Set<() => void>();
+
+function subscribeMode(onStoreChange: () => void) {
+  modeSubscribers.add(onStoreChange);
+  return () => modeSubscribers.delete(onStoreChange);
+}
+
+function notifyModeSubscribers() {
+  for (const subscriber of modeSubscribers) subscriber();
+}
+
+function getServerModeSnapshot(): Mode {
+  return "dark";
+}
+
 function MageMascot({ size = 40 }: { size?: number }) {
   return (
     <svg
@@ -119,26 +140,25 @@ function IconMoon({ size = 16 }: { size?: number }) {
 }
 
 function useMode(): [Mode, () => void] {
-  // Dark is the SSR-stamped default; the flash-guard in layout.tsx swaps to
-  // the stored mode before hydration.
-  const [mode, setMode] = useState<Mode>(() => {
-    if (typeof document === "undefined") return "dark";
-    const current = document.documentElement.getAttribute("data-mode");
-    return current === "light" || current === "dark" ? current : "dark";
-  });
+  // Dark is the SSR and hydration snapshot. The flash guard in layout.tsx can
+  // swap the document attribute before hydration; useSyncExternalStore lets the
+  // header match the server first, then read the already-applied DOM mode.
+  const mode = useSyncExternalStore(
+    subscribeMode,
+    getDocumentMode,
+    getServerModeSnapshot,
+  );
 
   const toggle = () => {
-    setMode((m) => {
-      const next: Mode = m === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-mode", next);
-      updateSafariThemeColor(next);
-      try {
-        localStorage.setItem(MODE_KEY, next);
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+    const next: Mode = getDocumentMode() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-mode", next);
+    updateSafariThemeColor(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // ignore
+    }
+    notifyModeSubscribers();
   };
 
   return [mode, toggle];
