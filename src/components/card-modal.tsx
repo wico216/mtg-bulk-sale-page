@@ -17,8 +17,46 @@ const CONDITION_MAP: Record<string, string> = {
   damaged: "DMG",
 };
 
+const CONDITION_FULL: Record<string, string> = {
+  near_mint: "Near Mint",
+  lightly_played: "Lightly Played",
+  moderately_played: "Moderately Played",
+  heavily_played: "Heavily Played",
+  damaged: "Damaged",
+};
+
+const CONDITION_NOTES: Record<string, string> = {
+  near_mint: "pack-fresh, looks unplayed",
+  lightly_played: "minor edge or surface wear — plays perfectly sleeved",
+  moderately_played: "visible wear, priced accordingly",
+  heavily_played: "heavy wear — a budget copy",
+  damaged: "major wear — for casual play",
+};
+
 function formatCondition(condition: string): string {
   return CONDITION_MAP[condition] ?? condition;
+}
+
+function formatConditionFull(condition: string): string {
+  return CONDITION_FULL[condition] ?? condition;
+}
+
+function formatConditionDisplay(condition: string): string {
+  const full = CONDITION_FULL[condition];
+  const abbreviation = CONDITION_MAP[condition];
+  if (!full || !abbreviation) return condition;
+  return `${full} (${abbreviation})`;
+}
+
+function getConditionNote(condition: string): string | undefined {
+  return CONDITION_NOTES[condition];
+}
+
+function getConditionTitle(condition: string): string | undefined {
+  const full = CONDITION_FULL[condition];
+  const note = CONDITION_NOTES[condition];
+  if (!full || !note) return undefined;
+  return `${full} — ${note}`;
 }
 
 function formatPrice(price: number | null): string {
@@ -212,6 +250,8 @@ export default function CardModal({
   const reviewLabel = selectionController?.copy?.reviewLabel ?? "Go to cart";
   const selectedBadgeLabel = selectionController?.copy?.selectedBadgeLabel ?? "satchel";
   const availableLabel = selectionController?.copy?.quantityAvailableLabel ?? "available";
+  const conditionNote = hasMultipleVariants ? undefined : getConditionNote(card.condition);
+  const etchedFinishClassName = !hasMultipleVariants && card.finish === "etched" ? "wiko-finish-etched" : undefined;
   const [imageSide, setImageSide] = useState({
     cardId: card.id,
     showingBack: false,
@@ -487,15 +527,19 @@ export default function CardModal({
             }}
           >
             <dt style={{ color: "var(--muted)" }}>Condition</dt>
-            <dd style={{ margin: 0, color: "var(--ink)" }}>{formatCondition(card.condition)}</dd>
+            <dd style={{ margin: 0, color: "var(--ink)" }}>
+              <div>{formatConditionDisplay(card.condition)}</div>
+              {conditionNote && (
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                  {conditionNote}
+                </div>
+              )}
+            </dd>
             <dt style={{ color: "var(--muted)" }}>Finish</dt>
             <dd
+              className={etchedFinishClassName}
               style={{
                 margin: 0,
-                // Phase 17 D-09: echo the storefront pill color for etched
-                // so the modal Finish row visually matches the tile badge.
-                color:
-                  !hasMultipleVariants && card.finish === "etched" ? "#581c87" : undefined,
               }}
             >
               {formatVariantSummary(variants)}
@@ -592,6 +636,8 @@ export default function CardModal({
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {variants.map((variant) => {
                     const optionLabel = variantOptionLabel(variant, variants);
+                    const conditionTitle = getConditionTitle(variant.condition);
+                    const conditionDetail = variant.condition !== "near_mint" ? ` · ${formatConditionFull(variant.condition)}` : "";
                     const variantQty = selectionItems.get(variant.id) ?? 0;
                     const variantInCart = variantQty > 0;
 
@@ -610,7 +656,10 @@ export default function CardModal({
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>
+                          <div
+                            title={conditionTitle}
+                            style={{ fontSize: 14, color: "var(--ink)", fontWeight: 600 }}
+                          >
                             {optionLabel}
                           </div>
                           <div
@@ -623,7 +672,7 @@ export default function CardModal({
                               textTransform: "uppercase",
                             }}
                           >
-                            {formatPrice(variant.price)} · {variant.quantity} {availableLabel}
+                            {formatPrice(variant.price)} · {variant.quantity} {availableLabel}{conditionDetail}
                           </div>
                         </div>
 

@@ -122,6 +122,16 @@ html[data-mode="light"] .wiko-starfield {
   opacity: 0.28;
 }
 
+/* Etched-finish text needs a gold glint on the dark buyer surface, while light
+ * mode keeps the existing purple echo from the storefront pill. */
+.wiko-finish-etched {
+  color: oklch(0.8 0.08 85);
+}
+
+html[data-mode="light"] .wiko-finish-etched {
+  color: #581c87;
+}
+
 /* Scattered starfield — opt-in by any element that wants it. */
 .wiko-starfield {
   position: absolute;

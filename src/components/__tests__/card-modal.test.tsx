@@ -47,6 +47,68 @@ describe("CardModal customer actions", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
+  it("spells out single-card conditions with buyer-friendly notes", () => {
+    render(
+      <CardModal
+        card={publicCard()}
+        onClose={() => {}}
+        onImageClick={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Near Mint (NM)")).toBeInTheDocument();
+    expect(screen.getByText("pack-fresh, looks unplayed")).toBeInTheDocument();
+  });
+
+  it("keeps multi-variant condition labels compact while explaining played copies", () => {
+    const nearMint = publicCard({
+      id: "lea-161-normal-near_mint",
+      finish: "normal",
+      condition: "near_mint",
+      price: 4,
+      quantity: 3,
+    });
+    const lightlyPlayed = publicCard({
+      id: "lea-161-foil-lightly_played",
+      finish: "foil",
+      condition: "lightly_played",
+      price: 3.5,
+      quantity: 2,
+    });
+
+    render(
+      <CardModal
+        card={nearMint}
+        variants={[nearMint, lightlyPlayed]}
+        onClose={() => {}}
+        onImageClick={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Near Mint (NM)")).toBeInTheDocument();
+    expect(screen.queryByText("pack-fresh, looks unplayed")).toBeNull();
+
+    const lpLabel = screen.getByText("Foil · LP");
+    expect(lpLabel).toHaveAttribute(
+      "title",
+      "Lightly Played — minor edge or surface wear — plays perfectly sleeved",
+    );
+    expect(screen.getByText("$3.50 · 2 available · Lightly Played")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add foil · lp to satchel/i })).toBeInTheDocument();
+  });
+
+  it("uses the mode-aware etched finish class instead of the dark inline purple", () => {
+    render(
+      <CardModal
+        card={publicCard({ finish: "etched" })}
+        onClose={() => {}}
+        onImageClick={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Etched")).toHaveClass("wiko-finish-etched");
+  });
+
   it("shows close and go-to-cart actions when the card is in the cart", () => {
     const card = publicCard();
     const onClose = vi.fn();
