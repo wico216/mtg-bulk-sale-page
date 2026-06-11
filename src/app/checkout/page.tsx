@@ -36,7 +36,15 @@ async function loadCheckoutCardsSafely(): Promise<PublicCard[] | null> {
 
 function CheckoutShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen font-sans bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ink)",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
       <Header />
       {children}
     </div>
@@ -49,8 +57,8 @@ export default async function CheckoutPage() {
   if (!cards) {
     return (
       <CheckoutShell>
-        <main className="mx-auto max-w-3xl px-4 py-16 text-center">
-          <p className="text-lg text-zinc-500 dark:text-zinc-400">
+        <main style={{ maxWidth: 720, margin: "0 auto", padding: "64px 24px", textAlign: "center" }}>
+          <p style={{ fontSize: 18, color: "var(--muted)" }}>
             Checkout is briefly unavailable — try again soon.
           </p>
         </main>
@@ -60,7 +68,7 @@ export default async function CheckoutPage() {
 
   return (
     <CheckoutShell>
-      <main className="pt-6 pb-24">
+      <main style={{ paddingTop: 24, paddingBottom: 96 }}>
         <CheckoutClient cards={cards} />
       </main>
     </CheckoutShell>

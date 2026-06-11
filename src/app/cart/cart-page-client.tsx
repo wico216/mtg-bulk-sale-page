@@ -132,13 +132,10 @@ export default function CartPageClient({ cards }: CartPageClientProps) {
   if (!hydrated) {
     return (
       <div className="max-w-3xl mx-auto px-4">
-        <div className="h-8 w-32 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse mt-2 mb-6" />
+        <div className="wiko-skeleton" style={{ height: 32, width: 128, marginTop: 8, marginBottom: 24 }} />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-20 bg-zinc-50 dark:bg-zinc-900 rounded-lg animate-pulse"
-            />
+            <div key={i} className="wiko-skeleton" style={{ height: 80 }} />
           ))}
         </div>
       </div>

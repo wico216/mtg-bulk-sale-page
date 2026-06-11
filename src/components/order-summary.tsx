@@ -21,18 +21,31 @@ interface OrderSummaryProps {
 export default function OrderSummary({
   items,
   totalPrice,
-  totalItems,
   editCartLink = false,
 }: OrderSummaryProps) {
   return (
     <div>
       {/* Heading row */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-zinc-500">Order summary</h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 14,
+        }}
+      >
+        <h2 className="wiko-eyebrow" style={{ margin: 0 }}>
+          Order summary
+        </h2>
         {editCartLink && (
           <Link
             href="/cart"
-            className="text-sm text-accent hover:underline"
+            style={{
+              fontSize: 12,
+              color: "var(--accent)",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
           >
             Edit cart
           </Link>
@@ -40,42 +53,108 @@ export default function OrderSummary({
       </div>
 
       {/* Item rows */}
-      <div className="space-y-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.map((item, i) => (
           <div
             key={`${item.name}-${item.setName}-${i}`}
-            className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: 12,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+            }}
           >
             {/* Thumbnail: 36px wide with MTG aspect ratio ~1:1.4 */}
-            <div className="flex-shrink-0">
+            <div style={{ flexShrink: 0 }}>
               {item.imageUrl ? (
                 <Image
                   src={item.imageUrl}
                   alt={item.name}
                   width={36}
                   height={50}
-                  className="rounded-sm object-cover flex-shrink-0"
+                  style={{ borderRadius: 3, objectFit: "cover", display: "block" }}
                 />
               ) : (
-                <div className="w-[36px] h-[50px] rounded-sm bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-zinc-400 text-[7px]">
+                <div
+                  style={{
+                    width: 36,
+                    height: 50,
+                    borderRadius: 3,
+                    background: "var(--surface-2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--muted)",
+                    fontSize: 7,
+                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
                   No img
                 </div>
               )}
             </div>
 
             {/* Card info */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{item.name}</p>
-              <p className="text-xs text-zinc-400 truncate">{item.setName}</p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-display)",
+                  fontSize: 15,
+                  fontWeight: 400,
+                  lineHeight: 1.2,
+                  color: "var(--ink)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={item.name}
+              >
+                {item.name}
+              </p>
+              <p
+                style={{
+                  margin: "3px 0 0",
+                  fontSize: 10,
+                  color: "var(--muted)",
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {item.setName}
+              </p>
             </div>
 
             {/* Quantity badge */}
-            <span className="text-sm text-zinc-500 flex-shrink-0">
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--muted)",
+                flexShrink: 0,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               x{item.quantity}
             </span>
 
             {/* Line total */}
-            <span className="text-sm ml-auto flex-shrink-0">
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--ink)",
+                flexShrink: 0,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               {item.price !== null
                 ? `$${(item.price * item.quantity).toFixed(2)}`
                 : "N/A"}
@@ -85,9 +164,27 @@ export default function OrderSummary({
       </div>
 
       {/* Total row */}
-      <div className="flex justify-between pt-4 mt-4 border-t border-zinc-200 dark:border-zinc-700">
-        <span className="text-sm font-semibold">Total</span>
-        <span className="text-sm font-semibold">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          paddingTop: 14,
+          marginTop: 14,
+          borderTop: "1px solid var(--border-strong)",
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+          Total
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 19,
+            color: "var(--ink)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           ${totalPrice.toFixed(2)}
         </span>
       </div>

@@ -27,7 +27,7 @@ export function GoogleSignInButton() {
       <button
         type="submit"
         disabled={!csrfToken || isLoading}
-        className="w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors focus:ring-2 focus:ring-accent/50 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors focus:ring-2 focus:ring-accent/50 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
       >
         <svg
           width="20"

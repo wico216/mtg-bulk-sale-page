@@ -76,6 +76,10 @@ html[data-mode="light"] {
   --color-accent: var(--accent);
   --color-accent-hover: oklch(0.64 0.17 295);
   --color-accent-light: oklch(0.94 0.04 295);
+  /* Correct foreground for accent-filled controls in BOTH modes (dark accent
+   * is a light violet — white text fails contrast on it; the scene token
+   * already encodes the right answer per mode). */
+  --color-accent-fg: var(--accent-fg);
 }
 
 * { box-sizing: border-box; }
@@ -168,6 +172,64 @@ input[type="range"]::-moz-range-thumb {
 }
 .wiko-tile:hover .wiko-tile-add {
   opacity: 1 !important;
+}
+
+/* ——— Shared storefront primitives (premium polish pass) ——— */
+
+/* Token-styled skeleton block for hydration/loading states (replaces the
+ * zinc Tailwind pulses that ignored the data-mode toggle). */
+.wiko-skeleton {
+  background: var(--surface-2);
+  border-radius: 6px;
+  animation: wiko-skeleton-pulse 1.6s ease-in-out infinite;
+}
+@keyframes wiko-skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Token-styled text input/textarea (checkout form). The global ≤640px
+ * 16px font-size rule below keeps iOS Safari from focus-zooming these. */
+.wiko-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+.wiko-input:focus {
+  border-color: var(--accent);
+}
+.wiko-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wiko-input::placeholder {
+  color: var(--dim);
+}
+
+/* One switch for every polish-pass animation (skeleton pulse, image fade,
+ * add-to-cart pop, cart-badge pulse, foil sheen sweep). */
+@media (prefers-reduced-motion: reduce) {
+  .wiko-skeleton {
+    animation: none;
+    opacity: 0.7;
+  }
+  .wiko-card-img {
+    transition: none !important;
+  }
+  .wiko-tile-add--added,
+  .wiko-cart-badge-pulse {
+    animation: none !important;
+  }
+  .wiko-tile-image[data-finish]::after {
+    transition: none !important;
+  }
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }

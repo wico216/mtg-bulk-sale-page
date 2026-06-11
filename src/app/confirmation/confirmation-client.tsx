@@ -29,6 +29,18 @@ function parseStoredConfirmation(raw: string): StoredConfirmation | null {
   return { order: parsed as PublicOrderData };
 }
 
+const accentLinkStyle: React.CSSProperties = {
+  display: "inline-block",
+  background: "var(--accent)",
+  color: "var(--accent-fg)",
+  padding: "11px 18px",
+  borderRadius: 3,
+  fontSize: 13,
+  fontWeight: 500,
+  letterSpacing: "0.02em",
+  textDecoration: "none",
+};
+
 export default function ConfirmationClient() {
   const searchParams = useSearchParams();
   const ref = searchParams.get("ref");
@@ -55,11 +67,18 @@ export default function ConfirmationClient() {
   if (!ref) {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center">
-        <p className="text-lg text-zinc-500 mb-4">No order found</p>
-        <Link
-          href="/"
-          className="inline-block px-5 py-2.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+        <p
+          style={{
+            margin: "0 0 24px",
+            fontFamily: "var(--font-display)",
+            fontSize: 24,
+            fontStyle: "italic",
+            color: "var(--ink)",
+          }}
         >
+          No order found
+        </p>
+        <Link href="/" style={accentLinkStyle}>
           Browse cards
         </Link>
       </div>
@@ -101,13 +120,26 @@ export default function ConfirmationClient() {
   return (
     <div className="max-w-md mx-auto px-4 py-16 text-center">
       {/* Checkmark icon */}
-      <div className="w-16 h-16 rounded-full bg-accent-light flex items-center justify-center mx-auto mb-6">
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: "50%",
+          background: "color-mix(in oklch, var(--accent) 16%, transparent)",
+          border: "1px solid color-mix(in oklch, var(--accent) 45%, transparent)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 24px",
+        }}
+      >
         <svg
-          className="w-8 h-8 text-accent"
+          width="32"
+          height="32"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth="2"
-          stroke="currentColor"
+          stroke="var(--accent)"
         >
           <path
             strokeLinecap="round"
@@ -118,19 +150,50 @@ export default function ConfirmationClient() {
       </div>
 
       {/* Success heading */}
-      <h1 className="text-2xl font-semibold mb-2">Order placed!</h1>
+      <h1
+        style={{
+          margin: "0 0 10px",
+          fontFamily: "var(--font-display)",
+          fontSize: 32,
+          fontWeight: 400,
+          fontStyle: "italic",
+          letterSpacing: "-0.005em",
+        }}
+      >
+        Order placed!
+      </h1>
 
       {/* Summary line */}
-      <p className="text-xl text-zinc-500 mb-1">
+      <p
+        style={{
+          margin: "0 0 6px",
+          fontSize: 19,
+          color: "var(--ink-soft)",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
         {displayCount} {displayCount === 1 ? "card" : "cards"} &mdash; $
         {displayTotal.toFixed(2)}
       </p>
 
       {/* Order ref */}
-      <p className="text-sm text-zinc-400 mb-6">Order {ref}</p>
+      <p
+        style={{
+          margin: "0 0 24px",
+          fontSize: 12,
+          color: "var(--muted)",
+          fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        Order {ref}
+      </p>
 
       {/* Email note */}
-      <p className="text-sm text-zinc-400 mb-6">{emailNote}</p>
+      <p style={{ margin: "0 0 24px", fontSize: 13, color: "var(--muted)" }}>
+        {emailNote}
+      </p>
 
       {/* Full order list from sessionStorage */}
       {fullOrder && fullOrder.items.length > 0 && (
@@ -145,15 +208,12 @@ export default function ConfirmationClient() {
       )}
 
       {/* Pay-in-person note (D-26) */}
-      <p className="text-sm text-zinc-500 mt-6">
+      <p style={{ margin: "24px 0 0", fontSize: 13, color: "var(--muted)" }}>
         No payment needed now &mdash; just pay when you pick up.
       </p>
 
       {/* Browse more cards link (D-27) */}
-      <Link
-        href="/"
-        className="inline-block mt-8 px-5 py-2.5 text-sm font-semibold rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
-      >
+      <Link href="/" style={{ ...accentLinkStyle, marginTop: 32 }}>
         Browse more cards
       </Link>
     </div>
