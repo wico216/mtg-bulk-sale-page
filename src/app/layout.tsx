@@ -60,6 +60,7 @@ export default function RootLayout({
       lang="en"
       data-mode="dark"
       data-theme="arcane"
+      suppressHydrationWarning
       className={`${instrumentSerif.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
