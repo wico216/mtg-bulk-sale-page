@@ -224,6 +224,21 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+/* Storefront intros (home hero + /new) compact down on phones; the
+ * how-it-works strip drops its descriptions and keeps 01/02/03 + labels. */
+@media (max-width: 640px) {
+  .wiko-storefront-intro {
+    padding: 20px 16px 10px !important;
+  }
+  .wiko-home-steps {
+    gap: 8px 14px !important;
+    margin-top: 12px !important;
+  }
+  .wiko-home-steps .wiko-home-step-desc {
+    display: none;
+  }
+}
+
 /* One switch for every polish-pass animation (skeleton pulse, image fade,
  * add-to-cart pop, cart-badge pulse, foil sheen sweep). */
 @media (prefers-reduced-motion: reduce) {
