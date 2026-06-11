@@ -303,6 +303,11 @@ test("mobile form controls use 16px text to avoid iOS focus zoom", async ({ page
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
 
+  // Settle guard: ensure the mobile layout branch has replaced the
+  // pre-hydration desktop branch before measuring/clicking (the desktop
+  // branch's controls detach on the swap, which reads as NaN font sizes).
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
+
   const expectFocusControlNotToZoom = async (label: string, locator: ReturnType<typeof page.locator>) => {
     await expect(locator, `${label} should be visible before checking its font size`).toBeVisible();
     const fontSize = await locator.evaluate((element) =>
@@ -337,6 +342,11 @@ test("mobile form controls use 16px text to avoid iOS focus zoom", async ({ page
 test("mobile card tiles reserve consistent height for smooth slow scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto("/");
+
+  // Settle guard: measure tiles only after the mobile layout branch is in
+  // (pre-hydration desktop-branch tiles are rail-squeezed and wrap titles
+  // differently, so their heights are not representative).
+  await expect(page.locator(".wiko-mobile-storefront-controls")).toBeVisible();
 
   const tiles = page.locator(".wiko-card-grid .wiko-tile");
   await expect(page.getByText(/cards in stock/i)).toBeVisible();
