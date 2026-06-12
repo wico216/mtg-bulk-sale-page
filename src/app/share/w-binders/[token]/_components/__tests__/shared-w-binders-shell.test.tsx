@@ -6,11 +6,14 @@ import {
   getE2ePrivateWBinderCards,
   getE2ePrivateWBinderMeta,
 } from "@/lib/e2e-fixtures";
+import { useCartStore } from "@/lib/store/cart-store";
 import { PRICE_MAX, useFilterStore } from "@/lib/store/filter-store";
-import { useWBinderPickStore } from "@/lib/store/w-binder-pick-store";
-import { AdminWBindersShell } from "../admin-w-binders-shell";
+import { useWBinderShareInterestStore } from "@/lib/store/w-binder-share-interest-store";
+import { SharedWBindersShell } from "../shared-w-binders-shell";
 
 function resetStores() {
+  useCartStore.setState({ items: new Map(), version: "1.3" });
+  useWBinderShareInterestStore.setState({ items: new Map<string, number>() });
   useFilterStore.setState({
     allCards: [],
     searchQuery: "",
@@ -22,11 +25,10 @@ function resetStores() {
     priceRange: [0, PRICE_MAX],
     sortBy: "name-asc",
   });
-  useWBinderPickStore.setState({ items: new Map<string, number>() });
   localStorage.clear();
 }
 
-describe("AdminWBindersShell", () => {
+describe("SharedWBindersShell", () => {
   beforeEach(() => {
     resetStores();
     Object.defineProperty(window, "matchMedia", {
@@ -44,44 +46,46 @@ describe("AdminWBindersShell", () => {
     });
   });
 
-  it("renders W binder cards from props before the shared filter store is hydrated", async () => {
+  it("renders as a read-only shared preview with no checkout/admin actions", async () => {
     const cards = getE2ePrivateWBinderCards();
 
     render(
-      <AdminWBindersShell
+      <SharedWBindersShell
         cards={cards}
         meta={getE2ePrivateWBinderMeta(cards)}
-        shareLinks={[]}
+        linkLabel="Commander pod"
+        expiresAt="2026-07-12T00:00:00.000Z"
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /my w binders/i })).toBeInTheDocument();
-    expect(screen.getByText(/admin-only lookup for personal folders/i)).toBeInTheDocument();
-    expect(screen.getByText(/3 cards in stock/i)).toBeInTheDocument();
-    expect(screen.getByText(/3 of 3 cards/i)).toBeInTheDocument();
-    expect(screen.getByText("W01")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /w binder preview/i })).toBeInTheDocument();
+    expect(screen.getByText(/browse-only: no checkout, no admin access/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /checkout/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin-only lookup/i)).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(useFilterStore.getState().allCards).toHaveLength(cards.length);
     });
   });
 
-  it("uses Pick actions to stage a private pull list instead of the public cart copy", async () => {
+  it("marks interest locally without adding cards to the public cart", async () => {
     const user = userEvent.setup();
     const cards = getE2ePrivateWBinderCards();
+    const firstCardId = cards[0].id;
 
     render(
-      <AdminWBindersShell
+      <SharedWBindersShell
         cards={cards}
         meta={getE2ePrivateWBinderMeta(cards)}
-        shareLinks={[]}
+        linkLabel="Commander pod"
+        expiresAt={null}
       />,
     );
 
-    await user.click(screen.getAllByRole("button", { name: /quick pick/i })[0]);
+    await user.click(screen.getAllByRole("button", { name: /quick interest/i })[0]);
 
-    expect(screen.getByText(/1 card staged/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /clear picks/i })).toBeInTheDocument();
-    expect(useWBinderPickStore.getState().totalItems()).toBe(1);
+    expect(useWBinderShareInterestStore.getState().totalItems()).toBe(1);
+    expect(useCartStore.getState().hasItem(firstCardId)).toBe(false);
+    expect(screen.getByRole("button", { name: /copy list/i })).toBeInTheDocument();
   });
 });

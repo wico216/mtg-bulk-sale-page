@@ -23,6 +23,8 @@
     "migrate:card-faces:dry-run": "tsx scripts/migrate-v1.3.x-card-face-images.ts --dry-run",
     "migrate:mana-cost": "tsx scripts/migrate-add-mana-cost.ts",
     "migrate:mana-cost:dry-run": "tsx scripts/migrate-add-mana-cost.ts --dry-run",
+    "migrate:w-binder-shares": "tsx scripts/migrate-w-binder-share-links.ts",
+    "migrate:w-binder-shares:dry-run": "tsx scripts/migrate-w-binder-share-links.ts --dry-run",
     "backfill:mana-cost": "tsx scripts/backfill-mana-cost.ts",
     "backfill:mana-cost:dry-run": "tsx scripts/backfill-mana-cost.ts --dry-run"
   },
