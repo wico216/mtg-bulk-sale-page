@@ -6,10 +6,13 @@ import { formatBinderForDisplay } from "@/lib/binder-name";
 import type { CardSelectionController } from "@/lib/card-selection";
 import { useWBinderPickStore } from "@/lib/store/w-binder-pick-store";
 import type { AdminCard, CardData, Finish } from "@/lib/types";
+import type { WBinderShareLink } from "@/lib/w-binder-share-types";
+import { WBinderShareManager } from "./w-binder-share-manager";
 
 interface AdminWBindersShellProps {
   cards: AdminCard[];
   meta: CardData["meta"];
+  shareLinks: WBinderShareLink[];
 }
 
 const CONDITION_MAP: Record<string, string> = {
@@ -39,7 +42,7 @@ function formatBinderList(card: AdminCard): string {
   return card.binders.map(formatBinderForDisplay).join(" · ");
 }
 
-export function AdminWBindersShell({ cards, meta }: AdminWBindersShellProps) {
+export function AdminWBindersShell({ cards, meta, shareLinks }: AdminWBindersShellProps) {
   const items = useWBinderPickStore((s) => s.items);
   const addItem = useWBinderPickStore((s) => s.addItem);
   const setQuantity = useWBinderPickStore((s) => s.setQuantity);
@@ -144,6 +147,8 @@ export function AdminWBindersShell({ cards, meta }: AdminWBindersShellProps) {
           </div>
         </div>
       </section>
+
+      <WBinderShareManager cards={cards} initialLinks={shareLinks} />
 
       <section
         id="w-pick-list"

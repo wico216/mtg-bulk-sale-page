@@ -23,6 +23,8 @@ const ACTION_LABELS: Record<AdminAuditAction, string> = {
   "order.cancel": "Order cancel",
   "order.restore_inventory": "Inventory restore",
   "manabox.removal_marked": "ManaBox removal",
+  "w_binder_share.create": "W binder share created",
+  "w_binder_share.revoke": "W binder share revoked",
   // Phase 23 (Plan 23-01): daily Scryfall price refresh + manual escape hatch.
   price_refresh: "Price refresh",
 };
@@ -38,6 +40,8 @@ const ACTION_CLASSES: Record<AdminAuditAction, string> = {
   "order.cancel": "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   "order.restore_inventory": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
   "manabox.removal_marked": "bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300",
+  "w_binder_share.create": "bg-violet-100 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
+  "w_binder_share.revoke": "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   // Phase 23 (Plan 23-01): teal -- distinct from inventory blue and order indigo.
   price_refresh: "bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-300",
 };

@@ -10,6 +10,7 @@ import {
   adminAuditLog,
   importHistory,
   cardPriceSnapshots,
+  binderShareLinks,
 } from "../schema";
 
 describe("cards table schema", () => {
@@ -194,6 +195,41 @@ describe("importHistory table schema", () => {
     expect(columns.fileNames.dataType).toBe("array");
     expect(columns.metadata.dataType).toBe("json");
     expect(columns.metadata.notNull).toBe(true);
+  });
+});
+
+describe("binderShareLinks table schema", () => {
+  const columns = getTableColumns(binderShareLinks);
+
+  it("stores revocable private W-binder magic-link metadata without raw tokens", () => {
+    const requiredColumns = [
+      "id",
+      "tokenHash",
+      "label",
+      "scope",
+      "allowedBinders",
+      "createdByEmail",
+      "expiresAt",
+      "revokedAt",
+      "lastUsedAt",
+      "useCount",
+      "createdAt",
+    ];
+    const colRecord = columns as Record<string, unknown>;
+    for (const col of requiredColumns) {
+      expect(colRecord[col], `missing column: ${col}`).toBeDefined();
+    }
+    expect(colRecord.token).toBeUndefined();
+    expect(columns.tokenHash.notNull).toBe(true);
+    expect(columns.allowedBinders.dataType).toBe("array");
+    expect(columns.revokedAt.notNull).toBe(false);
+    expect(columns.useCount.notNull).toBe(true);
+  });
+
+  it("declares token hash uniqueness for unrecoverable share tokens", () => {
+    const config = getTableConfig(binderShareLinks);
+    const indexNames = config.indexes.map((index) => index.config.name);
+    expect(indexNames).toContain("binder_share_links_token_hash_idx");
   });
 });
 

@@ -5,6 +5,7 @@ import {
   getPrivateWBinderCardsAggregated,
   getPrivateWBinderCardsMeta,
 } from "@/db/queries";
+import { listWBinderShareLinks } from "@/db/w-binder-share-links";
 import { isAdminEmail } from "@/lib/auth/helpers";
 import {
   e2eFixturesEnabled,
@@ -34,17 +35,18 @@ export default async function AdminWBindersPage({
 
   if (fixtureEnabled) {
     const cards = getE2ePrivateWBinderCards();
-    return <AdminWBindersShell cards={cards} meta={getE2ePrivateWBinderMeta(cards)} />;
+    return <AdminWBindersShell cards={cards} meta={getE2ePrivateWBinderMeta(cards)} shareLinks={[]} />;
   }
 
   const session = await auth();
   if (!session?.user) redirect("/admin/login");
   if (!isAdminEmail(session.user.email)) redirect("/admin/access-denied");
 
-  const [cards, meta] = await Promise.all([
+  const [cards, meta, shareLinks] = await Promise.all([
     getPrivateWBinderCardsAggregated(),
     getPrivateWBinderCardsMeta(),
+    listWBinderShareLinks(),
   ]);
 
-  return <AdminWBindersShell cards={cards} meta={meta} />;
+  return <AdminWBindersShell cards={cards} meta={meta} shareLinks={shareLinks} />;
 }

@@ -19,12 +19,28 @@ export type { ScopedImportAuditMetadata } from "@/lib/import-contract";
 const PUBLIC_SALE_BINDER_SQL = sql`LOWER(binder) NOT LIKE 'w%'`;
 const PRIVATE_W_BINDER_SQL = sql`LOWER(binder) LIKE 'w%'`;
 
+function binderInListSql(allowedBinders: readonly string[]): SQL {
+  return sql`LOWER(binder) IN (${sql.join(
+    allowedBinders.map((binder) => sql`${binder}`),
+    sql`, `,
+  )})`;
+}
+
+function privateWBinderSql(allowedBinders?: readonly string[]): SQL {
+  if (!allowedBinders?.length) return PRIVATE_W_BINDER_SQL;
+  return sql`${PRIVATE_W_BINDER_SQL} AND ${binderInListSql(allowedBinders)}`;
+}
+
 function publicSaleBinderWhere(): SQL {
   return sql`LOWER(${cards.binder}) NOT LIKE 'w%'`;
 }
 
-function privateWBinderWhere(): SQL {
-  return sql`LOWER(${cards.binder}) LIKE 'w%'`;
+function privateWBinderWhere(allowedBinders?: readonly string[]): SQL {
+  if (!allowedBinders?.length) return sql`LOWER(${cards.binder}) LIKE 'w%'`;
+  return and(
+    sql`LOWER(${cards.binder}) LIKE 'w%'`,
+    inArray(cards.binder, [...allowedBinders]),
+  )!;
 }
 
 /**
@@ -278,7 +294,9 @@ export async function getRecentlyAddedCards(): Promise<AdminCard[]> {
   return result.rows.map(rowToAggregatedCard);
 }
 
-export async function getPrivateWBinderCardsAggregated(): Promise<AdminCard[]> {
+export async function getPrivateWBinderCardsAggregated(
+  allowedBinders?: readonly string[],
+): Promise<AdminCard[]> {
   const result = await db.execute<AggregatedCardRow>(sql`
     SELECT
       set_code || '-' || collector_number || '-' || finish || '-' || condition AS "id",
@@ -302,7 +320,7 @@ export async function getPrivateWBinderCardsAggregated(): Promise<AdminCard[]> {
       MAX(created_at)                                                            AS "createdAt",
       MAX(updated_at)                                                            AS "updatedAt"
     FROM cards
-    WHERE ${PRIVATE_W_BINDER_SQL}
+    WHERE ${privateWBinderSql(allowedBinders)}
     GROUP BY set_code, collector_number, finish, condition
     HAVING SUM(quantity) > 0
     ORDER BY MAX(name) ASC
@@ -332,14 +350,16 @@ export async function getCardsMeta(): Promise<CardData["meta"]> {
   };
 }
 
-export async function getPrivateWBinderCardsMeta(): Promise<CardData["meta"]> {
+export async function getPrivateWBinderCardsMeta(
+  allowedBinders?: readonly string[],
+): Promise<CardData["meta"]> {
   const [result] = await db
     .select({
       totalCards: count(),
       lastUpdated: max(cards.updatedAt),
     })
     .from(cards)
-    .where(privateWBinderWhere());
+    .where(privateWBinderWhere(allowedBinders));
 
   return {
     lastUpdated: result.lastUpdated?.toISOString() ?? new Date().toISOString(),
@@ -381,9 +401,11 @@ export type AdminAuditAction =
   | "order.cancel"
   | "order.restore_inventory"
   | "manabox.removal_marked"
+  | "w_binder_share.create"
+  | "w_binder_share.revoke"
   | "price_refresh";
 
-export type AdminAuditTargetType = "card" | "inventory" | "order" | "order_item" | "import";
+export type AdminAuditTargetType = "card" | "inventory" | "order" | "order_item" | "import" | "binder_share_link";
 
 export interface AdminAuditEntry {
   id: number;

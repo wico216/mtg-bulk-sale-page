@@ -9,6 +9,7 @@ import {
   jsonb,
   timestamp,
   index,
+  uniqueIndex,
   check,
 } from "drizzle-orm/pg-core";
 
@@ -160,6 +161,30 @@ export const importHistory = pgTable(
   (table) => [
     index("import_history_committed_at_idx").on(table.committedAt),
     index("import_history_actor_email_idx").on(table.actorEmail),
+  ],
+);
+
+export const binderShareLinks = pgTable(
+  "binder_share_links",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    tokenHash: text("token_hash").notNull(),
+    label: text("label").notNull(),
+    scope: text("scope").notNull().default("w_binders"),
+    allowedBinders: text("allowed_binders").array(),
+    createdByEmail: text("created_by_email"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    useCount: integer("use_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("binder_share_links_token_hash_idx").on(table.tokenHash),
+    index("binder_share_links_scope_created_at_idx").on(table.scope, table.createdAt.desc()),
+    index("binder_share_links_revoked_at_idx").on(table.revokedAt),
   ],
 );
 
