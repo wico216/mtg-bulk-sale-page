@@ -188,6 +188,28 @@ export const binderShareLinks = pgTable(
   ],
 );
 
+export const commanderLinks = pgTable(
+  "commander_links",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    name: text("name").notNull(),
+    edhrecUrl: text("edhrec_url").notNull(),
+    imageUrl: text("image_url"),
+    createdByEmail: text("created_by_email"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("commander_links_name_idx").on(table.name),
+    index("commander_links_created_at_idx").on(table.createdAt.desc()),
+  ],
+);
+
 // Orders table
 export const orders = pgTable(
   "orders",

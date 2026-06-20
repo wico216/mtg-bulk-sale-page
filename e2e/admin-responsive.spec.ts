@@ -98,6 +98,26 @@ test.describe("mobile admin responsive audit surfaces", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("commander EDHREC shortcuts render as tappable image cards", async ({ page }) => {
+    await page.goto("/admin/commanders");
+    await expect(page.getByRole("heading", { name: "Commanders." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Commanders" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("button", { name: /add commander/i })).toBeVisible();
+
+    const grid = page.getByRole("region", { name: /Saved Commander EDHREC links/i });
+    await expect(grid).toBeVisible();
+    const muldrotha = grid.getByRole("article", { name: /Muldrotha, the Gravetide commander shortcut/i });
+    await expect(muldrotha).toBeVisible();
+    await expect(muldrotha.getByRole("img", { name: /Muldrotha, the Gravetide commander art/i })).toBeVisible();
+    await expect(muldrotha.getByRole("link", { name: /Open Muldrotha, the Gravetide on EDHREC/i })).toHaveAttribute(
+      "href",
+      "https://edhrec.com/commanders/muldrotha-the-gravetide",
+    );
+
+    await expectWithinViewport(page, ".wiko-commander-link-grid article");
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("ManaBox removals render as a visual checklist with card art and source boxes", async ({ page }) => {
     await page.goto("/admin/manabox");
     await expect(page.getByRole("heading", { name: "ManaBox visual removals" })).toBeVisible();

@@ -25,6 +25,8 @@
     "migrate:mana-cost:dry-run": "tsx scripts/migrate-add-mana-cost.ts --dry-run",
     "migrate:w-binder-shares": "tsx scripts/migrate-w-binder-share-links.ts",
     "migrate:w-binder-shares:dry-run": "tsx scripts/migrate-w-binder-share-links.ts --dry-run",
+    "migrate:commander-links": "tsx scripts/migrate-commander-links.ts",
+    "migrate:commander-links:dry-run": "tsx scripts/migrate-commander-links.ts --dry-run",
     "backfill:mana-cost": "tsx scripts/backfill-mana-cost.ts",
     "backfill:mana-cost:dry-run": "tsx scripts/backfill-mana-cost.ts --dry-run"
   },
