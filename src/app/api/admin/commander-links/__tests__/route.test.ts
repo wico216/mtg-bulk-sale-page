@@ -10,6 +10,7 @@ const {
   mockNormalizeCommanderName,
   mockNormalizeEdhrecUrl,
   mockNormalizeCommanderImageUrl,
+  mockBuildEdhrecCommanderUrl,
 } = vi.hoisted(() => ({
   mockRequireAdmin: vi.fn(),
   mockEnforceRateLimit: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockNormalizeCommanderName: vi.fn(),
   mockNormalizeEdhrecUrl: vi.fn(),
   mockNormalizeCommanderImageUrl: vi.fn(),
+  mockBuildEdhrecCommanderUrl: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -40,6 +42,7 @@ vi.mock("@/db/commander-links", () => ({
   normalizeCommanderName: mockNormalizeCommanderName,
   normalizeEdhrecUrl: mockNormalizeEdhrecUrl,
   normalizeCommanderImageUrl: mockNormalizeCommanderImageUrl,
+  buildEdhrecCommanderUrl: mockBuildEdhrecCommanderUrl,
 }));
 
 import { GET, POST } from "../route";
@@ -76,6 +79,7 @@ describe("/api/admin/commander-links", () => {
     mockNormalizeCommanderName.mockReset();
     mockNormalizeEdhrecUrl.mockReset();
     mockNormalizeCommanderImageUrl.mockReset();
+    mockBuildEdhrecCommanderUrl.mockReset();
 
     mockRequireAdmin.mockResolvedValue(adminSession);
     mockClientKeyFromRequest.mockReturnValue("admin@example.com");
@@ -83,6 +87,9 @@ describe("/api/admin/commander-links", () => {
     mockNormalizeCommanderName.mockImplementation((value: string) => value.trim());
     mockNormalizeEdhrecUrl.mockImplementation((value: string) => value.trim());
     mockNormalizeCommanderImageUrl.mockImplementation((value?: string) => value?.trim() || null);
+    mockBuildEdhrecCommanderUrl.mockImplementation(
+      (value: string) => `https://edhrec.com/commanders/${value.toLowerCase().replaceAll(" ", "-")}`,
+    );
   });
 
   it("returns 401/403 responses from requireAdmin before listing commanders", async () => {
@@ -127,6 +134,32 @@ describe("/api/admin/commander-links", () => {
     });
     expect(body.success).toBe(true);
     expect(body.commander).toEqual(commander);
+  });
+
+  it("auto-generates the EDHREC URL when the client sends only a selected commander", async () => {
+    mockCreateCommanderLink.mockResolvedValueOnce({
+      ...commander,
+      name: "Atraxa, Praetors' Voice",
+      edhrecUrl: "https://edhrec.com/commanders/atraxa-praetors-voice",
+    });
+    mockBuildEdhrecCommanderUrl.mockReturnValueOnce("https://edhrec.com/commanders/atraxa-praetors-voice");
+
+    const response = await POST(
+      request({
+        name: " Atraxa, Praetors' Voice ",
+        imageUrl: "https://cards.scryfall.io/normal/front/atraxa.jpg",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockNormalizeEdhrecUrl).not.toHaveBeenCalled();
+    expect(mockBuildEdhrecCommanderUrl).toHaveBeenCalledWith("Atraxa, Praetors' Voice");
+    expect(mockCreateCommanderLink).toHaveBeenCalledWith({
+      name: "Atraxa, Praetors' Voice",
+      edhrecUrl: "https://edhrec.com/commanders/atraxa-praetors-voice",
+      imageUrl: "https://cards.scryfall.io/normal/front/atraxa.jpg",
+      actorEmail: "admin@example.com",
+    });
   });
 
   it("rejects invalid commander payloads before creating a link", async () => {

@@ -1,4 +1,5 @@
 import {
+  buildEdhrecCommanderUrl,
   createCommanderLink,
   listCommanderLinks,
   normalizeCommanderImageUrl,
@@ -73,7 +74,11 @@ export async function POST(request: Request) {
   let imageUrl: string | null;
   try {
     name = normalizeCommanderName(payload.name);
-    edhrecUrl = normalizeEdhrecUrl(payload.edhrecUrl);
+    const rawEdhrecUrl = typeof payload.edhrecUrl === "string" ? payload.edhrecUrl.trim() : "";
+    if (payload.edhrecUrl !== undefined && payload.edhrecUrl !== null && typeof payload.edhrecUrl !== "string") {
+      throw new Error("edhrecUrl must be a string");
+    }
+    edhrecUrl = rawEdhrecUrl ? normalizeEdhrecUrl(rawEdhrecUrl) : buildEdhrecCommanderUrl(name);
     imageUrl = normalizeCommanderImageUrl(payload.imageUrl);
   } catch (err) {
     return Response.json(

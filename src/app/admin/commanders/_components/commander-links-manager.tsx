@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { CommanderLink } from "@/lib/commander-links-types";
+import { useEffect, useState, type CSSProperties } from "react";
+import type { CommanderLink, CommanderSearchResult } from "@/lib/commander-links-types";
 
 interface CommanderLinksManagerProps {
   initialCommanders: CommanderLink[];
@@ -16,6 +16,30 @@ interface DeleteCommanderResponse {
   success: true;
   commander: CommanderLink;
 }
+
+interface CommanderSearchResponse {
+  results: CommanderSearchResult[];
+}
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "var(--ink)",
+  borderRadius: 4,
+  padding: "10px 12px",
+  fontFamily: "inherit",
+  fontSize: 14,
+};
+
+const eyebrowStyle: CSSProperties = {
+  margin: "0 0 6px",
+  color: "var(--muted)",
+  fontSize: 10,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+};
 
 function formatDate(iso: string): string {
   const parsed = Date.parse(iso);
@@ -81,15 +105,113 @@ function CommanderImage({ commander }: { commander: CommanderLink }) {
   );
 }
 
+function CommanderResultImage({ result }: { result: CommanderSearchResult }) {
+  if (!result.imageUrl) {
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          width: 44,
+          height: 60,
+          borderRadius: 6,
+          border: "1px solid var(--border)",
+          background:
+            "linear-gradient(135deg, color-mix(in oklab, var(--accent) 25%, transparent), var(--surface))",
+          flex: "0 0 auto",
+        }}
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- Scryfall result thumbnails are remote admin-only previews.
+    <img
+      src={result.imageUrl}
+      alt=""
+      loading="lazy"
+      aria-hidden="true"
+      style={{
+        width: 44,
+        height: 60,
+        objectFit: "cover",
+        borderRadius: 6,
+        border: "1px solid var(--border)",
+        background: "var(--surface)",
+        flex: "0 0 auto",
+      }}
+    />
+  );
+}
+
+function formatColorIdentity(colors: string[]): string {
+  return colors.length > 0 ? colors.join("") : "Colorless";
+}
+
 export function CommanderLinksManager({ initialCommanders }: CommanderLinksManagerProps) {
   const [commanders, setCommanders] = useState(initialCommanders);
   const [name, setName] = useState("");
+  const [selectedCommander, setSelectedCommander] = useState<CommanderSearchResult | null>(null);
+  const [searchResults, setSearchResults] = useState<CommanderSearchResult[]>([]);
+  const [searchPending, setSearchPending] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [edhrecUrl, setEdhrecUrl] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const query = name.trim();
+    if (query.length < 2 || selectedCommander?.name === query) {
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchPending(false);
+      setSearchOpen(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setSearchPending(true);
+      setSearchError(null);
+      try {
+        const response = await fetch(`/api/admin/commander-search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(await readError(response));
+        const body = (await response.json()) as CommanderSearchResponse;
+        if (controller.signal.aborted) return;
+        setSearchResults(body.results ?? []);
+        setSearchOpen(true);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setSearchResults([]);
+        setSearchOpen(false);
+        setSearchError(err instanceof Error ? err.message : "Failed to search Scryfall");
+      } finally {
+        if (!controller.signal.aborted) setSearchPending(false);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [name, selectedCommander?.name]);
+
+  const selectCommander = (result: CommanderSearchResult) => {
+    setSelectedCommander(result);
+    setName(result.name);
+    setEdhrecUrl(result.edhrecUrl);
+    setImageUrl(result.imageUrl ?? "");
+    setSearchResults([]);
+    setSearchOpen(false);
+    setSearchError(null);
+    setMessage(null);
+    setError(null);
+  };
 
   const createCommander = async () => {
     setError(null);
@@ -102,7 +224,7 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name,
-          edhrecUrl,
+          edhrecUrl: edhrecUrl.trim() || undefined,
           imageUrl: imageUrl.trim() || undefined,
         }),
       });
@@ -115,6 +237,9 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
         ),
       );
       setName("");
+      setSelectedCommander(null);
+      setSearchResults([]);
+      setSearchOpen(false);
       setEdhrecUrl("");
       setImageUrl("");
       setMessage("Commander shortcut saved.");
@@ -144,6 +269,8 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
     }
   };
 
+  const canCreate = name.trim().length > 0 && !pending;
+
   return (
     <div className="space-y-5">
       <section
@@ -156,23 +283,12 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <p
-              style={{
-                margin: "0 0 6px",
-                color: "var(--muted)",
-                fontSize: 10,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-              }}
-            >
-              Add shortcut
-            </p>
+            <p style={eyebrowStyle}>Add shortcut</p>
             <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 400 }}>
               Commander EDHREC links
             </h2>
             <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: 13, maxWidth: 760 }}>
-              Paste the EDHREC page for a commander. Leave image blank and Spellbook will try to pull the commander art from Scryfall.
+              Search Scryfall, choose your commander, and Spellbook will fill the EDHREC link and card art automatically.
             </p>
           </div>
           <div style={{ color: "var(--muted)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
@@ -180,83 +296,143 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)]">
-          <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--muted)" }}>
-            Commander name
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)]">
+          <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--muted)", position: "relative" }}>
+            Commander search
             <input
               value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Muldrotha, the Gravetide"
-              style={{
-                width: "100%",
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--ink)",
-                borderRadius: 4,
-                padding: "10px 12px",
-                fontFamily: "inherit",
-                fontSize: 14,
+              onChange={(event) => {
+                setName(event.target.value);
+                setSelectedCommander(null);
+                setEdhrecUrl("");
+                setImageUrl("");
               }}
+              onFocus={() => {
+                if (searchResults.length > 0) setSearchOpen(true);
+              }}
+              onBlur={() => window.setTimeout(() => setSearchOpen(false), 140)}
+              placeholder="Start typing: Muldrotha, Atraxa, Prosper…"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searchOpen}
+              aria-controls="commander-search-results"
+              aria-label="Commander search"
+              style={inputStyle}
             />
+            {selectedCommander && (
+              <span style={{ color: "var(--accent)", fontSize: 11 }}>
+                Selected from Scryfall · {formatColorIdentity(selectedCommander.colorIdentity)}
+              </span>
+            )}
+            {!selectedCommander && searchPending && (
+              <span style={{ color: "var(--muted)", fontSize: 11 }}>Searching Scryfall…</span>
+            )}
+            {!selectedCommander && searchError && (
+              <span role="alert" style={{ color: "#ef4444", fontSize: 11 }}>{searchError}</span>
+            )}
+            {!selectedCommander && name.trim().length > 0 && name.trim().length < 2 && (
+              <span style={{ color: "var(--muted)", fontSize: 11 }}>Type at least 2 characters to search.</span>
+            )}
+
+            {searchOpen && searchResults.length > 0 && (
+              <div
+                id="commander-search-results"
+                role="listbox"
+                aria-label="Commander search results"
+                style={{
+                  position: "absolute",
+                  zIndex: 30,
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  marginTop: 6,
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  background: "var(--bg)",
+                  boxShadow: "0 18px 45px rgba(0,0,0,0.22)",
+                  overflow: "hidden",
+                }}
+              >
+                {searchResults.map((result) => (
+                  <button
+                    key={`${result.scryfallId ?? result.name}-${result.edhrecUrl}`}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedCommander?.name === result.name}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectCommander(result)}
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      borderBottom: "1px solid var(--border)",
+                      background: "transparent",
+                      color: "var(--ink)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <CommanderResultImage result={result} />
+                    <span style={{ minWidth: 0 }}>
+                      <strong style={{ display: "block", fontSize: 13, lineHeight: 1.25 }}>{result.name}</strong>
+                      <span style={{ display: "block", color: "var(--muted)", fontSize: 11, marginTop: 3 }}>
+                        {result.typeLine ?? "Commander"} · {formatColorIdentity(result.colorIdentity)}
+                      </span>
+                      <span style={{ display: "block", color: "var(--accent)", fontSize: 11, marginTop: 3 }}>
+                        Auto-link: {result.edhrecUrl.replace("https://", "")}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </label>
 
           <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--muted)" }}>
-            EDHREC URL
+            EDHREC URL · auto-filled
             <input
               value={edhrecUrl}
               onChange={(event) => setEdhrecUrl(event.target.value)}
-              placeholder="https://edhrec.com/commanders/muldrotha-the-gravetide"
+              placeholder="Choose a commander, or leave blank to generate on save"
               inputMode="url"
-              style={{
-                width: "100%",
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--ink)",
-                borderRadius: 4,
-                padding: "10px 12px",
-                fontFamily: "inherit",
-                fontSize: 14,
-              }}
+              style={inputStyle}
             />
+            <span style={{ color: "var(--muted)", fontSize: 11 }}>
+              You can still override this if EDHREC uses a special page.
+            </span>
           </label>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--muted)" }}>
-            Image URL · optional
+            Image URL · auto-filled
             <input
               value={imageUrl}
               onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="Leave blank to auto-fill from Scryfall"
+              placeholder="Choose a commander, or leave blank for Scryfall art"
               inputMode="url"
-              style={{
-                width: "100%",
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--ink)",
-                borderRadius: 4,
-                padding: "10px 12px",
-                fontFamily: "inherit",
-                fontSize: 14,
-              }}
+              style={inputStyle}
             />
           </label>
 
           <button
             type="button"
-            disabled={pending}
+            disabled={!canCreate}
             onClick={createCommander}
             style={{
               border: "none",
               borderRadius: 4,
-              background: pending ? "var(--muted)" : "var(--accent)",
+              background: canCreate ? "var(--accent)" : "var(--muted)",
               color: "var(--accent-fg)",
               padding: "11px 16px",
               fontSize: 13,
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              cursor: pending ? "not-allowed" : "pointer",
+              cursor: canCreate ? "pointer" : "not-allowed",
               minHeight: 42,
             }}
           >
@@ -278,7 +454,7 @@ export function CommanderLinksManager({ initialCommanders }: CommanderLinksManag
             textAlign: "center",
           }}
         >
-          No commanders saved yet. Add your first EDHREC shortcut above.
+          No commanders saved yet. Search for your first commander above.
         </section>
       ) : (
         <section
