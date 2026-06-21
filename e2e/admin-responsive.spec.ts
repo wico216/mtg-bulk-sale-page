@@ -99,13 +99,81 @@ test.describe("mobile admin responsive audit surfaces", () => {
   });
 
   test("commander EDHREC shortcuts render as tappable image cards", async ({ page }) => {
+    await page.route("**/api/admin/commander-search?*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          results: [
+            {
+              name: "Atraxa, Praetors' Voice",
+              scryfallId: "atraxa-id",
+              edhrecUrl: "https://edhrec.com/commanders/atraxa-praetors-voice",
+              imageUrl: "/window.svg",
+              typeLine: "Legendary Creature — Phyrexian Angel Horror",
+              colorIdentity: ["G", "W", "U", "B"],
+            },
+          ],
+        }),
+      });
+    });
+    await page.route("**/api/admin/commander-links", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      const payload = route.request().postDataJSON() as {
+        name?: string;
+        edhrecUrl?: string;
+        imageUrl?: string;
+      };
+      expect(payload).toMatchObject({
+        name: "Atraxa, Praetors' Voice",
+        edhrecUrl: "https://edhrec.com/commanders/atraxa-praetors-voice",
+        imageUrl: "/window.svg",
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          commander: {
+            id: 99,
+            name: "Atraxa, Praetors' Voice",
+            edhrecUrl: "https://edhrec.com/commanders/atraxa-praetors-voice",
+            imageUrl: "/window.svg",
+            createdByEmail: "admin@example.com",
+            createdAt: "2026-06-20T00:00:00.000Z",
+            updatedAt: "2026-06-20T00:00:00.000Z",
+          },
+        }),
+      });
+    });
+
     await page.goto("/admin/commanders");
     await expect(page.getByRole("heading", { name: "Commanders." })).toBeVisible();
     await expect(page.getByRole("link", { name: "Commanders" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("button", { name: /add commander/i })).toBeVisible();
 
+    const search = page.getByRole("combobox", { name: "Commander search" });
+    await search.fill("Atraxa");
+    const atraxaOption = page.getByRole("option", { name: /Atraxa, Praetors' Voice/i });
+    await expect(atraxaOption).toBeVisible();
+    await atraxaOption.click();
+    await expect(search).toHaveValue("Atraxa, Praetors' Voice");
+    await expect(page.getByLabel(/EDHREC URL/i)).toHaveValue("https://edhrec.com/commanders/atraxa-praetors-voice");
+    await expect(page.getByLabel(/Image URL/i)).toHaveValue("/window.svg");
+    await page.getByRole("button", { name: /add commander/i }).click();
+    await expect(page.getByRole("status")).toContainText("Commander shortcut saved");
+
     const grid = page.getByRole("region", { name: /Saved Commander EDHREC links/i });
     await expect(grid).toBeVisible();
+    const atraxa = grid.getByRole("article", { name: /Atraxa, Praetors' Voice commander shortcut/i });
+    await expect(atraxa).toBeVisible();
+    await expect(atraxa.getByRole("link", { name: /Open Atraxa, Praetors' Voice on EDHREC/i })).toHaveAttribute(
+      "href",
+      "https://edhrec.com/commanders/atraxa-praetors-voice",
+    );
     const muldrotha = grid.getByRole("article", { name: /Muldrotha, the Gravetide commander shortcut/i });
     await expect(muldrotha).toBeVisible();
     await expect(muldrotha.getByRole("img", { name: /Muldrotha, the Gravetide commander art/i })).toBeVisible();

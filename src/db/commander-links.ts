@@ -3,16 +3,29 @@ import "server-only";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { adminAuditLog, commanderLinks } from "@/db/schema";
-import type { CommanderLink } from "@/lib/commander-links-types";
+import type { CommanderLink, CommanderSearchResult } from "@/lib/commander-links-types";
 
 const MAX_COMMANDER_NAME_LENGTH = 100;
+const MAX_COMMANDER_SEARCH_LENGTH = 80;
 const MAX_URL_LENGTH = 500;
+const MAX_SEARCH_RESULTS = 8;
 const SCRYFALL_HEADERS = {
   Accept: "application/json",
   "User-Agent": "WikoSpellbinder/1.0 (+https://wikospellbinder.com)",
 } as const;
 
 type CommanderLinkRow = typeof commanderLinks.$inferSelect;
+
+type ScryfallCommanderCard = {
+  id?: string;
+  name?: string;
+  type_line?: string;
+  color_identity?: string[];
+  image_uris?: { small?: string; normal?: string; large?: string };
+  card_faces?: Array<{
+    image_uris?: { small?: string; normal?: string; large?: string };
+  }>;
+};
 
 function toIso(value: Date): string {
   return value.toISOString();
@@ -52,6 +65,31 @@ function normalizeHttpUrl(value: string, field: string): string {
   return parsed.toString();
 }
 
+function scryfallImageUrl(card: ScryfallCommanderCard): string | null {
+  return (
+    card.image_uris?.normal ??
+    card.image_uris?.large ??
+    card.image_uris?.small ??
+    card.card_faces?.[0]?.image_uris?.normal ??
+    card.card_faces?.[0]?.image_uris?.large ??
+    card.card_faces?.[0]?.image_uris?.small ??
+    null
+  );
+}
+
+function commanderSearchResult(card: ScryfallCommanderCard): CommanderSearchResult | null {
+  if (typeof card.name !== "string" || !card.name.trim()) return null;
+  const name = normalizeCommanderName(card.name);
+  return {
+    name,
+    scryfallId: typeof card.id === "string" ? card.id : null,
+    edhrecUrl: buildEdhrecCommanderUrl(name),
+    imageUrl: scryfallImageUrl(card),
+    typeLine: typeof card.type_line === "string" ? card.type_line : null,
+    colorIdentity: Array.isArray(card.color_identity) ? card.color_identity : [],
+  };
+}
+
 export function normalizeCommanderName(value: unknown): string {
   if (typeof value !== "string") throw new Error("name must be a string");
   const name = value.trim().replace(/\s+/g, " ");
@@ -60,6 +98,31 @@ export function normalizeCommanderName(value: unknown): string {
     throw new Error(`name must be ${MAX_COMMANDER_NAME_LENGTH} characters or less`);
   }
   return name;
+}
+
+export function normalizeCommanderSearchQuery(value: unknown): string {
+  if (typeof value !== "string") throw new Error("query must be a string");
+  const query = value.trim().replace(/\s+/g, " ");
+  if (query.length < 2) throw new Error("query must be at least 2 characters");
+  if (query.length > MAX_COMMANDER_SEARCH_LENGTH) {
+    throw new Error(`query must be ${MAX_COMMANDER_SEARCH_LENGTH} characters or less`);
+  }
+  return query;
+}
+
+export function buildEdhrecCommanderUrl(value: string): string {
+  const name = normalizeCommanderName(value).split(" // ")[0];
+  const slug = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (!slug) throw new Error("name must contain at least one alphanumeric character");
+  return `https://edhrec.com/commanders/${slug}`;
 }
 
 export function normalizeEdhrecUrl(value: unknown): string {
@@ -103,22 +166,37 @@ async function insertAuditEntry(args: {
   });
 }
 
+export async function searchCommanderCards(query: string): Promise<CommanderSearchResult[]> {
+  const normalizedQuery = normalizeCommanderSearchQuery(query);
+  const url = new URL("https://api.scryfall.com/cards/search");
+  url.searchParams.set("unique", "cards");
+  url.searchParams.set("order", "name");
+  url.searchParams.set("q", `is:commander ${normalizedQuery}`);
+
+  try {
+    const response = await fetch(url.toString(), { headers: SCRYFALL_HEADERS });
+    if (response.status === 404) return [];
+    if (!response.ok) return [];
+
+    const body = (await response.json()) as { data?: ScryfallCommanderCard[] };
+    if (!Array.isArray(body.data)) return [];
+
+    return body.data
+      .slice(0, MAX_SEARCH_RESULTS)
+      .map(commanderSearchResult)
+      .filter((result): result is CommanderSearchResult => result !== null);
+  } catch {
+    return [];
+  }
+}
+
 export async function resolveCommanderImageUrlByName(name: string): Promise<string | null> {
   const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`;
   try {
     const response = await fetch(url, { headers: SCRYFALL_HEADERS });
     if (!response.ok) return null;
-    const card = (await response.json()) as {
-      image_uris?: { normal?: string; large?: string };
-      card_faces?: Array<{ image_uris?: { normal?: string; large?: string } }>;
-    };
-    return (
-      card.image_uris?.normal ??
-      card.image_uris?.large ??
-      card.card_faces?.[0]?.image_uris?.normal ??
-      card.card_faces?.[0]?.image_uris?.large ??
-      null
-    );
+    const card = (await response.json()) as ScryfallCommanderCard;
+    return scryfallImageUrl(card);
   } catch {
     return null;
   }
