@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { DeckCheckItem, DeckCheckOption, DeckCheckResult } from "@/lib/deck-check";
+import type { DeckCheckItem, DeckCheckOption, DeckCheckResult, MoxfieldImportSection } from "@/lib/deck-check";
 import type { Finish } from "@/lib/types";
 import { useCartStore } from "@/lib/store/cart-store";
 
@@ -42,6 +42,26 @@ type EnlargedArt = {
   alt: string;
   detail: string;
 };
+
+const MOXFIELD_BOARD_OPTIONS: Array<{
+  value: MoxfieldImportSection;
+  label: string;
+  help: string;
+}> = [
+  { value: "main", label: "Main deck", help: "Commander + mainboard" },
+  { value: "sideboard", label: "Sideboard", help: "Only sideboard cards" },
+  { value: "considering", label: "Considering", help: "Moxfield maybeboard" },
+];
+
+function isMoxfieldDeckInput(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    return (host === "moxfield.com" || host === "www.moxfield.com") && url.pathname.toLowerCase().includes("/decks/");
+  } catch {
+    return false;
+  }
+}
 
 function optionImageUrl(option: DeckCheckOption): string | null {
   return option.card.imageUrl ?? option.card.backImageUrl ?? null;
@@ -132,6 +152,7 @@ export function DeckCheckShell() {
   const cartItems = useCartStore((s) => s.items);
   const setQuantity = useCartStore((s) => s.setQuantity);
   const [input, setInput] = useState("");
+  const [moxfieldSection, setMoxfieldSection] = useState<MoxfieldImportSection>("main");
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DeckCheckResult | null>(null);
@@ -157,6 +178,8 @@ export function DeckCheckShell() {
     if (!result) return [];
     return result.items.filter((item) => item.options.length > 0);
   }, [result]);
+
+  const moxfieldDeckInput = useMemo(() => isMoxfieldDeckInput(input), [input]);
 
   const missingItems = useMemo(() => {
     if (!result) return [];
@@ -191,10 +214,13 @@ export function DeckCheckShell() {
     setMissingExpanded(false);
 
     try {
+      const body: { input: string; moxfieldSection?: MoxfieldImportSection } = { input };
+      if (isMoxfieldDeckInput(input)) body.moxfieldSection = moxfieldSection;
+
       const response = await fetch("/api/deck-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify(body),
       });
       const json = (await response.json()) as DeckCheckResult | { error?: string };
       if (!response.ok) {
@@ -287,6 +313,31 @@ export function DeckCheckShell() {
                 rows={8}
                 className="wiko-deck-check-input"
               />
+              {moxfieldDeckInput && (
+                <div className="wiko-deck-check-moxfield-board">
+                  <div className="wiko-deck-check-moxfield-board-head">
+                    <strong id="moxfield-board-label">Moxfield board</strong>
+                    <span>Pick one section to match instead of importing every Moxfield card.</span>
+                  </div>
+                  <div role="radiogroup" aria-labelledby="moxfield-board-label" className="wiko-deck-check-moxfield-board-options">
+                    {MOXFIELD_BOARD_OPTIONS.map((option) => (
+                      <label key={option.value} className="wiko-deck-check-moxfield-board-option">
+                        <input
+                          type="radio"
+                          name="moxfield-section"
+                          value={option.value}
+                          checked={moxfieldSection === option.value}
+                          onChange={() => setMoxfieldSection(option.value)}
+                        />
+                        <span>
+                          <strong>{option.label}</strong>
+                          <small>{option.help}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="wiko-deck-check-form-actions">
                 <button type="submit" disabled={checking || input.trim().length === 0} className="wiko-primary-button">
                   {checking && <span aria-hidden="true" className="wiko-deck-check-button-spinner" />}

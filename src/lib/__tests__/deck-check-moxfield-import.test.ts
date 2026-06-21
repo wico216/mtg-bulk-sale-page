@@ -93,7 +93,9 @@ describe("Moxfield deck import", () => {
       },
     });
 
-    const deck = await importDeckInput("https://moxfield.com/decks/t7yNhAOYHEmgA7AXICUsxQ");
+    const deck = await importDeckInput("https://moxfield.com/decks/t7yNhAOYHEmgA7AXICUsxQ", {
+      moxfieldSection: "main",
+    });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://api2.moxfield.com/v3/decks/all/t7yNhAOYHEmgA7AXICUsxQ",
@@ -127,5 +129,51 @@ describe("Moxfield deck import", () => {
         },
       ],
     });
+  });
+
+  it("imports only the selected Moxfield board", async () => {
+    mockHttpsJsonResponse({
+      name: "Sectioned Deck",
+      commanders: {
+        commander: { quantity: 1, card: { name: "Main Commander", set: "fic", cn: "1", id: "commander-id" } },
+      },
+      mainboard: {
+        main: { quantity: 1, card: { name: "Main Deck Card", set: "fic", cn: "2", id: "main-id" } },
+      },
+      sideboard: {
+        side: { quantity: 2, card: { name: "Sideboard Card", set: "fic", cn: "3", id: "side-id" } },
+      },
+      maybeboard: {
+        considering: { quantity: 3, card: { name: "Considering Card", set: "fic", cn: "4", id: "considering-id" } },
+      },
+    });
+
+    const mainDeck = await importDeckInput("https://moxfield.com/decks/sectioned", {
+      moxfieldSection: "main",
+    });
+    expect(mainDeck.cards.map((card) => [card.name, card.section, card.quantity])).toEqual([
+      ["Main Commander", "commander", 1],
+      ["Main Deck Card", "main", 1],
+    ]);
+
+    const defaultDeck = await importDeckInput("https://moxfield.com/decks/sectioned");
+    expect(defaultDeck.cards.map((card) => [card.name, card.section, card.quantity])).toEqual([
+      ["Main Commander", "commander", 1],
+      ["Main Deck Card", "main", 1],
+    ]);
+
+    const sideboardDeck = await importDeckInput("https://moxfield.com/decks/sectioned", {
+      moxfieldSection: "sideboard",
+    });
+    expect(sideboardDeck.cards.map((card) => [card.name, card.section, card.quantity])).toEqual([
+      ["Sideboard Card", "sideboard", 2],
+    ]);
+
+    const consideringDeck = await importDeckInput("https://moxfield.com/decks/sectioned", {
+      moxfieldSection: "considering",
+    });
+    expect(consideringDeck.cards.map((card) => [card.name, card.section, card.quantity])).toEqual([
+      ["Considering Card", "maybeboard", 3],
+    ]);
   });
 });

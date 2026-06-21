@@ -229,6 +229,31 @@ describe("DeckCheckShell", () => {
     });
   });
 
+  it("sends the selected Moxfield board to the deck-check API", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => resultFixture(),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DeckCheckShell />);
+
+    const input = "https://www.moxfield.com/decks/example";
+    await user.type(screen.getByLabelText(/deck link or exported list/i), input);
+
+    expect(screen.getByRole("radiogroup", { name: /moxfield board/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: /sideboard/i }));
+    await user.click(screen.getByRole("button", { name: /check my deck/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /spellbook match report/i })).toBeInTheDocument();
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body).toEqual({ input, moxfieldSection: "sideboard" });
+  });
+
   it("shows an animated loading state while the deck link is checked", async () => {
     const user = userEvent.setup();
     const pending = deferred<{ ok: boolean; json: () => Promise<DeckCheckResult> }>();

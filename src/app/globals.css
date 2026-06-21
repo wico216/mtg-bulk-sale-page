@@ -1645,6 +1645,77 @@ a { color: inherit; }
   font: 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+.wiko-deck-check-moxfield-board {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 12px;
+}
+
+.wiko-deck-check-moxfield-board-head {
+  display: flex;
+  gap: 8px 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.wiko-deck-check-moxfield-board-head strong {
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wiko-deck-check-moxfield-board-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wiko-deck-check-moxfield-board-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wiko-deck-check-moxfield-board-option {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 10px;
+}
+
+.wiko-deck-check-moxfield-board-option:has(input:checked) {
+  border-color: color-mix(in oklch, var(--accent) 70%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 16%, transparent);
+}
+
+.wiko-deck-check-moxfield-board-option input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.wiko-deck-check-moxfield-board-option span {
+  display: grid;
+  gap: 3px;
+}
+
+.wiko-deck-check-moxfield-board-option strong {
+  font-size: 12px;
+}
+
+.wiko-deck-check-moxfield-board-option small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .wiko-deck-check-form-actions,
 .wiko-deck-check-results-head,
 .wiko-deck-check-actions {
@@ -2189,6 +2260,9 @@ a { color: inherit; }
     padding: 16px;
   }
   .wiko-deck-check-row-actions {
+    grid-template-columns: 1fr;
+  }
+  .wiko-deck-check-moxfield-board-options {
     grid-template-columns: 1fr;
   }
 }
