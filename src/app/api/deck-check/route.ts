@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildDeckCheckResult } from "@/lib/deck-check";
+import { buildDeckCheckResult, normalizeMoxfieldImportSection, type MoxfieldImportSection } from "@/lib/deck-check";
 import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 import { loadStorefrontData } from "@/lib/storefront-data";
 
@@ -7,6 +7,14 @@ export const dynamic = "force-dynamic";
 
 interface DeckCheckBody {
   input?: unknown;
+  moxfieldSection?: unknown;
+}
+
+const MOXFIELD_SECTION_VALUES = new Set<MoxfieldImportSection>(["main", "sideboard", "considering"]);
+
+function parseMoxfieldSection(value: unknown): MoxfieldImportSection {
+  const normalized = normalizeMoxfieldImportSection(value);
+  return MOXFIELD_SECTION_VALUES.has(normalized) ? normalized : "main";
 }
 
 export async function POST(request: NextRequest) {
@@ -28,6 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     const data = await loadStorefrontData();
     const result = await buildDeckCheckResult(input, data.cards, {
+      moxfieldSection: parseMoxfieldSection(body.moxfieldSection),
       resolveIdentities: !e2eFixturesEnabled(),
     });
     return NextResponse.json(result);

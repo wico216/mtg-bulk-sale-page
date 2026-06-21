@@ -173,6 +173,48 @@ test("active filter chips clear all search and menu filters", async ({ page }) =
   await expect(page.locator(".wiko-card-grid .wiko-tile")).toHaveCount(4);
 });
 
+test("deck check lets Moxfield users choose which board to import", async ({ page }) => {
+  await page.goto("/deck-check");
+
+  const requests: Array<{ input?: string; moxfieldSection?: string }> = [];
+  await page.route("**/api/deck-check", async (route) => {
+    requests.push(route.request().postDataJSON() as { input?: string; moxfieldSection?: string });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        source: "moxfield",
+        sourceLabel: "Moxfield",
+        deckName: "Sectioned Moxfield deck",
+        warnings: [],
+        summary: {
+          requestedCards: 0,
+          requestedQuantity: 0,
+          matchedCards: 0,
+          exactCards: 0,
+          alternateCards: 0,
+          availableNameCards: 0,
+          missingCards: 0,
+          addableQuantity: 0,
+          estimatedTotal: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
+  const deckUrl = "https://www.moxfield.com/decks/example";
+  await page.getByLabel(/deck link or exported list/i).fill(deckUrl);
+  const moxfieldBoardPicker = page.getByRole("radiogroup", { name: /moxfield board/i });
+  await expect(moxfieldBoardPicker).toBeVisible();
+  await page.getByRole("radio", { name: /sideboard/i }).click();
+  await page.getByRole("button", { name: /check my deck/i }).click();
+
+  await expect(page.getByRole("heading", { name: /spellbook match report/i })).toBeVisible();
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toEqual({ input: deckUrl, moxfieldSection: "sideboard" });
+});
+
 test("deck check matches pasted decklists and adds selected cards to the satchel", async ({ page }) => {
   await page.goto("/deck-check");
   await page.route("**/api/deck-check", async (route) => {

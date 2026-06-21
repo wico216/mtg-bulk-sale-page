@@ -4,6 +4,7 @@ import { fetchCardsByNames, fetchCardsByScryfallIds } from "@/lib/scryfall";
 
 export type DeckSource = "text" | "moxfield" | "archidekt" | "manabox";
 export type DeckSection = "main" | "commander" | "sideboard" | "maybeboard" | "companion";
+export type MoxfieldImportSection = "main" | "sideboard" | "considering";
 export type DeckMatchStatus = "exact" | "alternate" | "available" | "missing";
 export type DeckOptionMatchType = "exact" | "alternate" | "available";
 
@@ -71,6 +72,14 @@ export interface DeckCheckResult {
   items: DeckCheckItem[];
 }
 
+export interface DeckImportOptions {
+  moxfieldSection?: MoxfieldImportSection;
+}
+
+export interface BuildDeckCheckOptions extends DeckImportOptions {
+  resolveIdentities?: boolean;
+}
+
 const REQUEST_LIMIT = 250;
 const KNOWN_URL_HOSTS = new Set([
   "moxfield.com",
@@ -91,9 +100,32 @@ const SECTION_HEADINGS: Record<string, DeckSection> = {
   side: "sideboard",
   maybeboard: "maybeboard",
   maybe: "maybeboard",
+  considering: "maybeboard",
   companion: "companion",
   companions: "companion",
 };
+
+const DEFAULT_MOXFIELD_SECTION: MoxfieldImportSection = "main";
+const MOXFIELD_SECTION_KEYS: Record<MoxfieldImportSection, Array<[string, DeckSection]>> = {
+  main: [
+    ["commanders", "commander"],
+    ["mainboard", "main"],
+    ["companions", "companion"],
+  ],
+  sideboard: [["sideboard", "sideboard"]],
+  considering: [
+    ["maybeboard", "maybeboard"],
+    ["considering", "maybeboard"],
+  ],
+};
+
+export function normalizeMoxfieldImportSection(value: unknown): MoxfieldImportSection {
+  if (typeof value !== "string") return DEFAULT_MOXFIELD_SECTION;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "side" || normalized === "sideboard") return "sideboard";
+  if (normalized === "considering" || normalized === "maybeboard" || normalized === "maybe") return "considering";
+  return DEFAULT_MOXFIELD_SECTION;
+}
 
 const CONDITION_RANK: Record<string, number> = {
   near_mint: 0,
@@ -455,16 +487,13 @@ function cardFromMoxfieldEntry(entry: unknown, section: DeckSection, index: numb
   };
 }
 
-function cardsFromMoxfieldJson(json: unknown): ImportedDeck {
+function cardsFromMoxfieldJson(
+  json: unknown,
+  moxfieldSection: MoxfieldImportSection = DEFAULT_MOXFIELD_SECTION,
+): ImportedDeck {
   const deckName = firstString(json, [["name"], ["deck", "name"]]);
   const cards: DeckCardRequest[] = [];
-  const sections: Array<[string, DeckSection]> = [
-    ["commanders", "commander"],
-    ["mainboard", "main"],
-    ["sideboard", "sideboard"],
-    ["maybeboard", "maybeboard"],
-    ["companions", "companion"],
-  ];
+  const sections = MOXFIELD_SECTION_KEYS[normalizeMoxfieldImportSection(moxfieldSection)];
 
   for (const [key, section] of sections) {
     const bucket = getPathValue(json, [key]);
@@ -569,9 +598,10 @@ function extractDeckId(url: URL): string | null {
   return extractPathId(url, "decks");
 }
 
-async function fetchMoxfieldDeck(url: URL): Promise<ImportedDeck> {
+async function fetchMoxfieldDeck(url: URL, options: DeckImportOptions = {}): Promise<ImportedDeck> {
   const id = extractDeckId(url);
   if (!id) throw new Error("Could not find a Moxfield deck id in that link.");
+  const moxfieldSection = normalizeMoxfieldImportSection(options.moxfieldSection);
   const endpoints = [
     `https://api2.moxfield.com/v3/decks/all/${encodeURIComponent(id)}`,
     `https://api.moxfield.com/v2/decks/all/${encodeURIComponent(id)}`,
@@ -580,9 +610,9 @@ async function fetchMoxfieldDeck(url: URL): Promise<ImportedDeck> {
   let lastError: unknown;
   for (const endpoint of endpoints) {
     try {
-      const deck = cardsFromMoxfieldJson(await fetchJson(endpoint));
+      const deck = cardsFromMoxfieldJson(await fetchJson(endpoint), moxfieldSection);
       if (deck.cards.length > 0) return deck;
-      lastError = new Error("Moxfield returned no cards.");
+      lastError = new Error("Moxfield returned no cards in the selected board.");
     } catch (error) {
       lastError = error;
     }
@@ -633,7 +663,7 @@ async function fetchManaBoxDeck(url: URL): Promise<ImportedDeck> {
   };
 }
 
-export async function importDeckInput(input: string): Promise<ImportedDeck> {
+export async function importDeckInput(input: string, options: DeckImportOptions = {}): Promise<ImportedDeck> {
   const trimmed = input.trim();
   const url = parseKnownUrl(trimmed);
   if (!url) {
@@ -646,7 +676,7 @@ export async function importDeckInput(input: string): Promise<ImportedDeck> {
   }
 
   const source = detectDeckSource(trimmed);
-  if (source === "moxfield") return fetchMoxfieldDeck(url);
+  if (source === "moxfield") return fetchMoxfieldDeck(url, options);
   if (source === "archidekt") return fetchArchidektDeck(url);
   if (source === "manabox") return fetchManaBoxDeck(url);
   return {
@@ -857,9 +887,11 @@ export async function resolveDeckCheckIdentities(
 export async function buildDeckCheckResult(
   input: string,
   inventory: PublicCard[],
-  options: { resolveIdentities?: boolean } = {},
+  options: BuildDeckCheckOptions = {},
 ): Promise<DeckCheckResult> {
-  const imported = await importDeckInput(input);
+  const imported = await importDeckInput(input, {
+    moxfieldSection: options.moxfieldSection,
+  });
   const warnings = [...imported.warnings];
   const printingRequestedIds = new Set(
     imported.cards
