@@ -51,6 +51,46 @@ test("saved light mode survives hydration and reloads", async ({ page }) => {
   expect(hydrationMessages).toEqual([]);
 });
 
+test("mobile header keeps the Admin entry tappable in portrait", async ({ page }) => {
+  for (const width of [390, 375]) {
+    await page.setViewportSize({ width, height: 664 });
+    await page.goto("/");
+
+    const adminButton = page.getByRole("button", { name: "Admin" });
+    await expect(adminButton, `Admin should be visible at ${width}px wide`).toBeVisible();
+
+    const [buttonBox, headerBox, actionBoxes, docMetrics] = await Promise.all([
+      adminButton.boundingBox(),
+      page.locator(".wiko-header").boundingBox(),
+      page.locator(".wiko-header-actions > *").evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return {
+            x: Math.round(box.x),
+            width: Math.round(box.width),
+            right: Math.round(box.right),
+            display: getComputedStyle(element).display,
+          };
+        }),
+      ),
+      page.evaluate(() => {
+        const doc = document.scrollingElement ?? document.documentElement;
+        return { viewport: window.innerWidth, scroll: doc.scrollWidth };
+      }),
+    ]);
+
+    expect(buttonBox).not.toBeNull();
+    expect(headerBox).not.toBeNull();
+    expect(buttonBox!.x).toBeGreaterThanOrEqual(headerBox!.x);
+    expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(headerBox!.x + headerBox!.width);
+    expect(docMetrics.scroll).toBeLessThanOrEqual(docMetrics.viewport);
+    expect(actionBoxes.every((box) => box.display !== "none" && box.right <= docMetrics.viewport)).toBe(true);
+
+    await adminButton.click();
+    await expect(page.getByRole("heading", { name: /keeper's door/i })).toBeVisible();
+  }
+});
+
 test("storefront supports search, card details, and unauthenticated admin redirect", async ({ page }) => {
   await page.goto("/");
 

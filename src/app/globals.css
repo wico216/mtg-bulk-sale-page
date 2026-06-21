@@ -444,11 +444,10 @@ a { color: inherit; }
   .wiko-header-admin-btn { padding: 0 4px !important; font-size: 11px !important; }
 }
 
-/* Phone-width header: the Admin button (keeper-only, also reachable at
- * /admin directly) yields its space so the brand title fits untruncated. */
-@media (max-width: 480px) {
-  .wiko-header-admin-btn { display: none !important; }
-}
+/* Phone-width header: keep the keeper/Admin entry tappable in portrait.
+ * Earlier versions hid it below 480px, which forced admins to rotate phones
+ * before they could open the sign-in modal. The title already ellipsizes and
+ * the Satchel label is hidden, so leave Admin in the action row. */
 @media (max-width: 400px) {
   .wiko-header-title { font-size: 18px !important; }
 }
