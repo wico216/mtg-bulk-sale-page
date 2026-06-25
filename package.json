@@ -13,6 +13,7 @@
     "lint": "eslint",
     "smoke:production": "tsx scripts/smoke-production.ts",
     "smoke:production:readonly": "tsx scripts/smoke-production.ts --read-only",
+    "qa:gate:status": "tsx scripts/check-qa-gate-status.ts",
     "migrate:v1.3": "tsx scripts/migrate-v1.3-binder.ts",
     "migrate:v1.3:dry-run": "tsx scripts/migrate-v1.3-binder.ts --dry-run",
     "migrate:phone": "tsx scripts/migrate-v1.3.x-buyer-phone.ts",

@@ -7,6 +7,7 @@
 - ✅ **v1.2 Store Operations & Hardening** — Phases 13-15 (shipped 2026-05-11)
 - ✅ **v1.3 Binder-Aware Inventory & Pick Workflow** — Phases 16-22 (shipped 2026-05-11)
 - ✅ **v1.4 Import UX & Price Refresh** — Phase 23 (shipped 2026-05-20)
+- ✅ **v1.5 Visual QA Release Loop** — Phase 24 (implemented locally 2026-06-25; PR/release pending)
 
 _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 
@@ -66,7 +67,14 @@ _For per-milestone details see `.planning/milestones/v{X.Y}-ROADMAP.md`._
 
 </details>
 
-_Per-milestone details: `.planning/milestones/v1.4-ROADMAP.md`_
+<details open>
+<summary>✅ v1.5 Visual QA Release Loop (Phase 24) — IMPLEMENTED LOCALLY 2026-06-25</summary>
+
+- [x] Phase 24: Visual QA Release Loop (3/3 plans) — implemented locally 2026-06-25; PR/release pending
+
+</details>
+
+_Per-milestone details: `.planning/milestones/v1.5-ROADMAP.md`_
 
 ## Progress
 
@@ -96,3 +104,4 @@ _Per-milestone details: `.planning/milestones/v1.4-ROADMAP.md`_
 | 21. Admin Visibility & Audit                | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 22. Hardening & UAT                         | v1.3 | 2/2 | Complete | 2026-05-11 |
 | 23. Import UX & Price Refresh               | v1.4 | 2/2 | Complete   | 2026-05-20 |
+| 24. Visual QA Release Loop                  | v1.5 | 3/3 | Implemented local | —          |

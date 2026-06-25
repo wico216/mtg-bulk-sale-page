@@ -76,8 +76,146 @@ export const QA_CHECKLIST_STATES: readonly QaChecklistState[] = [
   "unchecked",
 ] as const;
 
+const QA_GATE_ARTIFACT_KINDS = [
+  "video",
+  "screenshot",
+  "trace",
+  "deployment",
+  "other",
+] as const satisfies readonly QaGateArtifact["kind"][];
+
+const QA_GATE_EVIDENCE_STATUSES = [
+  "passed",
+  "failed",
+  "warning",
+  "not-run",
+] as const satisfies readonly QaGateEvidenceStatus[];
+
+const QA_GATE_ARTIFACT_KIND_SET = new Set<string>(QA_GATE_ARTIFACT_KINDS);
+const QA_GATE_EVIDENCE_STATUS_SET = new Set<string>(QA_GATE_EVIDENCE_STATUSES);
+
+export type QaGateRunManifest = Omit<
+  QaGateRun,
+  "changeSummary" | "reviewerInstructions" | "evidence" | "artifacts"
+> & {
+  changeSummary?: string[];
+  reviewerInstructions?: string[];
+  evidence?: QaGateEvidence[];
+  artifacts?: QaGateArtifact[];
+};
+
+function hasText(value: string | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function pushMissing(errors: string[], field: string, value: string | undefined) {
+  if (!hasText(value)) errors.push(`${field} is required`);
+}
+
+function duplicateValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates];
+}
+
+export function validateQaGateRun(run: QaGateRun): string[] {
+  const errors: string[] = [];
+
+  pushMissing(errors, "id", run.id);
+  pushMissing(errors, "ticketId", run.ticketId);
+  pushMissing(errors, "title", run.title);
+  pushMissing(errors, "featureArea", run.featureArea);
+  pushMissing(errors, "summary", run.summary);
+  pushMissing(errors, "createdAt", run.createdAt);
+
+  if (run.createdAt && Number.isNaN(Date.parse(run.createdAt))) {
+    errors.push("createdAt must be an ISO-compatible date string");
+  }
+
+  pushMissing(errors, "proofRun.tool", run.proofRun?.tool);
+  pushMissing(errors, "proofRun.recordedAt", run.proofRun?.recordedAt);
+  pushMissing(errors, "proofRun.targetUrl", run.proofRun?.targetUrl);
+  pushMissing(errors, "proofRun.browser", run.proofRun?.browser);
+  pushMissing(errors, "proofRun.command", run.proofRun?.command);
+  pushMissing(errors, "proofRun.resultSummary", run.proofRun?.resultSummary);
+
+  if (run.proofRun?.recordedAt && Number.isNaN(Date.parse(run.proofRun.recordedAt))) {
+    errors.push("proofRun.recordedAt must be an ISO-compatible date string");
+  }
+
+  if (run.expectedBehavior.length === 0) {
+    errors.push("expectedBehavior must include at least one item");
+  }
+  if (run.checklist.length === 0) {
+    errors.push("checklist must include at least one item");
+  }
+
+  const checklistIds = run.checklist.map((item) => item.id);
+  for (const duplicate of duplicateValues(checklistIds)) {
+    errors.push(`checklist id '${duplicate}' is duplicated`);
+  }
+
+  const checklistIdSet = new Set(checklistIds);
+  run.checklist.forEach((item, index) => {
+    pushMissing(errors, `checklist[${index}].id`, item.id);
+    pushMissing(errors, `checklist[${index}].label`, item.label);
+    pushMissing(errors, `checklist[${index}].expected`, item.expected);
+  });
+
+  for (const duplicate of duplicateValues(run.evidence.map((item) => item.id))) {
+    errors.push(`evidence id '${duplicate}' is duplicated`);
+  }
+
+  run.evidence.forEach((item, index) => {
+    pushMissing(errors, `evidence[${index}].id`, item.id);
+    pushMissing(errors, `evidence[${index}].title`, item.title);
+    pushMissing(errors, `evidence[${index}].expected`, item.expected);
+    pushMissing(errors, `evidence[${index}].observed`, item.observed);
+    if (!QA_GATE_EVIDENCE_STATUS_SET.has(item.status)) {
+      errors.push(`evidence[${index}].status is invalid`);
+    }
+    if (!QA_GATE_ARTIFACT_KIND_SET.has(item.artifactKind)) {
+      errors.push(`evidence[${index}].artifactKind is invalid`);
+    }
+    if (item.checklistItemId && !checklistIdSet.has(item.checklistItemId)) {
+      errors.push(`evidence[${index}].checklistItemId does not match a checklist item`);
+    }
+  });
+
+  run.artifacts.forEach((artifact, index) => {
+    pushMissing(errors, `artifacts[${index}].label`, artifact.label);
+    pushMissing(errors, `artifacts[${index}].url`, artifact.url);
+    if (!QA_GATE_ARTIFACT_KIND_SET.has(artifact.kind)) {
+      errors.push(`artifacts[${index}].kind is invalid`);
+    }
+  });
+
+  return errors;
+}
+
+export function defineQaGateRun(manifest: QaGateRunManifest): QaGateRun {
+  const run: QaGateRun = {
+    ...manifest,
+    changeSummary: manifest.changeSummary ?? [],
+    reviewerInstructions: manifest.reviewerInstructions ?? [],
+    evidence: manifest.evidence ?? [],
+    artifacts: manifest.artifacts ?? [],
+  };
+
+  const errors = validateQaGateRun(run);
+  if (errors.length > 0) {
+    throw new Error(`Invalid QA gate run '${manifest.id || "unknown"}': ${errors.join("; ")}`);
+  }
+
+  return run;
+}
+
 export const QA_GATE_RUNS: readonly QaGateRun[] = [
-  {
+  defineQaGateRun({
     id: "latest-mtg-bulk-changes",
     ticketId: "WIKO-LATEST-CHANGES",
     ticketUrl: "/docs/qa-approval-gates.md",
@@ -224,8 +362,8 @@ export const QA_GATE_RUNS: readonly QaGateRun[] = [
         kind: "deployment",
       },
     ],
-  },
-  {
+  }),
+  defineQaGateRun({
     id: "demo-mobile-storefront-gate",
     ticketId: "QA-GATE-DEMO",
     ticketUrl: "/docs/qa-approval-gates.md",
@@ -339,7 +477,134 @@ export const QA_GATE_RUNS: readonly QaGateRun[] = [
         kind: "video",
       },
     ],
-  },
+  }),
+  defineQaGateRun({
+    id: "mobile-storefront-visual-qa-loop",
+    ticketId: "VQA-24-02",
+    ticketUrl: "/docs/qa-approval-gates.md#reference-mobile-storefront-visual-qa-gate",
+    title: "Mobile Storefront Visual QA Loop",
+    featureArea: "Visual QA / mobile storefront UAT",
+    summary:
+      "Reference UI Review packet for the v1.5 release loop: Atlas attaches mobile proof, Wiko reviews the expected behavior remotely, and approval/fail notes decide whether the agent loop can release.",
+    changeSummary: [
+      "Defines the canonical Spellbook mobile UI Review gate used after an AI lane changes storefront behavior.",
+      "Shows the proof, checklist, approve/fail, and regression-learning expectations that future feature branches should copy.",
+      "Keeps this reference gate honest: live branch proofs should replace the placeholder artifact entries before real release approval.",
+    ],
+    reviewerInstructions: [
+      "Open the preview or production storefront artifact from your phone when a real branch proof is attached.",
+      "Compare the mobile evidence against each required checklist row before approving.",
+      "If the proof is missing, unclear, or shows jank/overflow, choose Fail / request fixes and leave actionable notes for Atlas Dev.",
+    ],
+    proofRun: {
+      tool: "Playwright",
+      recordedAt: "2026-06-25T12:56:02.000-04:00",
+      targetUrl: "https://wikospellbinder.com",
+      browser: "Chromium mobile viewport reference workflow",
+      command:
+        "PLAYWRIGHT_PORT=3202 CI=1 npx playwright test e2e/qa-gates.spec.ts --project=chromium --reporter=list --workers=1 -g 'Mobile Storefront Visual QA Loop'",
+      resultSummary:
+        "Reference gate packet is wired for remote review; replace placeholder artifacts with real mobile proof before using it as a release approval gate.",
+    },
+    createdAt: "2026-06-25T12:56:02.000-04:00",
+    branch: "gsd/visual-qa-release-loop",
+    deploymentUrl: "https://wikospellbinder.com",
+    expectedBehavior: [
+      "The mobile storefront remains usable at phone widths: header, search, filters, sort, card grid, and satchel actions are visible without horizontal scrolling.",
+      "The proof packet includes a preview/deployment URL plus mobile screenshot/video evidence captured by Playwright or an equivalent browser check.",
+      "Wiko can approve or fail the change from /qa/gates without manually replaying every implementation step.",
+      "A failed review captures notes that the next Atlas/agent loop can act on before merge or release.",
+      "Any issue found during review becomes a regression test, checklist row, or runbook update before the next release attempt.",
+    ],
+    checklist: [
+      {
+        id: "mobile-proof-attached",
+        label: "Mobile proof is attached",
+        expected:
+          "A real release gate must include mobile screenshot/video proof from the branch or deployment being reviewed.",
+        required: true,
+      },
+      {
+        id: "phone-layout-safe",
+        label: "Phone layout is safe",
+        expected:
+          "The proof shows no horizontal overflow at common phone widths such as 390px and 375px.",
+        required: true,
+      },
+      {
+        id: "storefront-controls-usable",
+        label: "Storefront controls remain usable",
+        expected:
+          "Header, search, filter, sort, card grid, and satchel actions remain visible/tappable in the mobile proof.",
+        required: true,
+      },
+      {
+        id: "remote-reviewable",
+        label: "Review is remote-friendly",
+        expected:
+          "Artifact links open from the Vercel-hosted QA gate and do not depend on a local Mac-only file path.",
+        required: true,
+      },
+      {
+        id: "failure-notes-actionable",
+        label: "Failure notes are actionable",
+        expected:
+          "If the gate fails, notes clearly say what Atlas Dev should change in the next loop.",
+        required: true,
+      },
+      {
+        id: "regression-learning-captured",
+        label: "Regression learning is captured",
+        expected:
+          "Any problem discovered by this gate is turned into a Playwright check, checklist row, or runbook update.",
+      },
+    ],
+    evidence: [
+      {
+        id: "reference-gate-wired",
+        checklistItemId: "remote-reviewable",
+        title: "Reference gate is browser-openable",
+        expected: "Wiko can open a single QA gate URL and see the proof/checklist/decision packet.",
+        observed:
+          "This v1.5 reference packet is registered in /qa/gates and covered by Playwright. Real branch artifacts should be attached before release approval.",
+        status: "warning",
+        artifactKind: "deployment",
+        artifactUrl: "https://wikospellbinder.com",
+      },
+      {
+        id: "mobile-proof-placeholder",
+        checklistItemId: "mobile-proof-attached",
+        title: "Mobile proof still needs branch artifact",
+        expected: "Release gates should show actual mobile screenshot/video proof for the branch under review.",
+        observed:
+          "No branch-specific mobile screenshot/video is attached to this reference gate yet; attach one when using the loop for a real Spellbook change.",
+        status: "not-run",
+        artifactKind: "other",
+      },
+      {
+        id: "release-learning-loop",
+        checklistItemId: "regression-learning-captured",
+        title: "Regression learning loop is explicit",
+        expected: "Gate failures feed the next agent loop as tests, checklist rows, or runbook updates.",
+        observed:
+          "The gate instructions and docs require failed review notes and regression-learning capture before another release attempt.",
+        status: "passed",
+        artifactKind: "other",
+      },
+    ],
+    artifacts: [
+      {
+        label: "Production storefront reference target",
+        url: "https://wikospellbinder.com",
+        kind: "deployment",
+      },
+      {
+        label: "Visual QA release loop documentation",
+        url: "/docs/qa-approval-gates.md",
+        kind: "other",
+      },
+    ],
+  }),
 ];
 
 export function listQaGateRuns(): QaGateRun[] {
