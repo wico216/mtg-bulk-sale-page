@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Visual QA Release Loop
-status: Planned
-last_updated: "2026-06-25T12:56:02-0400"
-last_activity: 2026-06-25 — Phase 24 planned from Wiko/Atlas loop-engineering discussion
+status: Implemented locally; PR/release pending
+last_updated: "2026-06-25T13:23:00-0400"
+last_activity: 2026-06-25 — Phase 24 implemented and verified locally
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -20,22 +20,22 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** v1.5 Visual QA Release Loop: make AI-assisted Spellbook changes produce proof, pass a browser-openable Visual QA/UAT gate, and leave behind better tests/process notes.
+**Current focus:** v1.5 Visual QA Release Loop is implemented locally and verified on `gsd/visual-qa-release-loop`; next step is PR/preview/QA approval before merge/release.
 
 ## Current Position
 
 Phase: 24 — Visual QA Release Loop
-Plan: 24-01 / 24-02 / 24-03 planned
-Status: Ready for execution
-Last activity: 2026-06-25 — Phase 24 GSD context + three executable plans created
+Plan: 24-01 / 24-02 / 24-03 complete locally
+Status: Implemented locally; PR/release pending
+Last activity: 2026-06-25 — Phase 24 implementation verified with unit tests, Playwright QA gate E2E, typecheck, lint, and build
 
 ## v1.5 Phase Sequence
 
-Single phase, three plans. Recommended execution order:
+Single phase, three plans. All implemented locally on `gsd/visual-qa-release-loop`:
 
-1. **Plan 24-01 — Gate Packet Generator + Registry Cleanup** (VQA-01..02) — foundation; makes future gates repeatable.
-2. **Plan 24-02 — Mobile Storefront Proof Exemplar** (VQA-03..05) — reference gate Wiko can review.
-3. **Plan 24-03 — Release Guard + Reusable Playbook** (VQA-06..08) — makes approval status enforceable and portable to work/UAT.
+1. **Plan 24-01 — Gate Packet Generator + Registry Cleanup** (VQA-01..02) — completed locally; makes future gates repeatable.
+2. **Plan 24-02 — Mobile Storefront Proof Exemplar** (VQA-03..05) — completed locally; reference gate Wiko can review.
+3. **Plan 24-03 — Release Guard + Reusable Playbook** (VQA-06..08) — completed locally; approval status guard and work/UAT mapping.
 
 ## v1.4 Phase Sequence
 
@@ -113,17 +113,18 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-- Execute Phase 24 plan 24-01 first: gate packet generator + registry cleanup.
-- Then run 24-02 for the mobile storefront Visual QA exemplar.
-- Then run 24-03 for release guard + work-transfer playbook.
+- Open a PR from `gsd/visual-qa-release-loop`.
+- Let Vercel create a preview deployment.
+- Use the preview URL to open `/qa/gates/mobile-storefront-visual-qa-loop`.
+- Before merge/release, run `npm run qa:gate:status -- --deployment <preview> --run mobile-storefront-visual-qa-loop --require-approved` after Wiko approves the gate.
 
 ## Session Continuity
 
-Last session: 2026-06-25T12:56:02-0400
+Last session: 2026-06-25T13:23:00-0400
 
-Next action: Execute Plan 24-01 on branch `gsd/visual-qa-release-loop`, starting with a focused refactor/validation around QA gate metadata authoring. Do not release or merge without running the Phase 24 verification gates and Wiko's QA approval loop.
+Next action: Push branch `gsd/visual-qa-release-loop`, open a PR, wait for Vercel preview, and use the QA gate status guard after Wiko approval before merge/release.
 
-Resume hint: v1.5 is planned but not implemented. The current GSD artifacts are `.planning/milestones/v1.5-ROADMAP.md` and `.planning/phases/24-visual-qa-release-loop/24-{CONTEXT,DISCUSSION-LOG,01-PLAN,02-PLAN,03-PLAN}.md`.
+Resume hint: v1.5 is implemented locally but not pushed/released. Key code artifacts: `src/lib/qa-gates.ts` (`defineQaGateRun`, `validateQaGateRun`, `mobile-storefront-visual-qa-loop`), `src/lib/qa-gate-status.ts`, `scripts/check-qa-gate-status.ts`, `e2e/qa-gates.spec.ts`, and `docs/qa-approval-gates.md`. Verification evidence is in `.planning/phases/24-visual-qa-release-loop/24-VERIFICATION.md`.
 
 Local-env state on this workstation:
 
