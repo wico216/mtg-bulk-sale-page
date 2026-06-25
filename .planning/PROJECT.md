@@ -12,7 +12,7 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 **Last shipped:** v1.4 Import UX & Price Refresh (2026-05-20). Live at `wikos-spellbinder.vercel.app`. Daily Vercel cron at `0 9 * * *` UTC refreshes Scryfall prices via the shared `runPriceRefresh` service; admin can trigger manual refresh on `/admin/health`; binder import picker opens with explicit opt-in (no remembered selection); `lastPriceRefreshAt` and `cronSecret` env presence on the health surface. Post-deploy `cardToRow` bug discovered + fixed + 2353 prod rows backfilled with `scryfall_id` in the same session.
 
-**Next milestone:** TBD — planning required.
+**Current milestone:** v1.5 Visual QA Release Loop — planned 2026-06-25. Goal: turn Spellbook's existing `/qa/gates` approval surface into a repeatable AI release-quality loop with generated proof packets, a mobile UI review exemplar, release-status guardrails, and reusable work/UAT documentation.
 
 ## Requirements
 
@@ -54,9 +54,10 @@ Friends can easily find and order cards from your bulk collection without fricti
 
 ### Active
 
-<!-- Next milestone (TBD) — populate via /gsd:new-milestone -->
-
-_None — awaiting next milestone planning._
+- [ ] Visual QA gate packet generation is standardized from structured metadata rather than hand-authored large source blocks — Planned in Phase 24 (VQA-01..02)
+- [ ] A mobile storefront Visual QA / UI Review gate is available as the canonical Spellbook loop exemplar — Planned in Phase 24 (VQA-03..05)
+- [ ] Atlas/release tooling can query QA gate status and fail closed when not approved — Planned in Phase 24 (VQA-06)
+- [ ] The Spellbook release-quality loop is documented so it can later transfer to work/Nova-style UAT — Planned in Phase 24 (VQA-07..08)
 
 ### Out of Scope
 
@@ -78,6 +79,7 @@ _None — awaiting next milestone planning._
 - v1.2 shipped 2026-05-11: admin order workflow, inventory audit trail, production hardening (rate limits + structured logs + `/admin/health` + smoke script + STRIDE review)
 - v1.3 shipped 2026-05-11: binder-aware inventory + multi-binder allocator + binder picker + storefront aggregation with PublicCard/AdminCard type-split privacy + admin binder visibility + hardening delta. Etched-foil bug fix for 11 known cards in operator's collection.
 - v1.4 shipped 2026-05-20: daily Scryfall price refresh (Vercel cron + admin manual) + explicit-opt-in binder picker. Discovered + fixed post-deploy that `cardToRow` had silently dropped `scryfall_id` on every Manabox import since v1.0; backfilled all 2353 prod rows. First real refresh: `updated:1102 unchanged:1251 skipped:0`.
+- v1.5 planned 2026-06-25: Visual QA Release Loop. Converts `/qa/gates` from a useful one-off approval surface into a repeatable AI release-quality loop: generated/validated gate packets, mobile storefront exemplar, approval-status guard, and reusable work/UAT playbook.
 - Codebase: ~26,292 LOC TypeScript (+6,631 from v1.2; +~5,929 net from v1.4 work). 545 tests passing + 2 skipped.
 
 ## Constraints

@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Import UX & Price Refresh
-status: Awaiting next milestone
-last_updated: "2026-05-20T23:25:23.603Z"
-last_activity: 2026-05-20 — Milestone v1.4 completed and archived
+milestone: v1.5
+milestone_name: Visual QA Release Loop
+status: Planned
+last_updated: "2026-06-25T12:56:02-0400"
+last_activity: 2026-06-25 — Phase 24 planned from Wiko/Atlas loop-engineering discussion
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,14 +20,22 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** Friends can easily find and order cards from the bulk collection without friction.
-**Current focus:** v1.4 milestone complete (human UAT passed 2026-05-20); ready for `/gsd:complete-milestone` after operator provisions `CRON_SECRET` and confirms first live cron firing.
+**Current focus:** v1.5 Visual QA Release Loop: make AI-assisted Spellbook changes produce proof, pass a browser-openable Visual QA/UAT gate, and leave behind better tests/process notes.
 
 ## Current Position
 
-Phase: Milestone v1.4 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-20 — Milestone v1.4 completed and archived
+Phase: 24 — Visual QA Release Loop
+Plan: 24-01 / 24-02 / 24-03 planned
+Status: Ready for execution
+Last activity: 2026-06-25 — Phase 24 GSD context + three executable plans created
+
+## v1.5 Phase Sequence
+
+Single phase, three plans. Recommended execution order:
+
+1. **Plan 24-01 — Gate Packet Generator + Registry Cleanup** (VQA-01..02) — foundation; makes future gates repeatable.
+2. **Plan 24-02 — Mobile Storefront Proof Exemplar** (VQA-03..05) — reference gate Wiko can review.
+3. **Plan 24-03 — Release Guard + Reusable Playbook** (VQA-06..08) — makes approval status enforceable and portable to work/UAT.
 
 ## v1.4 Phase Sequence
 
@@ -105,15 +113,17 @@ Items acknowledged and deferred at v1.3 milestone close on 2026-05-11 (carried f
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Execute Phase 24 plan 24-01 first: gate packet generator + registry cleanup.
+- Then run 24-02 for the mobile storefront Visual QA exemplar.
+- Then run 24-03 for release guard + work-transfer playbook.
 
 ## Session Continuity
 
-Last session: 2026-05-20T23:00:00.000Z
+Last session: 2026-06-25T12:56:02-0400
 
-Next action: Wait for the first prod cron firing window (~next 09:00–09:59 UTC) to record one `trigger='cron'` row in `admin_audit_log`, then `/gsd:complete-milestone` to archive v1.4. The cron observation is non-blocking — milestone can be closed now if you don't want to wait. v1.5 / next-milestone planning is the natural continuation.
+Next action: Execute Plan 24-01 on branch `gsd/visual-qa-release-loop`, starting with a focused refactor/validation around QA gate metadata authoring. Do not release or merge without running the Phase 24 verification gates and Wiko's QA approval loop.
 
-Resume hint: v1.4 is fully shipped and live on `wikos-spellbinder.vercel.app`. Latest prod deploy `77jk94cka` (post-backfill-script commit). Prod `cards.scryfall_id` is 2353/2353 populated. First real price refresh succeeded (audit row 2026-05-20T22:58Z, `updated:1102`). Before/after snapshots at `/tmp/prices-before-1779316713.tsv` and `/tmp/prices-after-1779317933.tsv` (will disappear on reboot — not persisted to repo).
+Resume hint: v1.5 is planned but not implemented. The current GSD artifacts are `.planning/milestones/v1.5-ROADMAP.md` and `.planning/phases/24-visual-qa-release-loop/24-{CONTEXT,DISCUSSION-LOG,01-PLAN,02-PLAN,03-PLAN}.md`.
 
 Local-env state on this workstation:
 
